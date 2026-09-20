@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, FlatList, TouchableOpacity, 
-  Image, TextInput, StatusBar, Modal, ActivityIndicator, 
+  Image, TextInput, StatusBar, Modal, ActivityIndicator, Alert,
   KeyboardAvoidingView, Platform, ScrollView, Dimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
