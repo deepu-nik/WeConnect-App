@@ -27,7 +27,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const VaultScreen = () => {
+const VaultScreen = ({ navigation }) => {
   const currentUser = auth.currentUser;
 
   // View States
@@ -282,7 +282,7 @@ const VaultScreen = () => {
         type: file.mimeType?.includes('pdf') ? 'pdf' : file.mimeType?.includes('image') ? 'image' : 'doc',
         size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
         fileUrl: secureUrl,
-        uploader: { uid: currentUser.uid, name: currentUser.displayName || 'Student' },
+        uploader: { uid: currentUser.uid, name: currentUser.displayName || 'Student', avatar: currentUser.photoURL || '' },
         status: initialStatus,
         upvotes: [],
         createdAt: serverTimestamp()
@@ -363,6 +363,8 @@ const VaultScreen = () => {
     );
   };
 
+  const openUploaderProfile = (uploader) => { if (!uploader?.uid || uploader.uid === currentUser?.uid) return; navigation.navigate('Profile', { uid: uploader.uid, name: uploader.name, avatar: uploader.avatar }); };
+
   const renderFileItem = ({ item }) => {
     const isAdmin = currentVault?.admins?.includes(currentUser.uid);
     const isUploader = item.uploader?.uid === currentUser.uid;
@@ -380,7 +382,7 @@ const VaultScreen = () => {
         <View style={styles.itemDetails}>
           <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
           <Text style={styles.itemMeta}>
-            {item.size} • By {item.uploader?.name}
+            {item.size} • By <Text onPress={() => openUploaderProfile(item.uploader)} style={item.uploader?.uid === currentUser.uid ? undefined : styles.uploaderLink}>{item.uploader?.name}</Text>
           </Text>
           {isPending && <Text style={styles.pendingText}>Waiting for Approval ({upvoteCount}/5 votes)</Text>}
         </View>
@@ -642,6 +644,7 @@ const styles = StyleSheet.create({
   iconBox: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
   itemDetails: { flex: 1, justifyContent: 'center' },
   itemName: { fontSize: 16, fontWeight: '600', color: '#0f172a', marginBottom: 4 },
+  uploaderLink: { color: '#007AFF', fontWeight: '700' },
   itemMeta: { fontSize: 13, color: '#64748b' },
   adminBadge: { backgroundColor: '#e2e8f0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginRight: 10 },
   adminBadgeText: { fontSize: 11, fontWeight: 'bold', color: '#475569' },

@@ -16,6 +16,14 @@ export const normalizeUser = (uid, data = {}) => ({
   gradYear: data.gradYear || '',
   skills: Array.isArray(data.skills) ? data.skills : [],
   connections: Array.isArray(data.connections) ? data.connections : [],
+  coverPhoto: data.coverPhoto || '',
+  projectsCount: Number(data.projectsCount) || 0,
+  website: data.website || '',
+  resumeLink: data.resumeLink || '',
+  instagram: data.instagram || '',
+  linkedin: data.linkedin || '',
+  github: data.github || '',
+  whatsapp: data.whatsapp || '',
 });
 
 export const getUserProfile = async (uid) => {

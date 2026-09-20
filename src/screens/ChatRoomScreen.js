@@ -184,7 +184,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
     const isMe = item.senderId === currentUser?.uid;
     return (
       <View style={[styles.messageRow, isMe ? styles.myRow : styles.theirRow]}>
-        {!isMe && <Image source={{ uri: otherUserAvatar }} style={styles.tinyAvatar} />}
+        {!isMe && <TouchableOpacity onPress={() => navigation.navigate('Profile', { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar })}><Image source={{ uri: otherUserAvatar }} style={styles.tinyAvatar} /></TouchableOpacity>}
         <View style={[styles.messageBubble, isMe ? styles.myBubble : styles.theirBubble]}>
           {item.mediaUrl && item.mediaType === 'image' && (
             <Image source={{ uri: item.mediaUrl }} style={styles.messageImage} />

@@ -15,7 +15,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { acceptConnectionRequest, declineConnectionRequest, sendConnectionRequest, subscribeToConnectionRequests } from '../services/connectionService';
-import { getAllUsers, normalizeUser } from '../services/userService';
+import { getAllUsers, getUserProfile, normalizeUser } from '../services/userService';
 
 const LOCATIONS = [
   ['Library', '📚', '#007AFF'],
@@ -158,7 +158,7 @@ const ConnectScreen = ({ navigation }) => {
     if (scanned || !data) return;
     setScanned(true);
     try {
-      const profile = await getAllUsers(null).then((all) => all.find((user) => user.uid === data));
+      const profile = await getUserProfile(data);
       setQrVisible(false);
       if (!profile) {
         Alert.alert('User not found', 'That QR code does not belong to a WeConnect profile.');

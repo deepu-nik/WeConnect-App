@@ -52,6 +52,7 @@ const ProfileScreen = ({ route, navigation }) => {
           gradYear: '',
           website: '',
           resumeLink: '',
+          instagram: '', linkedin: '', github: '', whatsapp: '',
         });
 
         const vaultSnap = await getDocs(query(collection(db, 'vault_files'), where('uploader.uid', '==', targetUid)));
@@ -73,6 +74,10 @@ const ProfileScreen = ({ route, navigation }) => {
       location: user.location || '',
       website: user.website || '',
       resumeLink: user.resumeLink || '',
+      instagram: user.instagram || '',
+      linkedin: user.linkedin || '',
+      github: user.github || '',
+      whatsapp: user.whatsapp || '',
       course: user.course || '',
       gradYear: String(user.gradYear || ''),
       projectsCount: String(user.projectsCount || 0),
@@ -99,6 +104,10 @@ const ProfileScreen = ({ route, navigation }) => {
         location: form.location.trim(),
         website: form.website.trim(),
         resumeLink: form.resumeLink.trim(),
+        instagram: form.instagram.trim(),
+        linkedin: form.linkedin.trim(),
+        github: form.github.trim(),
+        whatsapp: form.whatsapp.trim(),
         course: form.course.trim(),
         gradYear: form.gradYear.trim(),
         projectsCount: Number.parseInt(form.projectsCount, 10) || 0,
@@ -148,6 +157,13 @@ const ProfileScreen = ({ route, navigation }) => {
     } finally {
       setUploading(false);
     }
+  };
+
+  const openWhatsApp = async (value) => {
+    const digits = String(value || '').replace(/\\D/g, '');
+    if (!digits) return;
+    const url = `https://wa.me/${digits}`;
+    try { if (await Linking.canOpenURL(url)) await Linking.openURL(url); else Alert.alert('WhatsApp unavailable', 'Could not open WhatsApp.'); } catch { Alert.alert('Error', 'Could not open WhatsApp.'); }
   };
 
   const openLink = async (value) => {
@@ -215,6 +231,10 @@ const ProfileScreen = ({ route, navigation }) => {
           <View style={styles.info}>
             <View style={styles.infoRow}><MapPin size={16} color="#64748b" /><Text style={styles.infoText}>{user.location}</Text></View>
             {user.website ? <TouchableOpacity style={styles.infoRow} onPress={() => openLink(user.website)}>{socialIcon(user.website)}<Text style={styles.linkText}>{user.website.replace(/^https?:\/\//, '')}</Text></TouchableOpacity> : null}
+            {user.instagram ? <TouchableOpacity style={styles.infoRow} onPress={() => openLink(user.instagram.startsWith('http') ? user.instagram : 'https://instagram.com/' + user.instagram.replace(/^@/, ''))}><Instagram size={16} color="#E1306C" /><Text style={styles.linkText}>Instagram</Text></TouchableOpacity> : null}
+            {user.linkedin ? <TouchableOpacity style={styles.infoRow} onPress={() => openLink(user.linkedin.startsWith('http') ? user.linkedin : 'https://linkedin.com/in/' + user.linkedin.replace(/^@/, ''))}><Linkedin size={16} color="#0077b5" /><Text style={styles.linkText}>LinkedIn</Text></TouchableOpacity> : null}
+            {user.github ? <TouchableOpacity style={styles.infoRow} onPress={() => openLink(user.github.startsWith('http') ? user.github : 'https://github.com/' + user.github.replace(/^@/, ''))}><Github size={16} color="#111" /><Text style={styles.linkText}>GitHub</Text></TouchableOpacity> : null}
+            {user.whatsapp ? <TouchableOpacity style={styles.infoRow} onPress={() => openWhatsApp(user.whatsapp)}><Text style={{ width: 16, textAlign: 'center', fontWeight: '800', color: '#25D366' }}>W</Text><Text style={styles.linkText}>WhatsApp</Text></TouchableOpacity> : null}
             {user.resumeLink ? <TouchableOpacity style={styles.infoRow} onPress={() => openLink(user.resumeLink)}><LinkIcon size={16} color="#AF52DE" /><Text style={[styles.linkText, { color: '#AF52DE' }]}>View Resume / Portfolio</Text></TouchableOpacity> : null}
           </View>
 
@@ -251,7 +271,8 @@ const ProfileScreen = ({ route, navigation }) => {
             <ScrollView contentContainerStyle={styles.form}>
               {[
                 ['name', 'Name'], ['handle', 'Username / Handle'], ['course', 'Course / Major'],
-                ['gradYear', 'Class of'], ['location', 'Campus Location'], ['website', 'Social Link'],
+                ['gradYear', 'Class of'], ['location', 'Campus Location'], ['website', 'Website'], ['instagram', 'Instagram Username / URL'],
+                ['linkedin', 'LinkedIn Username / URL'], ['github', 'GitHub Username / URL'], ['whatsapp', 'WhatsApp Number'],
                 ['resumeLink', 'Resume / Portfolio Link'], ['projectsCount', 'Projects Completed'],
               ].map(([key, label]) => (
                 <View key={key}>
@@ -260,8 +281,8 @@ const ProfileScreen = ({ route, navigation }) => {
                     style={styles.input}
                     value={String(form?.[key] ?? '')}
                     onChangeText={(value) => setForm({ ...form, [key]: value })}
-                    keyboardType={key === 'projectsCount' || key === 'gradYear' ? 'numeric' : key.includes('Link') || key === 'website' ? 'url' : 'default'}
-                    autoCapitalize={key === 'handle' || key === 'website' || key === 'resumeLink' ? 'none' : 'sentences'}
+                    keyboardType={key === 'projectsCount' || key === 'gradYear' || key === 'whatsapp' ? 'numeric' : key.includes('Link') || ['website','instagram','linkedin','github'].includes(key) ? 'url' : 'default'}
+                    autoCapitalize={['handle','website','instagram','linkedin','github','resumeLink','whatsapp'].includes(key) ? 'none' : 'sentences'}
                   />
                 </View>
               ))}

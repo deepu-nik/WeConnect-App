@@ -174,7 +174,7 @@ const ChatsScreen = ({ navigation }) => {
       othersStories.forEach(s => {
         if (!seenUids.has(s.author.uid)) {
           seenUids.add(s.author.uid);
-          uniqueOthers.push({ ...s, hasNew: true, storyData: s }); 
+          uniqueOthers.push({ ...s, uid: s.author.uid, name: s.author.name || 'Student', avatar: s.author.avatar || 'https://via.placeholder.com/150', hasNew: true, storyData: s }); 
         }
       });
 
@@ -227,6 +227,8 @@ const ChatsScreen = ({ navigation }) => {
       setSearchResults([]);
     }
   };
+
+  const openProfile = (user) => navigation.navigate('Profile', { uid: user.uid || user.otherUserId, name: user.name, avatar: user.avatar });
 
   const startNewChat = (selectedUser) => {
     setIsSearching(false);
@@ -335,7 +337,7 @@ const ChatsScreen = ({ navigation }) => {
 
   // --- RENDERERS ---
   const renderStory = ({ item }) => (
-    <TouchableOpacity style={styles.storyContainer} activeOpacity={0.8} onPress={() => handleStoryTap(item)}>
+    <TouchableOpacity style={styles.storyContainer} activeOpacity={0.8} onPress={() => item.isMe ? handleStoryTap(item) : openProfile(item)}>
       <View style={[styles.storyRing, item.hasNew && styles.storyRingActive, item.isMe && !item.hasNew && {borderColor: '#eee'}]}>
         <Image source={{ uri: item.avatar }} style={styles.storyAvatar} />
       </View>
@@ -346,12 +348,12 @@ const ChatsScreen = ({ navigation }) => {
 
   const renderChatItem = ({ item }) => (
     <View style={styles.chatItem}>
-      <TouchableOpacity onPress={() => setAvatarModalData({ name: item.name, avatar: item.avatar })}>
+      <TouchableOpacity onPress={() => openProfile(item)}>
         <Image source={{ uri: item.avatar }} style={styles.avatar} />
       </TouchableOpacity>
       <TouchableOpacity style={styles.chatDetails} activeOpacity={0.7} onPress={() => navigation.navigate('ChatRoom', { chatId: item.id, name: item.name, avatar: item.avatar, uid: item.otherUserId })}>
         <View style={styles.chatHeader}>
-          <Text style={styles.chatName} numberOfLines={1}>{item.name}</Text>
+          <TouchableOpacity onPress={() => openProfile(item)}><Text style={styles.chatName} numberOfLines={1}>{item.name}</Text></TouchableOpacity>
           <Text style={styles.chatTime}>{item.timestamp?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || ''}</Text>
         </View>
         <Text style={[styles.lastMessage, item.unreadCount > 0 && styles.lastMessageUnread]} numberOfLines={1}>{item.lastMessage}</Text>
@@ -362,11 +364,11 @@ const ChatsScreen = ({ navigation }) => {
 
   const renderSearchItem = ({ item }) => (
     <View style={styles.chatItem}>
-      <TouchableOpacity onPress={() => setAvatarModalData({ name: item.name, avatar: item.avatar })}>
+      <TouchableOpacity onPress={() => openProfile(item)}>
         <Image source={{ uri: item.avatar || 'https://via.placeholder.com/150' }} style={styles.avatar} />
       </TouchableOpacity>
       <TouchableOpacity style={styles.chatDetails} activeOpacity={0.7} onPress={() => startNewChat(item)}>
-        <Text style={styles.chatName}>{item.name}</Text>
+        <TouchableOpacity onPress={() => openProfile(item)}><Text style={styles.chatName}>{item.name}</Text></TouchableOpacity>
         <Text style={styles.lastMessage}>{item.email || '@student'}</Text>
       </TouchableOpacity>
       <MessageCircle size={24} color="#007AFF" />
