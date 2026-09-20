@@ -27,7 +27,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const VaultScreen = () => {
+const VaultScreen = ({ navigation }) => {
   const currentUser = auth.currentUser;
 
   // View States
