@@ -62,11 +62,7 @@ const UpdatesScreen = ({ navigation }) => {
           return postTime > cutoffTime;
         });
       
-      if (fetchedPosts.length === 0) {
-        setPosts(DUMMY_POSTS);
-      } else {
-        setPosts(fetchedPosts);
-      }
+      setPosts(fetchedPosts);
       setLoading(false);
     });
 
