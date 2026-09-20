@@ -174,7 +174,7 @@ const ChatsScreen = ({ navigation }) => {
       othersStories.forEach(s => {
         if (!seenUids.has(s.author.uid)) {
           seenUids.add(s.author.uid);
-          uniqueOthers.push({ ...s, hasNew: true, storyData: s }); 
+          uniqueOthers.push({ ...s, uid: s.author.uid, name: s.author.name || 'Student', avatar: s.author.avatar || 'https://via.placeholder.com/150', hasNew: true, storyData: s }); 
         }
       });
 
