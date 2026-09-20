@@ -269,8 +269,8 @@ const UpdatesScreen = () => {
             {item.content ? <Text style={styles.eventDesc}>{item.content}</Text> : null}
             
             <View style={styles.eventAuthorRow}>
-               <Image source={{ uri: item.author.avatar }} style={styles.eventAvatar} />
-               <Text style={styles.eventAuthorText}>Posted by <Text style={{fontWeight: 'bold', color: '#0f172a'}}>{item.author.name}</Text> • {formatTime(item.createdAt)}</Text>
+               <TouchableOpacity onPress={() => openProfile(item.author)}><Image source={{ uri: item.author.avatar }} style={styles.eventAvatar} /></TouchableOpacity>
+               <Text style={styles.eventAuthorText}>Posted by <Text onPress={() => openProfile(item.author)} style={{fontWeight: 'bold', color: '#0f172a'}}>{item.author.name}</Text> • {formatTime(item.createdAt)}</Text>
             </View>
 
             <View style={styles.eventFooter}>
@@ -301,10 +301,10 @@ const UpdatesScreen = () => {
       return (
         <View style={styles.premiumCard}>
           <View style={styles.cardHeader}>
-            <Image source={{ uri: item.author.avatar }} style={styles.authorAvatar} />
+            <TouchableOpacity onPress={() => openProfile(item.author)}><Image source={{ uri: item.author.avatar }} style={styles.authorAvatar} /></TouchableOpacity>
             <View style={styles.authorInfo}>
               <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                <Text style={styles.authorName}>{item.author.name}</Text>
+                <TouchableOpacity onPress={() => openProfile(item.author)}><Text style={styles.authorName}>{item.author.name}</Text></TouchableOpacity>
                 {item.type === 'spotted' && (
                   <View style={styles.spottedBadge}>
                     <MapPin size={10} color="#fff" />
@@ -383,9 +383,9 @@ const UpdatesScreen = () => {
         <View style={styles.hotTakeCard}>
           <View style={styles.hotTakeHeader}>
             <View style={{flexDirection: 'row', alignItems: 'center'}}>
-              <Image source={{ uri: item.author.avatar }} style={styles.hotTakeAvatar} />
+              <TouchableOpacity onPress={() => openProfile(item.author)}><Image source={{ uri: item.author.avatar }} style={styles.hotTakeAvatar} /></TouchableOpacity>
               <View>
-                <Text style={styles.hotTakeAuthor}>{item.author.name}</Text>
+                <TouchableOpacity onPress={() => openProfile(item.author)}><Text style={styles.hotTakeAuthor}>{item.author.name}</Text></TouchableOpacity>
                 <Text style={styles.hotTakeTime}>{formatTime(item.createdAt)}</Text>
               </View>
             </View>
@@ -520,11 +520,13 @@ const UpdatesScreen = () => {
     return null;
   };
 
+  const openProfile = (author) => { if (!author?.uid || author.uid === currentUser?.uid) return; navigation.navigate('Profile', { uid: author.uid, name: author.name, avatar: author.avatar }); };
+
   const renderComment = ({ item }) => (
     <View style={styles.commentRow}>
       <Image source={{ uri: item.author.avatar }} style={styles.commentAvatar} />
       <View style={styles.commentContent}>
-        <Text style={styles.commentAuthor}>{item.author.name} <Text style={styles.commentTime}>{formatTime(item.createdAt)}</Text></Text>
+        <TouchableOpacity onPress={() => openProfile(item.author)}><Text style={styles.commentAuthor}>{item.author.name} <Text style={styles.commentTime}>{formatTime(item.createdAt)}</Text></Text></TouchableOpacity>
         <Text style={styles.commentText}>{item.text}</Text>
       </View>
     </View>
