@@ -93,8 +93,12 @@ const VaultScreen = () => {
 
   // --- 2. FETCH FILES WHEN INSIDE A VAULT ---
   useEffect(() => {
-    if (!currentVault) return;
+    if (!currentVault) {
+      setFiles([]);
+      return;
+    }
 
+    setFiles([]);
     const filesRef = collection(db, 'vault_files');
     const q = query(filesRef, where('vaultId', '==', currentVault.id));
 
@@ -268,7 +272,7 @@ const VaultScreen = () => {
         return Alert.alert("Error", "Upload failed. Check Cloudinary details.");
       }
 
-      const isAdmin = currentVault.admins.includes(currentUser.uid);
+      const isAdmin = currentVault.admins?.includes(currentUser.uid);
       const isPrivate = currentVault.type === 'private';
       const initialStatus = (isAdmin || isPrivate) ? 'approved' : 'pending';
 

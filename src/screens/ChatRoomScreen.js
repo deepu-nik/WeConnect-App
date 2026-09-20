@@ -6,13 +6,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
-  ArrowLeft, Send, Image as ImageIcon, Camera, Mic, 
-  Smile, Phone, Video, MoreVertical, X, Crop, Type, PenTool
+  ArrowLeft, Send, Image as ImageIcon, Camera, 
+  Smile, X
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 
 import { auth, db } from '../config/firebase';
-import { collection, query, where, addDoc, onSnapshot, orderBy, serverTimestamp, doc, updateDoc, getDocs } from 'firebase/firestore';
+import { markChatRead } from '../services/chatService';
+import { collection, query, where, addDoc, onSnapshot, orderBy, serverTimestamp, doc, updateDoc, getDocs, increment } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 
 const TypingIndicator = () => {
@@ -61,7 +62,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [previewImage, setPreviewImage] = useState(null);
   const [imageCaption, setImageCaption] = useState('');
   const [isUploading, setIsUploading] = useState(false);
-  let typingTimeout = useRef(null).current;
+  const typingTimeout = useRef(null);
 
   const currentUser = auth.currentUser;
 
@@ -81,7 +82,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
   }, [otherUserId, currentUser, chatId]);
 
   useEffect(() => {
-    if (!chatId) return; 
+    if (!chatId || !currentUser) return;
+    markChatRead(chatId, currentUser.uid).catch((error) => console.error('Failed to mark chat read:', error));
     const messagesRef = collection(db, 'chats', chatId, 'messages');
     const q = query(messagesRef, orderBy('createdAt', 'desc'));
     const unsubscribeMsgs = onSnapshot(q, (snapshot) => {
@@ -101,17 +103,29 @@ const ChatRoomScreen = ({ route, navigation }) => {
     });
 
     return () => { unsubscribeMsgs(); unsubscribeTyping(); };
-  }, [chatId]);
+  }, [chatId, currentUser]);
+
+  useEffect(() => () => {
+    if (typingTimeout.current) clearTimeout(typingTimeout.current);
+  }, []);
 
   const handleTextChange = async (text) => {
     setInputText(text);
     if (!chatId) return;
-    await updateDoc(doc(db, 'chats', chatId), { [`typing.${currentUser.uid}`]: true });
+    try {
+      await updateDoc(doc(db, 'chats', chatId), { ['typing.' + currentUser.uid]: true });
+    } catch (error) {
+      console.error('Typing state update failed:', error);
+    }
 
-    if (typingTimeout) clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(async () => {
-      await updateDoc(doc(db, 'chats', chatId), { [`typing.${currentUser.uid}`]: false });
-    }, 2000);
+    if (typingTimeout.current) clearTimeout(typingTimeout.current);
+    typingTimeout.current = setTimeout(async () => {
+      try {
+        await updateDoc(doc(db, 'chats', chatId), { ['typing.' + currentUser.uid]: false });
+      } catch (error) {
+        console.error('Typing state update failed:', error);
+      }
+    }, 1200);
   };
 
   const sendMessage = async (mediaUrl = null, mediaType = null, caption = null) => {
@@ -146,7 +160,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
       });
 
       await updateDoc(doc(db, 'chats', currentChatId), {
-        lastMessage: mediaUrl ? '📷 Image' : messageText, updatedAt: serverTimestamp(), [`unreadCount.${otherUserId}`]: 1 
+        lastMessage: mediaUrl ? '📷 Image' : messageText, updatedAt: serverTimestamp(), ['unreadCount.' + otherUserId]: increment(1) 
       });
     } catch (error) { console.error('Error sending:', error); }
   };
@@ -162,7 +176,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
     setIsUploading(true);
     const secureUrl = await uploadToCloudinary(previewImage, 'image');
     if (secureUrl) await sendMessage(secureUrl, 'image', imageCaption);
-    else alert("Upload failed.");
+    else Alert.alert('Upload failed', 'Could not upload this image. Please try again.');
     setIsUploading(false);
   };
 
@@ -208,10 +222,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
           </TouchableOpacity>
         </View>
         
-        <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.iconBtn}><Phone size={22} color="#000" /></TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn}><Video size={24} color="#000" /></TouchableOpacity>
-        </View>
+
       </View>
 
       <KeyboardAvoidingView style={styles.keyboardAvoid} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 25}>
@@ -243,7 +254,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
           ) : (
             <View style={styles.rightIconsRow}>
               <TouchableOpacity style={styles.actionBtn} onPress={() => pickImage(false)}><ImageIcon size={24} color="#888" /></TouchableOpacity>
-              <TouchableOpacity style={styles.actionBtn}><Mic size={24} color="#888" /></TouchableOpacity>
+
             </View>
           )}
         </View>
@@ -255,9 +266,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
           <View style={styles.previewHeader}>
             <TouchableOpacity onPress={() => setPreviewImage(null)} style={styles.previewIconBtn}><X size={28} color="#fff" /></TouchableOpacity>
             <View style={styles.previewToolsRow}>
-              <TouchableOpacity style={styles.previewIconBtn}><Crop size={24} color="#fff" /></TouchableOpacity>
-              <TouchableOpacity style={styles.previewIconBtn}><Type size={24} color="#fff" /></TouchableOpacity>
-              <TouchableOpacity style={styles.previewIconBtn}><PenTool size={24} color="#fff" /></TouchableOpacity>
+
             </View>
           </View>
           <Image source={{ uri: previewImage }} style={styles.fullPreviewImage} resizeMode="contain" />
@@ -279,7 +288,6 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f0f0f0', zIndex: 10 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   headerProfileClick: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  headerRight: { flexDirection: 'row', alignItems: 'center' },
   iconBtn: { padding: 8 },
   headerAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#ccc', marginRight: 10, marginLeft: 2 },
   headerName: { fontSize: 18, fontWeight: '700', color: '#000' },
@@ -313,7 +321,7 @@ const styles = StyleSheet.create({
   sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#007AFF', justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
   previewModalContainer: { flex: 1, backgroundColor: '#000' },
   previewHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20, zIndex: 10, position: 'absolute', width: '100%' },
-  previewToolsRow: { flexDirection: 'row', gap: 20 },
+  previewToolsRow: { flexDirection: 'row' },
   previewIconBtn: { padding: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.8, shadowRadius: 4, elevation: 5 },
   fullPreviewImage: { flex: 1, width: '100%', height: '100%' },
   previewBottomBar: { flexDirection: 'row', alignItems: 'center', padding: 20, backgroundColor: 'rgba(0,0,0,0.5)', position: 'absolute', bottom: 0, width: '100%' },
