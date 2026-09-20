@@ -225,13 +225,15 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
       </View>
 
-      <KeyboardAvoidingView style={styles.keyboardAvoid} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 25}>
+      <KeyboardAvoidingView style={styles.keyboardAvoid} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
         <FlatList
           data={messages}
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
-          inverted 
+          inverted
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={
             isOtherUserTyping ? (
@@ -314,7 +316,7 @@ const styles = StyleSheet.create({
   inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, paddingVertical: 10, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f0f0f0' },
   cameraBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f2f3f5', justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
   inputWrapper: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#f2f3f5', borderRadius: 20, marginHorizontal: 10, paddingLeft: 15, paddingRight: 5, minHeight: 40, maxHeight: 100 },
-  textInput: { flex: 1, fontSize: 16, color: '#000', paddingTop: 10, paddingBottom: 10 },
+  textInput: { flex: 1, fontSize: 16, color: '#000', paddingTop: 8, paddingBottom: 8, textAlignVertical: 'center' },
   insideInputBtn: { padding: 8 },
   rightIconsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   actionBtn: { paddingHorizontal: 8 },
