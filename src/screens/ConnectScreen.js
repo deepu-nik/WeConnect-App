@@ -15,7 +15,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { acceptConnectionRequest, declineConnectionRequest, sendConnectionRequest, subscribeToConnectionRequests } from '../services/connectionService';
-import { getAllUsers, normalizeUser } from '../services/userService';
+import { getAllUsers, getUserProfile, normalizeUser } from '../services/userService';
 
 const LOCATIONS = [
   ['Library', '📚', '#007AFF'],
