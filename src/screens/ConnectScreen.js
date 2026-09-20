@@ -158,7 +158,7 @@ const ConnectScreen = ({ navigation }) => {
     if (scanned || !data) return;
     setScanned(true);
     try {
-      const profile = await getAllUsers(null).then((all) => all.find((user) => user.uid === data));
+      const profile = await getUserProfile(data);
       setQrVisible(false);
       if (!profile) {
         Alert.alert('User not found', 'That QR code does not belong to a WeConnect profile.');
