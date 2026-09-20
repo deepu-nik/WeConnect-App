@@ -14,43 +14,10 @@ import * as ImagePicker from 'expo-image-picker';
 
 // Firebase & Utils
 import { auth, db } from '../config/firebase';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, arrayRemove, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, arrayRemove, orderBy, increment } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 
 const { width } = Dimensions.get('window');
-
-// --- DUMMY DATA FOR EMPTY STATE ---
-const DUMMY_POSTS = [
-  {
-    id: 'dummy_6',
-    type: 'event',
-    author: { name: 'Deepu Sharma', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150' },
-    eventName: 'Smart India Hackathon (SIH) Internal Round',
-    eventDate: 'March 15, 2026',
-    content: 'Forming teams now! We need one solid MERN stack dev and a UI designer. Hit me up if you want to join our squad.',
-    likes: ['u1', 'u2', 'u3', 'u4', 'u5', 'u6'], 
-    commentCount: 14,
-    createdAt: { toDate: () => new Date(Date.now() - 300000) } 
-  },
-  {
-    id: 'dummy_5',
-    type: 'plan',
-    author: { name: 'Rahul', avatar: 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=150' },
-    content: 'Need 2 more players for CS2 competitive rn! Drop your tags below.',
-    likes: ['user1', 'user2', 'user3'], 
-    commentCount: 5,
-    createdAt: { toDate: () => new Date(Date.now() - 900000) } 
-  },
-  {
-    id: 'dummy_4',
-    type: 'hot_take',
-    author: { name: 'Alex', avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=150' },
-    content: 'The new canteen vendor makes the absolute worst Maggi in the history of this college.',
-    likes: ['u1', 'u2', 'u3', 'u4', 'u5', 'u6', 'u7'], 
-    commentCount: 32,
-    createdAt: { toDate: () => new Date(Date.now() - 1800000) } 
-  }
-];
 
 const UpdatesScreen = () => {
   const currentUser = auth.currentUser;
@@ -135,6 +102,15 @@ const UpdatesScreen = () => {
     setIsUploading(true);
 
     try {
+      if (!currentUser) throw new Error('You must be signed in.');
+      if (['confession', 'hot_take', 'plan'].includes(postType) && !caption.trim()) {
+        setIsUploading(false);
+        return alert('Please write something before sharing.');
+      }
+      if (postType === 'poll' && !pollQuestion.trim()) {
+        setIsUploading(false);
+        return alert('Please add a poll question.');
+      }
       let imageUrl = null;
       if ((postType === 'image' || postType === 'spotted') && selectedImage) {
         imageUrl = await uploadToCloudinary(selectedImage, 'image');
@@ -202,8 +178,7 @@ const UpdatesScreen = () => {
 
   // --- INTERACTION LOGIC ---
   const toggleLike = async (postId, currentLikes) => {
-    if (postId.startsWith('dummy_')) return alert("This is a demo post! Create a real post to interact.");
-    
+
     const postRef = doc(db, 'buzz_posts', postId);
     if (currentLikes.includes(currentUser.uid)) {
       await updateDoc(postRef, { likes: arrayRemove(currentUser.uid) });
@@ -213,8 +188,6 @@ const UpdatesScreen = () => {
   };
 
   const votePoll = async (postId, optionIndex) => {
-    if (postId.startsWith('dummy_')) return alert("This is a demo poll! Create a real post to vote.");
-
     const postRef = doc(db, 'buzz_posts', postId);
     await updateDoc(postRef, {
       [`votes.${currentUser.uid}`]: optionIndex
@@ -222,7 +195,6 @@ const UpdatesScreen = () => {
   };
 
   const openComments = (postId) => {
-    if (postId.startsWith('dummy_')) return alert("This is a demo post! You cannot comment on it.");
     setActivePostId(postId);
     setCommentsVisible(true);
   };
@@ -243,12 +215,7 @@ const UpdatesScreen = () => {
         createdAt: serverTimestamp()
       });
 
-      // Increment comment count on the main post
-      const postRef = doc(db, 'buzz_posts', activePostId);
-      const post = posts.find(p => p.id === activePostId);
-      if (post) {
-        await updateDoc(postRef, { commentCount: (post.commentCount || 0) + 1 });
-      }
+      await updateDoc(doc(db, 'buzz_posts', activePostId), { commentCount: increment(1) });
 
       setNewComment('');
     } catch (error) {
@@ -589,7 +556,13 @@ const UpdatesScreen = () => {
           keyExtractor={(item) => item.id}
           renderItem={renderPost}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.feedContent}
+          contentContainerStyle={[styles.feedContent, posts.length === 0 && { flex: 1 }]}
+          ListEmptyComponent={
+            <View style={styles.centerContainer}>
+              <Text style={styles.emptyTitle}>No recent updates</Text>
+              <Text style={styles.emptySubtitle}>Be the first to post something useful for your campus.</Text>
+            </View>
+          }
         />
       )}
 
@@ -813,7 +786,9 @@ const UpdatesScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' }, 
-  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#0f172a' },
+  emptySubtitle: { marginTop: 6, textAlign: 'center', color: '#64748b', lineHeight: 21 },
   
   // Premium Header
   premiumHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15, backgroundColor: '#f8fafc' },

@@ -15,6 +15,7 @@ import { collection, query, where, onSnapshot, getDocs, addDoc, serverTimestamp,
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 
 import Dashboard from '../components/Dashboard';
+import { findUsersByName } from '../services/userService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DASHBOARD_MAX_HEIGHT = SCREEN_HEIGHT * 0.5;

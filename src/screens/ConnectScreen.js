@@ -1,390 +1,329 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-  View, Text, StyleSheet, FlatList, TouchableOpacity, 
-  Image, TextInput, StatusBar, Modal, ActivityIndicator, 
-  ScrollView, Dimensions, Alert, Share, BackHandler
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator, Alert, BackHandler, FlatList, Image, Modal, Platform,
+  SafeAreaView as NativeSafeAreaView, ScrollView, Share, StyleSheet, Text,
+  TextInput, TouchableOpacity, View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { 
-  Search, MapPin, UserPlus, UserCheck, UserX, 
-  MessageCircle, QrCode as QrIcon, ScanLine, Share2, Hand, X, Check
+import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  Check, Hand, MessageCircle, QrCode as QrIcon, ScanLine, Search, Share2,
+  UserCheck, UserPlus, X,
 } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-
-// Firebase & Utils
+import { collection, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
-import { collection, query, onSnapshot, doc, updateDoc, getDocs, setDoc, where, getDoc } from 'firebase/firestore';
+import { acceptConnectionRequest, declineConnectionRequest, sendConnectionRequest, subscribeToConnectionRequests } from '../services/connectionService';
+import { getAllUsers, normalizeUser } from '../services/userService';
 
-const { width } = Dimensions.get('window');
-
-const CAMPUS_LOCATIONS = [
-  { id: '1', name: 'Library', icon: '📚', color: '#007AFF' },
-  { id: '2', name: 'Canteen', icon: '🍔', color: '#FF9500' },
-  { id: '3', name: 'Hostel', icon: '🛏️', color: '#AF52DE' },
-  { id: '4', name: 'Ground', icon: '⚽', color: '#34C759' },
-  { id: '5', name: 'CS Lab', icon: '💻', color: '#5856D6' },
-  { id: '6', name: 'Outside', icon: '🚶', color: '#FF3B30' },
+const LOCATIONS = [
+  ['Library', '📚', '#007AFF'],
+  ['Canteen', '🍔', '#FF9500'],
+  ['Hostel', '🛏️', '#AF52DE'],
+  ['Ground', '⚽', '#34C759'],
+  ['CS Lab', '💻', '#5856D6'],
+  ['Outside', '🚶', '#FF3B30'],
 ];
 
 const ConnectScreen = ({ navigation }) => {
   const currentUser = auth.currentUser;
-
-  // View States
-  const [activeTab, setActiveTab] = useState('discover'); 
+  const [activeTab, setActiveTab] = useState('discover');
   const [searchQuery, setSearchQuery] = useState('');
-  const [myLocation, setMyLocation] = useState('Classroom');
-  
-  // Data States
-  const [network, setNetwork] = useState([]);
+  const [users, setUsers] = useState([]);
   const [requests, setRequests] = useState([]);
-  const [discover, setDiscover] = useState([]);
+  const [myLocation, setMyLocation] = useState('Classroom');
   const [loading, setLoading] = useState(true);
-
-  // QR Modal & Camera States
-  const [isQrModalVisible, setQrModalVisible] = useState(false);
-  const [qrMode, setQrMode] = useState('my_code'); 
-  const [permission, requestPermission] = useCameraPermissions();
+  const [qrVisible, setQrVisible] = useState(false);
+  const [qrMode, setQrMode] = useState('my_code');
   const [scanned, setScanned] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
 
-  // --- HARDWARE BACK BUTTON INTERCEPTOR ---
   useFocusEffect(
     useCallback(() => {
-      const onBackPress = () => {
-        if (isQrModalVisible) {
-          setQrModalVisible(false); // Close the modal instead of crashing
-          return true; // We handled it
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (qrVisible) {
+          setQrVisible(false);
+          return true;
         }
-        return false; // Let default navigation happen
-      };
-
-      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-      return () => subscription.remove(); 
-    }, [isQrModalVisible]) 
+        return false;
+      });
+      return () => subscription.remove();
+    }, [qrVisible])
   );
 
-  // --- 1. FETCH LIVE USERS (DISCOVER) ---
   useEffect(() => {
-    if (!currentUser) return;
-
-    // Listen for changes in the 'users' collection to populate Discover
-    const q = query(collection(db, 'users'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const allUsers = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        // Don't show myself in the Discover tab
-        if (doc.id !== currentUser.uid) {
-          allUsers.push({
-            uid: doc.id,
-            name: data.displayName || data.name || 'Student',
-            avatar: data.photoURL || data.avatar || 'https://via.placeholder.com/150',
-            major: data.bio?.substring(0, 30) || 'Student',
-            location: data.location || 'Campus',
-            locationIcon: data.locationIcon || '📍'
-          });
-        }
-        
-        // If the doc IS the current user, set their location
-        if (doc.id === currentUser.uid && data.location) {
-           setMyLocation(data.location);
-        }
-      });
-      setDiscover(allUsers);
+    if (!currentUser) return undefined;
+    const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
+      const next = snapshot.docs
+        .filter((item) => item.id !== currentUser.uid)
+        .map((item) => normalizeUser(item.id, item.data()));
+      const me = snapshot.docs.find((item) => item.id === currentUser.uid);
+      if (me?.data()?.location) setMyLocation(me.data().location);
+      setUsers(next);
+      setLoading(false);
+    }, (error) => {
+      console.error('Users subscription failed:', error);
       setLoading(false);
     });
-
-    return () => unsubscribe();
+    return unsubscribe;
   }, [currentUser]);
 
-  // --- ACTIONS ---
-  const updateLocation = async (loc) => {
-    setMyLocation(loc.name);
-    if(currentUser) {
-      try {
-        await updateDoc(doc(db, 'users', currentUser.uid), { 
-          location: loc.name, 
-          locationIcon: loc.icon 
-        });
-      } catch (error) {
-        console.log("Error updating location", error);
-      }
+  useEffect(() => {
+    if (!currentUser) return undefined;
+    return subscribeToConnectionRequests(currentUser.uid, setRequests);
+  }, [currentUser]);
+
+  const connectedUsers = useMemo(
+    () => users.filter((user) => currentUser?.uid && user.connections.includes(currentUser.uid)),
+    [users, currentUser]
+  );
+
+  const discoverUsers = useMemo(() => {
+    const connectedIds = new Set(connectedUsers.map((user) => user.uid));
+    return users.filter((user) => !connectedIds.has(user.uid));
+  }, [users, connectedUsers]);
+
+  const filteredData = useMemo(() => {
+    let data = activeTab === 'network' ? connectedUsers : activeTab === 'requests' ? requests.map((r) => normalizeUser(r.senderId, r.sender || {})) : discoverUsers;
+    const term = searchQuery.trim().toLowerCase();
+    if (!term) return data;
+    return data.filter((user) => user.name.toLowerCase().includes(term) || user.handle.toLowerCase().includes(term));
+  }, [activeTab, connectedUsers, discoverUsers, requests, searchQuery]);
+
+  const updateLocation = async (name, icon) => {
+    setMyLocation(name);
+    try {
+      await import('firebase/firestore').then(({ doc, updateDoc }) =>
+        updateDoc(doc(db, 'users', currentUser.uid), { location: name, locationIcon: icon })
+      );
+    } catch (error) {
+      console.error('Location update failed:', error);
+      Alert.alert('Error', 'Could not update your location.');
     }
   };
 
-  const handleCustomLocation = () => {
-    Alert.prompt("Custom Location", "Where are you?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Update", onPress: (text) => updateLocation({ name: text, icon: '📍' }) }
+  const customLocation = () => {
+    if (Platform.OS !== 'ios') {
+      Alert.alert('Custom location', 'Choose one of the campus locations for now.');
+      return;
+    }
+    Alert.prompt('Custom Location', 'Where are you?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Update', onPress: (text) => text?.trim() && updateLocation(text.trim(), '📍') },
     ]);
   };
 
-  const handleWave = (user) => {
-    Alert.alert("Wave Sent! 👋", `You waved at ${user.name}.`);
-  };
-
-  const handleConnect = (user) => {
-    Alert.alert("Request Sent", `Connection request sent to ${user.name}.`);
-  };
-
-  // --- QR & SCANNER LOGIC ---
-  const handleShareQR = async () => {
+  const sendRequest = async (user) => {
     try {
-      const profileLink = `weconnect://profile/${currentUser.uid}`;
-      await Share.share({
-        message: `Add me on WeConnect! Scan my QR or tap this link: ${profileLink}`,
+      await sendConnectionRequest({
+        sender: { ...normalizeUser(currentUser.uid, { name: currentUser.displayName, photoURL: currentUser.photoURL }) },
+        receiver: user,
       });
+      Alert.alert('Request sent', 'Your connection request has been sent.');
     } catch (error) {
-      console.log(error);
+      console.error('Connection request failed:', error);
+      Alert.alert('Error', 'Could not send the connection request.');
     }
   };
 
-  const handleBarCodeScanned = async ({ type, data }) => {
-    setScanned(true);
-    
-    if (data && data.length > 10) {
-      setQrModalVisible(false); // Close modal automatically
-      
-      try {
-        const userDoc = await getDoc(doc(db, 'users', data));
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          navigation.navigate('Profile', { 
-            uid: data, 
-            name: userData.displayName || userData.name || 'Student', 
-            avatar: userData.photoURL || userData.avatar || 'https://via.placeholder.com/150' 
-          });
-        } else {
-           Alert.alert("User Not Found", "This QR code does not match any active WeConnect student.");
-           setTimeout(() => setScanned(false), 2000);
-        }
-      } catch (error) {
-         Alert.alert("Error", "Could not load user profile.");
-         setTimeout(() => setScanned(false), 2000);
-      }
-    } else {
-      Alert.alert("Invalid Code", "This is not a valid WeConnect profile code.");
-      setTimeout(() => setScanned(false), 2000);
+  const handleRequest = async (request, accept) => {
+    try {
+      if (accept) await acceptConnectionRequest(request);
+      else await declineConnectionRequest(request);
+    } catch (error) {
+      console.error('Connection request update failed:', error);
+      Alert.alert('Error', 'Could not update this request.');
     }
+  };
+
+  const openQr = (mode = 'my_code') => {
+    setQrMode(mode);
+    setScanned(false);
+    setQrVisible(true);
   };
 
   const openScanner = async () => {
     if (!permission?.granted) {
-      const { granted } = await requestPermission();
-      if (!granted) return Alert.alert("Permission Required", "We need camera access to scan QR codes.");
+      const result = await requestPermission();
+      if (!result.granted) {
+        Alert.alert('Permission required', 'Camera access is needed to scan QR codes.');
+        return;
+      }
     }
-    setScanned(false);
-    setQrMode('scan');
+    openQr('scan');
   };
 
-  // --- RENDERERS ---
-  const renderNetworkItem = ({ item }) => (
-    <TouchableOpacity style={styles.card} activeOpacity={0.7} onPress={() => navigation.navigate('Profile', { uid: item.uid, name: item.name, avatar: item.avatar })}>
-      <Image source={{ uri: item.avatar }} style={styles.avatar} />
-      <View style={styles.cardInfo}>
-        <Text style={styles.userName}>{item.name}</Text>
-        <View style={styles.locationBadge}>
-          <Text style={styles.locationBadgeText}>{item.locationIcon} {item.location}</Text>
+  const handleScan = async ({ data }) => {
+    if (scanned || !data) return;
+    setScanned(true);
+    try {
+      const profile = await getAllUsers(null).then((all) => all.find((user) => user.uid === data));
+      setQrVisible(false);
+      if (!profile) {
+        Alert.alert('User not found', 'That QR code does not belong to a WeConnect profile.');
+        return;
+      }
+      navigation.navigate('Profile', { uid: profile.uid, name: profile.name, avatar: profile.avatar });
+    } catch (error) {
+      console.error('QR scan failed:', error);
+      setQrVisible(false);
+      Alert.alert('Error', 'Could not load that profile.');
+    } finally {
+      setScanned(false);
+    }
+  };
+
+  const shareQr = async () => {
+    try {
+      await Share.share({ message: 'Add me on WeConnect! Scan my QR code.', url: 'weconnect://profile/' + currentUser.uid });
+    } catch (error) {
+      if (error?.message) console.log(error.message);
+    }
+  };
+
+  const renderItem = ({ item }) => {
+    if (activeTab === 'requests') {
+      const request = requests.find((entry) => entry.senderId === item.uid);
+      return (
+        <View style={styles.card}>
+          <Image source={{ uri: item.avatar }} style={styles.avatar} />
+          <View style={styles.cardInfo}>
+            <Text style={styles.name}>{item.name}</Text>
+            <Text style={styles.meta}>{item.handle || 'Pending request'}</Text>
+          </View>
+          <TouchableOpacity style={styles.decline} onPress={() => request && handleRequest(request, false)}>
+            <X size={19} color="#FF3B30" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.accept} onPress={() => request && handleRequest(request, true)}>
+            <Check size={18} color="#fff" />
+          </TouchableOpacity>
         </View>
-      </View>
-      <View style={styles.actionRow}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => handleWave(item)}><Hand size={22} color="#FF9500" /></TouchableOpacity>
-        <TouchableOpacity style={styles.primaryIconBtn} onPress={() => navigation.navigate('ChatRoom', { uid: item.uid, name: item.name, avatar: item.avatar })}><MessageCircle size={20} color="#fff" /></TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+      );
+    }
 
-  const renderRequestItem = ({ item }) => (
-    <View style={styles.card}>
-      <Image source={{ uri: item.avatar }} style={styles.avatar} />
-      <View style={styles.cardInfo}>
-        <Text style={styles.userName}>{item.name}</Text>
-        <Text style={styles.subText}>Pending Request</Text>
+    return (
+      <View style={styles.card}>
+        <TouchableOpacity onPress={() => navigation.navigate('Profile', { uid: item.uid })}>
+          <Image source={{ uri: item.avatar }} style={styles.avatar} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.cardInfo} onPress={() => navigation.navigate('Profile', { uid: item.uid })}>
+          <Text style={styles.name}>{item.name}</Text>
+          <Text style={styles.meta}>{activeTab === 'network' ? item.location : (item.bio || item.handle || 'Student')}</Text>
+          {activeTab === 'network' && <Text style={styles.location}>{item.locationIcon} {item.location}</Text>}
+        </TouchableOpacity>
+        {activeTab === 'network' ? (
+          <>
+            <TouchableOpacity style={styles.wave} onPress={() => Alert.alert('Wave sent', '👋 ' + item.name + ' will see your wave.')}>
+              <Hand size={19} color="#FF9500" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.chat} onPress={() => navigation.navigate('ChatRoom', { uid: item.uid, name: item.name, avatar: item.avatar })}>
+              <MessageCircle size={19} color="#fff" />
+            </TouchableOpacity>
+          </>
+        ) : (
+          <TouchableOpacity style={styles.connect} onPress={() => sendRequest(item)}>
+            <UserPlus size={17} color="#007AFF" />
+            <Text style={styles.connectText}>Connect</Text>
+          </TouchableOpacity>
+        )}
       </View>
-      <View style={styles.actionRow}>
-        <TouchableOpacity style={styles.declineBtn}><X size={20} color="#FF3B30" /></TouchableOpacity>
-        <TouchableOpacity style={styles.acceptBtn}><Check size={20} color="#fff" /><Text style={styles.acceptBtnText}>Accept</Text></TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  const renderDiscoverItem = ({ item }) => (
-    <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('Profile', { uid: item.uid, name: item.name, avatar: item.avatar })}>
-      <Image source={{ uri: item.avatar }} style={styles.avatar} />
-      <View style={styles.cardInfo}>
-        <Text style={styles.userName}>{item.name}</Text>
-        <Text style={styles.subText}>{item.major || 'Student'}</Text>
-      </View>
-      <TouchableOpacity style={styles.connectBtn} onPress={() => handleConnect(item)}>
-        <UserPlus size={18} color="#007AFF" />
-        <Text style={styles.connectBtnText}>Connect</Text>
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
-
-  // Data Selector
-  let currentData = network;
-  let currentRenderer = renderNetworkItem;
-  if (activeTab === 'requests') { currentData = requests; currentRenderer = renderRequestItem; }
-  if (activeTab === 'discover') { currentData = discover; currentRenderer = renderDiscoverItem; }
-
-  if (searchQuery.trim() !== '') {
-    currentData = currentData.filter(u => u.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  }
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" />
-
-      {/* HEADER */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Connect</Text>
-        <View style={styles.headerIcons}>
-          <TouchableOpacity style={styles.qrBtn} onPress={() => { setQrMode('my_code'); setQrModalVisible(true); }}>
-            <ScanLine size={22} color="#007AFF" />
+        <Text style={styles.title}>Connect</Text>
+        <TouchableOpacity style={styles.qrButton} onPress={() => openQr()}>
+          <ScanLine size={22} color="#007AFF" />
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.sectionLabel}>WHERE ARE YOU?</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.locationRow}>
+        {LOCATIONS.map(([name, icon, color]) => (
+          <TouchableOpacity key={name} style={[styles.locationChip, myLocation === name && { backgroundColor: color, borderColor: color }]} onPress={() => updateLocation(name, icon)}>
+            <Text style={[styles.locationText, myLocation === name && { color: '#fff' }]}>{icon} {name}</Text>
           </TouchableOpacity>
-        </View>
+        ))}
+        <TouchableOpacity style={styles.locationChip} onPress={customLocation}><Text style={styles.locationText}>✏️ Custom</Text></TouchableOpacity>
+      </ScrollView>
+
+      <View style={styles.search}>
+        <Search size={18} color="#888" />
+        <TextInput style={styles.searchInput} placeholder="Search students..." placeholderTextColor="#888" value={searchQuery} onChangeText={setSearchQuery} />
       </View>
 
-      {/* LIVE STATUS WIDGET */}
-      <View style={styles.statusWidget}>
-        <Text style={styles.statusTitle}>Where are you right now?</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statusScroll}>
-          {CAMPUS_LOCATIONS.map(loc => (
-            <TouchableOpacity key={loc.id} style={[styles.statusChip, myLocation === loc.name && {backgroundColor: loc.color, borderColor: loc.color}]} onPress={() => updateLocation(loc)}>
-              <Text style={[styles.statusChipText, myLocation === loc.name && {color: '#fff'}]}>{loc.icon} {loc.name}</Text>
-            </TouchableOpacity>
-          ))}
-          <TouchableOpacity style={styles.statusChip} onPress={handleCustomLocation}>
-            <Text style={styles.statusChipText}>✏️ Custom...</Text>
+      <View style={styles.tabs}>
+        {[
+          ['discover', 'Discover'],
+          ['network', 'My Network'],
+          ['requests', 'Requests' + (requests.length ? ' (' + requests.length + ')' : '')],
+        ].map(([key, label]) => (
+          <TouchableOpacity key={key} style={[styles.tab, activeTab === key && styles.activeTab]} onPress={() => setActiveTab(key)}>
+            <Text style={[styles.tabText, activeTab === key && styles.activeTabText]}>{label}</Text>
           </TouchableOpacity>
-        </ScrollView>
+        ))}
       </View>
 
-      {/* SEARCH BAR */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Search size={18} color="#888" style={styles.searchIcon} />
-          <TextInput style={styles.searchInput} placeholder="Search students..." placeholderTextColor="#888" value={searchQuery} onChangeText={setSearchQuery} />
-        </View>
-      </View>
-
-      {/* SEGMENTED TABS */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity style={[styles.tabBtn, activeTab === 'discover' && styles.activeTabBtn]} onPress={() => setActiveTab('discover')}>
-          <Text style={[styles.tabText, activeTab === 'discover' && styles.activeTabText]}>Discover</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.tabBtn, activeTab === 'network' && styles.activeTabBtn]} onPress={() => setActiveTab('network')}>
-          <Text style={[styles.tabText, activeTab === 'network' && styles.activeTabText]}>My Network</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.tabBtn, activeTab === 'requests' && styles.activeTabBtn]} onPress={() => setActiveTab('requests')}>
-          <Text style={[styles.tabText, activeTab === 'requests' && styles.activeTabText]}>Requests {requests.length > 0 && `(${requests.length})`}</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* MAIN LIST */}
-      <View style={styles.contentArea}>
-        {loading ? (
-           <ActivityIndicator size="large" color="#007AFF" style={{marginTop: 50}} />
-        ) : (
+      <View style={styles.content}>
+        {loading ? <ActivityIndicator size="large" color="#007AFF" /> : (
           <FlatList
-            data={currentData}
-            keyExtractor={item => item.uid}
-            renderItem={currentRenderer}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
+            data={filteredData}
+            keyExtractor={(item) => item.uid}
+            renderItem={renderItem}
+            contentContainerStyle={styles.list}
             ListEmptyComponent={
-              <View style={styles.emptyState}>
+              <View style={styles.empty}>
                 <UserCheck size={48} color="#cbd5e1" />
-                <Text style={styles.emptyStateText}>Nothing to see here</Text>
-                <Text style={styles.emptyStateSub}>Try searching for friends to add.</Text>
+                <Text style={styles.emptyTitle}>Nothing to see here</Text>
+                <Text style={styles.emptyText}>{activeTab === 'requests' ? 'No pending requests.' : 'Try searching for a classmate.'}</Text>
               </View>
             }
           />
         )}
       </View>
 
-      {/* --- REAL QR / SCANNER MODAL --- */}
-      <Modal 
-        visible={isQrModalVisible} 
-        animationType="slide" 
-        presentationStyle="pageSheet"
-        onRequestClose={() => setQrModalVisible(false)}
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setQrModalVisible(false)}><X size={28} color="#000" /></TouchableOpacity>
-            <Text style={styles.modalTitle}>Connect via QR</Text>
-            <TouchableOpacity onPress={handleShareQR}><Share2 size={24} color="#007AFF" /></TouchableOpacity>
+      <Modal visible={qrVisible} animationType="slide" onRequestClose={() => setQrVisible(false)}>
+        <NativeSafeAreaView style={styles.qrModal}>
+          <View style={styles.qrHeader}>
+            <TouchableOpacity onPress={() => setQrVisible(false)}><X size={28} color="#000" /></TouchableOpacity>
+            <Text style={styles.qrTitle}>Connect via QR</Text>
+            <TouchableOpacity onPress={shareQr}><Share2 size={22} color="#007AFF" /></TouchableOpacity>
           </View>
 
           <View style={styles.qrTabs}>
             <TouchableOpacity style={[styles.qrTab, qrMode === 'my_code' && styles.qrTabActive]} onPress={() => setQrMode('my_code')}>
-              <QrIcon size={18} color={qrMode === 'my_code' ? "#fff" : "#64748b"} />
+              <QrIcon size={18} color={qrMode === 'my_code' ? '#fff' : '#64748b'} />
               <Text style={[styles.qrTabText, qrMode === 'my_code' && styles.qrTabTextActive]}>My Code</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.qrTab, qrMode === 'scan' && styles.qrTabActive]} onPress={openScanner}>
-              <ScanLine size={18} color={qrMode === 'scan' ? "#fff" : "#64748b"} />
-              <Text style={[styles.qrTabText, qrMode === 'scan' && styles.qrTabTextActive]}>Scan Code</Text>
+              <ScanLine size={18} color={qrMode === 'scan' ? '#fff' : '#64748b'} />
+              <Text style={[styles.qrTabText, qrMode === 'scan' && styles.qrTabTextActive]}>Scan</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.qrContentArea}>
-            {qrMode === 'my_code' ? (
-              // REAL QR CODE GENERATION
-              <View style={styles.myQrBox}>
-                <Image source={{ uri: currentUser?.photoURL || 'https://via.placeholder.com/150' }} style={styles.qrAvatar} />
-                <Text style={styles.qrName}>{currentUser?.displayName || 'Deepu Sharma'}</Text>
-                <Text style={styles.qrHandle}>Student</Text>
-                
-                <View style={styles.qrPlaceholder}>
-                  {currentUser?.uid ? (
-                    <QRCode 
-                      value={currentUser.uid} 
-                      size={180} 
-                      color="#0f172a" 
-                      backgroundColor="transparent" 
-                    />
-                  ) : (
-                    <ActivityIndicator color="#000" />
-                  )}
-                </View>
-                <Text style={styles.qrHelperText}>Have a friend scan this code to connect instantly.</Text>
-              </View>
-            ) : (
-              // REAL CAMERA SCANNER
-              <View style={styles.scannerBox}>
-                {!permission?.granted ? (
-                   <View style={styles.cameraPlaceholder}>
-                     <Text style={{color: '#fff'}}>Requesting camera permission...</Text>
-                   </View>
-                ) : (
-                  <>
-                    <CameraView
-                      style={StyleSheet.absoluteFillObject}
-                      facing="back"
-                      onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-                      barcodeScannerSettings={{
-                        barcodeTypes: ["qr"],
-                      }}
-                    />
-                    
-                    <View style={styles.cameraOverlay}>
-                       <View style={[styles.scanCorner, styles.tl]} />
-                       <View style={[styles.scanCorner, styles.tr]} />
-                       <View style={[styles.scanCorner, styles.bl]} />
-                       <View style={[styles.scanCorner, styles.br]} />
-                    </View>
-                  </>
-                )}
-                {scanned && <View style={styles.scanningOverlay}><ActivityIndicator size="large" color="#fff" /><Text style={{color:'#fff', marginTop:10}}>Finding Profile...</Text></View>}
-              </View>
-            )}
-          </View>
-        </SafeAreaView>
+          {qrMode === 'my_code' ? (
+            <View style={styles.qrCard}>
+              <Image source={{ uri: currentUser?.photoURL || 'https://via.placeholder.com/150' }} style={styles.qrAvatar} />
+              <Text style={styles.qrName}>{currentUser?.displayName || 'Student'}</Text>
+              <QRCode value={currentUser?.uid || 'weconnect'} size={190} />
+              <Text style={styles.qrHint}>Let a classmate scan this code to open your profile.</Text>
+            </View>
+          ) : (
+            <View style={styles.scanner}>
+              <CameraView
+                style={StyleSheet.absoluteFillObject}
+                facing="back"
+                onBarcodeScanned={scanned ? undefined : handleScan}
+                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              />
+              {scanned && <View style={styles.scanOverlay}><ActivityIndicator color="#fff" size="large" /><Text style={styles.scanText}>Opening profile…</Text></View>}
+            </View>
+          )}
+        </NativeSafeAreaView>
       </Modal>
-
     </SafeAreaView>
   );
 };
@@ -392,81 +331,51 @@ const ConnectScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15 },
-  headerTitle: { fontSize: 28, fontWeight: '800', color: '#0f172a', letterSpacing: -0.5 },
-  headerIcons: { flexDirection: 'row', alignItems: 'center' },
-  qrBtn: { backgroundColor: '#f1f5f9', padding: 8, borderRadius: 12 },
-
-  statusWidget: { paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  statusTitle: { fontSize: 13, fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', paddingHorizontal: 20, marginBottom: 10 },
-  statusScroll: { paddingHorizontal: 15, gap: 8 },
-  statusChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0' },
-  statusChipText: { fontSize: 14, fontWeight: '600', color: '#334155' },
-
-  searchContainer: { paddingHorizontal: 20, paddingVertical: 15, backgroundColor: '#fff' },
-  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 12, paddingHorizontal: 12, height: 45, borderWidth: 1, borderColor: '#e2e8f0' },
-  searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, fontSize: 15, color: '#0f172a' },
-
-  tabContainer: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4, marginBottom: 10 },
-  tabBtn: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10 },
-  activeTabBtn: { backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
-  tabText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
-  activeTabText: { color: '#0f172a', fontWeight: '700' },
-
-  contentArea: { flex: 1, backgroundColor: '#f8fafc' },
-  listContent: { paddingHorizontal: 20, paddingTop: 15, paddingBottom: 100 },
-  
-  card: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 15, borderRadius: 20, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 10, elevation: 2 },
-  avatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#e2e8f0', marginRight: 15 },
-  cardInfo: { flex: 1, justifyContent: 'center' },
-  userName: { fontSize: 16, fontWeight: '700', color: '#0f172a', marginBottom: 4 },
-  subText: { fontSize: 13, color: '#64748b' },
-  
-  locationBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#e6f4fe', alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  locationBadgeText: { fontSize: 11, fontWeight: '700', color: '#007AFF' },
-
-  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  iconBtn: { padding: 8, backgroundColor: '#fffbf0', borderRadius: 12 },
-  primaryIconBtn: { padding: 10, backgroundColor: '#007AFF', borderRadius: 16 },
-  declineBtn: { padding: 10, backgroundColor: '#FFEBEB', borderRadius: 16 },
-  acceptBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#34C759', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 16 },
-  acceptBtnText: { color: '#fff', fontWeight: 'bold', marginLeft: 4, fontSize: 14 },
-  connectBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#e6f4fe', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 16 },
-  connectBtnText: { color: '#007AFF', fontWeight: 'bold', marginLeft: 6, fontSize: 14 },
-
-  emptyState: { alignItems: 'center', marginTop: 60 },
-  emptyStateText: { marginTop: 15, fontSize: 18, color: '#0f172a', fontWeight: 'bold' },
-  emptyStateSub: { marginTop: 5, fontSize: 14, color: '#64748b' },
-
-  modalContainer: { flex: 1, backgroundColor: '#f8fafc' },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 15, paddingBottom: 15, backgroundColor: '#fff' },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#0f172a' },
-  
-  qrTabs: { flexDirection: 'row', marginHorizontal: 40, marginTop: 20, backgroundColor: '#e2e8f0', borderRadius: 12, padding: 4 },
-  qrTab: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 10, borderRadius: 10, gap: 8 },
+  title: { fontSize: 28, fontWeight: '800', color: '#0f172a' },
+  qrButton: { backgroundColor: '#f1f5f9', padding: 9, borderRadius: 12 },
+  sectionLabel: { fontSize: 12, fontWeight: '800', color: '#94a3b8', paddingHorizontal: 20, marginBottom: 8 },
+  locationRow: { paddingHorizontal: 15, gap: 8, paddingBottom: 12 },
+  locationChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' },
+  locationText: { color: '#334155', fontWeight: '600', fontSize: 13 },
+  search: { margin: 15, marginTop: 5, height: 46, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, backgroundColor: '#f8fafc', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 },
+  searchInput: { flex: 1, color: '#0f172a', fontSize: 15 },
+  tabs: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4, marginBottom: 10 },
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 9 },
+  activeTab: { backgroundColor: '#fff' },
+  tabText: { color: '#64748b', fontWeight: '600', fontSize: 13 },
+  activeTabText: { color: '#0f172a', fontWeight: '800' },
+  content: { flex: 1, backgroundColor: '#f8fafc' },
+  list: { padding: 15, paddingBottom: 100 },
+  card: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 16, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' },
+  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#e2e8f0', marginRight: 13 },
+  cardInfo: { flex: 1 },
+  name: { fontSize: 16, fontWeight: '700', color: '#0f172a' },
+  meta: { color: '#64748b', fontSize: 13, marginTop: 3 },
+  location: { color: '#007AFF', fontSize: 12, marginTop: 3, fontWeight: '600' },
+  connect: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#e6f4fe', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 18, gap: 5 },
+  connectText: { color: '#007AFF', fontWeight: '700' },
+  wave: { padding: 9, backgroundColor: '#fffbeb', borderRadius: 12, marginRight: 6 },
+  chat: { padding: 10, backgroundColor: '#007AFF', borderRadius: 13 },
+  decline: { padding: 9, backgroundColor: '#ffebeb', borderRadius: 13, marginRight: 6 },
+  accept: { padding: 9, backgroundColor: '#34C759', borderRadius: 13 },
+  empty: { alignItems: 'center', paddingTop: 70 },
+  emptyTitle: { fontSize: 18, fontWeight: '800', color: '#334155', marginTop: 12 },
+  emptyText: { color: '#94a3b8', marginTop: 5 },
+  qrModal: { flex: 1, backgroundColor: '#f8fafc' },
+  qrHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18, backgroundColor: '#fff' },
+  qrTitle: { fontSize: 18, fontWeight: '800', color: '#0f172a' },
+  qrTabs: { flexDirection: 'row', margin: 20, backgroundColor: '#e2e8f0', padding: 4, borderRadius: 12 },
+  qrTab: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7, paddingVertical: 10, borderRadius: 9 },
   qrTabActive: { backgroundColor: '#0f172a' },
-  qrTabText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
+  qrTabText: { color: '#64748b', fontWeight: '700' },
   qrTabTextActive: { color: '#fff' },
-
-  qrContentArea: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  
-  myQrBox: { backgroundColor: '#fff', width: '100%', padding: 30, borderRadius: 30, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
-  qrAvatar: { width: 80, height: 80, borderRadius: 40, marginBottom: 15, borderWidth: 4, borderColor: '#f8fafc' },
+  qrCard: { margin: 20, padding: 30, borderRadius: 24, backgroundColor: '#fff', alignItems: 'center', gap: 14 },
+  qrAvatar: { width: 76, height: 76, borderRadius: 38 },
   qrName: { fontSize: 22, fontWeight: '800', color: '#0f172a' },
-  qrHandle: { fontSize: 15, color: '#64748b', marginTop: 4, marginBottom: 30 },
-  qrPlaceholder: { padding: 20, backgroundColor: '#fff', borderRadius: 20, elevation: 5, shadowColor: '#000', shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.1 },
-  qrHelperText: { marginTop: 30, fontSize: 14, color: '#64748b', textAlign: 'center', paddingHorizontal: 20, lineHeight: 20 },
-
-  scannerBox: { width: '100%', aspectRatio: 0.8, backgroundColor: '#000', borderRadius: 30, overflow: 'hidden', position: 'relative' },
-  cameraPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1e293b' },
-  cameraOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'transparent', justifyContent: 'center', alignItems: 'center' },
-  scanningOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
-  
-  scanCorner: { position: 'absolute', width: 40, height: 40, borderColor: '#007AFF', borderWidth: 5 },
-  tl: { top: 60, left: 60, borderBottomWidth: 0, borderRightWidth: 0, borderTopLeftRadius: 20 },
-  tr: { top: 60, right: 60, borderBottomWidth: 0, borderLeftWidth: 0, borderTopRightRadius: 20 },
-  bl: { bottom: 60, left: 60, borderTopWidth: 0, borderRightWidth: 0, borderBottomLeftRadius: 20 },
-  br: { bottom: 60, right: 60, borderTopWidth: 0, borderLeftWidth: 0, borderBottomRightRadius: 20 },
+  qrHint: { textAlign: 'center', color: '#64748b', lineHeight: 20 },
+  scanner: { margin: 20, flex: 1, borderRadius: 24, overflow: 'hidden', backgroundColor: '#000' },
+  scanOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,.65)', alignItems: 'center', justifyContent: 'center' },
+  scanText: { color: '#fff', marginTop: 10 },
 });
 
 export default ConnectScreen;
