@@ -230,8 +230,10 @@ const ChatRoomScreen = ({ route, navigation }) => {
           data={messages}
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
-          inverted 
+          inverted
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={
             isOtherUserTyping ? (
