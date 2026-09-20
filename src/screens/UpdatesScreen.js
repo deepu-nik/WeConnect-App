@@ -19,7 +19,7 @@ import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 
 const { width } = Dimensions.get('window');
 
-const UpdatesScreen = () => {
+const UpdatesScreen = ({ navigation }) => {
   const currentUser = auth.currentUser;
 
   const [posts, setPosts] = useState([]);
