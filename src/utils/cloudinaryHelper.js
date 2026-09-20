@@ -1,3 +1,6 @@
+import { fetch as expoFetch } from 'expo/fetch';
+import { File } from 'expo-file-system';
+
 const CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
@@ -30,18 +33,24 @@ export const uploadToCloudinary = async (fileUri, type = 'auto') => {
     const extension = getExtension(fileUri);
     const resourceType = type === 'image' ? 'image' : type === 'audio' ? 'video' : 'auto';
     const filename = 'upload_' + Date.now() + (extension ? '.' + extension : '');
-    const form = new FormData();
+    const mimeType = getMimeType(extension, type);
 
-    form.append('file', {
-      uri: fileUri,
-      type: getMimeType(extension, type),
-      name: filename,
-    });
+    const file = new File(fileUri);
+    const form = new FormData();
+    form.append('file', file);
     form.append('upload_preset', UPLOAD_PRESET);
 
-    const response = await fetch(
-      'https://api.cloudinary.com/v1_1/' + CLOUD_NAME + '/' + resourceType + '/upload',
-      { method: 'POST', body: form }
+    const response = await expoFetch(
+      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${resourceType}/upload`,
+      {
+        method: 'POST',
+        body: form,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'X-File-Name': filename,
+          'X-File-Type': mimeType,
+        },
+      }
     );
 
     const data = await response.json();
