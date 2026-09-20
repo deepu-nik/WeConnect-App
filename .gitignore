@@ -44,3 +44,4 @@ app-example
 
 # Local Environment Variables
 .env
+.expo/
