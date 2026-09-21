@@ -351,7 +351,7 @@ const ConnectScreen = ({ navigation }) => {
             ) : null}
           </View>
         </View>
-      ) : null>
+      ) : null}
 
       <View style={styles.search}>
         <Search size={18} color="#888" />
