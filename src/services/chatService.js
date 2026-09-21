@@ -13,8 +13,14 @@ import { getUserProfile } from './userService';
 
 export const findDirectChat = async (currentUid, otherUid) => {
   if (!currentUid || !otherUid) return null;
+  const currentProfile = await getUserProfile(currentUid);
+  if (!currentProfile?.collegeId) return null;
   const snapshot = await getDocs(
-    query(collection(db, 'chats'), where('participants', 'array-contains', currentUid))
+    query(
+      collection(db, 'chats'),
+      where('collegeId', '==', currentProfile.collegeId),
+      where('participants', 'array-contains', currentUid)
+    )
   );
   const existing = snapshot.docs.find((item) =>
     Array.isArray(item.data().participants) && item.data().participants.includes(otherUid)
@@ -35,6 +41,7 @@ export const createDirectChat = async ({ currentUser, otherUser, otherUserId }) 
   if (existing) return existing.id;
 
   const chat = await addDoc(collection(db, 'chats'), {
+    collegeId: currentProfile.collegeId,
     participants: [currentUser.uid, otherUserId],
     updatedAt: serverTimestamp(),
     lastMessage: '',
