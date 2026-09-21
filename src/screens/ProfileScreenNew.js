@@ -52,16 +52,16 @@ import { FALLBACK_AVATAR, getUserProfile } from '../services/userService';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 
 const COLORS = {
-  ink: '#111827',
-  muted: '#64748B',
-  blue: '#2563EB',
-  blueSoft: '#EFF6FF',
-  border: '#E5E7EB',
-  bg: '#F6F8FB',
+  ink: '#111111',
+  muted: '#777770',
+  blue: '#FFD60A',
+  blueSoft: '#FFF8D6',
+  border: '#E8E8E3',
+  bg: '#F7F7F5',
   white: '#FFFFFF',
-  green: '#16A34A',
-  purple: '#7C3AED',
-  orange: '#EA580C',
+  green: '#16803C',
+  purple: '#FFD60A',
+  orange: '#FFD60A',
 };
 
 const DEFAULT_ARRAYS = {
@@ -402,10 +402,8 @@ const ProfileScreenNew = ({ route, navigation }) => {
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sectionTabs}>
             <SectionButton icon={UserRound} label="Overview" />
-            <SectionButton icon={Code2} label="Portfolio" />
+            <SectionButton icon={Code2} label="Projects" />
             <SectionButton icon={Trophy} label="Achievements" />
-            <SectionButton icon={BriefcaseBusiness} label="Experience" />
-            <SectionButton icon={Heart} label="Interests" />
           </ScrollView>
 
           {activeSection === 'Overview' && (
@@ -448,7 +446,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
             </>
           )}
 
-          {activeSection === 'Portfolio' && (
+          {activeSection === 'Projects' && (
             <View style={styles.card}>
               <View style={styles.cardHeader}><Text style={styles.cardTitle}>Projects</Text>{isSelf && <TouchableOpacity onPress={() => Alert.alert('Projects', 'Project editor will be added in the next profile phase.')}><Plus size={18} color={COLORS.blue} /></TouchableOpacity>}</View>
               {projects.length ? projects.map((project, index) => (
@@ -475,7 +473,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
             </>
           )}
 
-          {activeSection === 'Experience' && (
+          {false && activeSection === 'Experience' && (
             <View style={styles.card}>
               <View style={styles.cardHeader}><Text style={styles.cardTitle}>Experience</Text></View>
               {experience.length ? experience.map((item, index) => (
@@ -492,7 +490,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
             </View>
           )}
 
-          {activeSection === 'Interests' && (
+          {false && activeSection === 'Interests' && (
             <>
               <View style={styles.card}>
                 <View style={styles.cardHeader}><Text style={styles.cardTitle}>Interests</Text></View>
@@ -549,18 +547,6 @@ const ProfileScreenNew = ({ route, navigation }) => {
 
               <EditorCard title="Skills" hint="Technologies and capabilities you are learning.">
                 <ArrayEditor items={form?.skills || []} label="Skill" placeholder="e.g. React Native" onAdd={(v) => addToArray('skills', v)} onRemove={(v) => removeFromArray('skills', v)} />
-              </EditorCard>
-
-              <EditorCard title="Interests" hint="Domains, hobbies and topics you care about.">
-                <ArrayEditor items={form?.interests || []} label="Interest" placeholder="e.g. Startups" onAdd={(v) => addToArray('interests', v)} onRemove={(v) => removeFromArray('interests', v)} />
-              </EditorCard>
-
-              <EditorCard title="Clubs & Communities" hint="Student clubs, societies and communities.">
-                <ArrayEditor items={form?.clubs || []} label="Community" placeholder="e.g. CodeDecode" onAdd={(v) => addToArray('clubs', v)} onRemove={(v) => removeFromArray('clubs', v)} />
-              </EditorCard>
-
-              <EditorCard title="Languages" hint="Languages you can communicate in.">
-                <ArrayEditor items={form?.languages || []} label="Language" placeholder="e.g. English" onAdd={(v) => addToArray('languages', v)} onRemove={(v) => removeFromArray('languages', v)} />
               </EditorCard>
 
               <EditorCard title="Social & Links" hint="Connect your public work.">
@@ -628,33 +614,33 @@ const styles = StyleSheet.create({
   scroll: { paddingBottom: 50 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.bg },
   errorText: { color: COLORS.muted },
-  cover: { height: 230, backgroundColor: '#172554', position: 'relative' },
+  cover: { height: 210, backgroundColor: COLORS.blue, position: 'relative' },
   coverImage: { ...StyleSheet.absoluteFillObject },
-  coverFallback: { ...StyleSheet.absoluteFillObject, backgroundColor: '#172554' },
-  coverGradient: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,23,42,.32)' },
+  coverFallback: { ...StyleSheet.absoluteFillObject, backgroundColor: COLORS.blue },
+  coverGradient: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,.16)' },
   coverTop: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 6 },
-  coverButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,.45)', alignItems: 'center', justifyContent: 'center' },
-  hero: { marginTop: -28, backgroundColor: COLORS.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 18, paddingTop: 0 },
+  coverButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,.75)', alignItems: 'center', justifyContent: 'center' },
+  hero: { marginTop: -28, backgroundColor: COLORS.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 18, paddingTop: 0 },
   avatarRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   avatarContainer: { width: 104, height: 104, marginTop: -52, position: 'relative' },
   avatar: { width: 104, height: 104, borderRadius: 52, borderWidth: 4, borderColor: COLORS.white, backgroundColor: '#E2E8F0' },
-  avatarCamera: { position: 'absolute', right: 0, bottom: 2, width: 31, height: 31, borderRadius: 16, backgroundColor: COLORS.blue, borderWidth: 2, borderColor: COLORS.white, alignItems: 'center', justifyContent: 'center' },
+  avatarCamera: { position: 'absolute', right: 0, bottom: 2, width: 31, height: 31, borderRadius: 16, backgroundColor: COLORS.ink, borderWidth: 2, borderColor: COLORS.white, alignItems: 'center', justifyContent: 'center' },
   heroActions: { paddingBottom: 9 },
-  primaryOutline: { height: 40, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, borderColor: '#D1D5DB', flexDirection: 'row', alignItems: 'center', gap: 7 },
+  primaryOutline: { height: 40, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, borderColor: COLORS.ink, flexDirection: 'row', alignItems: 'center', gap: 7 },
   primaryOutlineText: { fontWeight: '800', color: COLORS.ink, fontSize: 13 },
   primaryButton: { height: 40, paddingHorizontal: 17, borderRadius: 20, backgroundColor: COLORS.blue, flexDirection: 'row', alignItems: 'center', gap: 7 },
-  primaryButtonText: { color: '#FFF', fontWeight: '800' },
+  primaryButtonText: { color: COLORS.ink, fontWeight: '800' },
   name: { marginTop: 13, fontSize: 26, lineHeight: 31, fontWeight: '900', color: COLORS.ink },
   handle: { marginTop: 2, color: COLORS.muted, fontSize: 14 },
   identityLine: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 9 },
-  identityStrong: { color: COLORS.blue, fontWeight: '800' },
+  identityStrong: { color: COLORS.ink, fontWeight: '800' },
   identityMuted: { color: COLORS.muted },
   bio: { marginTop: 12, color: '#334155', fontSize: 15, lineHeight: 22 },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 14 },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 5, maxWidth: '100%' },
   metaText: { color: COLORS.muted, fontSize: 12 },
-  goalPill: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 13, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 14, backgroundColor: '#F5F3FF' },
-  goalText: { color: COLORS.purple, fontWeight: '700', fontSize: 12 },
+  goalPill: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 13, paddingHorizontal: 11, paddingVertical: 7, borderRadius: 14, backgroundColor: COLORS.blueSoft },
+  goalText: { color: COLORS.ink, fontWeight: '700', fontSize: 12 },
   stats: { marginTop: 18, paddingVertical: 15, borderTopWidth: 1, borderBottomWidth: 1, borderColor: COLORS.border, flexDirection: 'row', alignItems: 'center' },
   stat: { flex: 1, alignItems: 'center' },
   statDivider: { width: 1, height: 27, backgroundColor: COLORS.border },
@@ -668,12 +654,12 @@ const styles = StyleSheet.create({
   progressTrack: { height: 7, borderRadius: 4, backgroundColor: '#DBEAFE', marginTop: 11, overflow: 'hidden' },
   progressFill: { height: 7, borderRadius: 4, backgroundColor: COLORS.blue },
   completeAction: { marginTop: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  completeActionText: { color: COLORS.blue, fontSize: 12, fontWeight: '800' },
+  completeActionText: { color: COLORS.ink, fontSize: 12, fontWeight: '800' },
   sectionTabs: { gap: 8, paddingVertical: 17 },
   sectionTab: { height: 38, paddingHorizontal: 13, borderRadius: 19, backgroundColor: '#F1F5F9', flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sectionTabActive: { backgroundColor: COLORS.blueSoft, borderWidth: 1, borderColor: '#BFDBFE' },
+  sectionTabActive: { backgroundColor: COLORS.blue, borderWidth: 1, borderColor: COLORS.ink },
   sectionTabText: { color: COLORS.muted, fontSize: 12, fontWeight: '800' },
-  sectionTabTextActive: { color: COLORS.blue },
+  sectionTabTextActive: { color: COLORS.ink },
   card: { backgroundColor: COLORS.white, borderRadius: 19, borderWidth: 1, borderColor: COLORS.border, padding: 16, marginBottom: 13 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   cardTitle: { fontSize: 17, fontWeight: '900', color: COLORS.ink },
@@ -685,24 +671,24 @@ const styles = StyleSheet.create({
   detailLabel: { color: COLORS.muted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
   detailValue: { marginTop: 2, color: COLORS.ink, fontSize: 13, fontWeight: '700' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  skillChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: COLORS.blueSoft },
-  skillText: { color: '#1D4ED8', fontWeight: '800', fontSize: 12 },
+  skillChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: COLORS.blueSoft, borderWidth: 1, borderColor: '#F0D33B' },
+  skillText: { color: COLORS.ink, fontWeight: '800', fontSize: 12 },
   miniChip: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 9, backgroundColor: '#F1F5F9' },
   miniChipText: { color: '#475569', fontSize: 11, fontWeight: '700' },
   linksGrid: { gap: 8 },
-  linkCard: { minHeight: 44, paddingHorizontal: 12, borderRadius: 12, backgroundColor: '#F8FAFC', flexDirection: 'row', alignItems: 'center', gap: 9 },
+  linkCard: { minHeight: 44, paddingHorizontal: 12, borderRadius: 12, backgroundColor: '#FAFAF7', flexDirection: 'row', alignItems: 'center', gap: 9 },
   linkCardText: { flex: 1, color: COLORS.ink, fontWeight: '700', fontSize: 13 },
   projectCard: { overflow: 'hidden', borderRadius: 15, borderWidth: 1, borderColor: COLORS.border, marginBottom: 11 },
   projectImage: { width: '100%', height: 150, backgroundColor: '#E2E8F0' },
   projectBody: { padding: 13 },
   projectTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   projectTitle: { flex: 1, fontSize: 16, fontWeight: '900', color: COLORS.ink },
-  featuredBadge: { paddingHorizontal: 7, paddingVertical: 4, borderRadius: 7, backgroundColor: '#FEF3C7' },
-  featuredText: { color: '#92400E', fontSize: 8, fontWeight: '900' },
+  featuredBadge: { paddingHorizontal: 7, paddingVertical: 4, borderRadius: 7, backgroundColor: COLORS.blue },
+  featuredText: { color: COLORS.ink, fontSize: 8, fontWeight: '900' },
   projectDescription: { marginTop: 7, color: COLORS.muted, lineHeight: 19, fontSize: 13 },
   projectLinks: { flexDirection: 'row', gap: 16, marginTop: 11 },
   listItem: { flexDirection: 'row', gap: 11, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  listIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#FFF7ED', alignItems: 'center', justifyContent: 'center' },
+  listIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: COLORS.blueSoft, alignItems: 'center', justifyContent: 'center' },
   listCopy: { flex: 1 },
   listTitle: { color: COLORS.ink, fontWeight: '900', fontSize: 14 },
   listMeta: { marginTop: 3, color: COLORS.muted, fontSize: 12 },
@@ -714,8 +700,8 @@ const styles = StyleSheet.create({
   timelineOrg: { marginTop: 3, color: COLORS.blue, fontWeight: '700' },
   timelinePeriod: { marginTop: 3, color: COLORS.muted, fontSize: 11 },
   timelineDescription: { marginTop: 5, color: '#475569', lineHeight: 18, fontSize: 12 },
-  interestChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: '#F5F3FF' },
-  interestText: { color: '#6D28D9', fontWeight: '800', fontSize: 12 },
+  interestChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: COLORS.blueSoft },
+  interestText: { color: COLORS.ink, fontWeight: '800', fontSize: 12 },
   emptyState: { alignItems: 'center', paddingVertical: 20, paddingHorizontal: 12 },
   emptyIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { marginTop: 9, color: COLORS.ink, fontWeight: '900' },
@@ -749,8 +735,8 @@ const styles = StyleSheet.create({
   addButton: { width: 49, height: 49, borderRadius: 12, backgroundColor: COLORS.ink, alignItems: 'center', justifyContent: 'center' },
   editChip: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: '#FFF1F2', borderWidth: 1, borderColor: '#FECDD3' },
   editChipText: { color: '#9F1239', fontSize: 12, fontWeight: '800' },
-  saveButton: { height: 56, borderRadius: 16, backgroundColor: COLORS.blue, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 2 },
-  saveText: { color: '#FFF', fontWeight: '900', fontSize: 15 },
+  saveButton: { height: 56, borderRadius: 16, backgroundColor: COLORS.blue, borderWidth: 1, borderColor: COLORS.ink, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 2 },
+  saveText: { color: COLORS.ink, fontWeight: '900', fontSize: 15 },
 });
 
 export default ProfileScreenNew;
