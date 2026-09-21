@@ -283,39 +283,37 @@ const ProfileScreen = ({ route, navigation }) => {
       <Modal
         visible={editVisible}
         animationType="slide"
-        transparent
+        presentationStyle="pageSheet"
         onRequestClose={() => setEditVisible(false)}
       >
         <KeyboardAvoidingView
-          style={styles.modalOverlay}
+          style={styles.editorScreen}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={0}
         >
-          <View style={styles.modal}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalEyebrow}>EDIT PROFILE</Text>
-                <Text style={styles.modalTitle}>Edit Profile</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.modalClose}
-                onPress={() => setEditVisible(false)}
-                accessibilityLabel="Close edit profile"
-              >
-                <X size={24} color="#111111" />
-              </TouchableOpacity>
+          <View style={styles.editorHeader}>
+            <View style={styles.editorHeaderText}>
+              <Text style={styles.editorKicker}>PROFILE</Text>
+              <Text style={styles.editorTitle}>Edit Profile</Text>
+              <Text style={styles.editorSubtitle}>Update the information classmates see.</Text>
             </View>
-
-            <ScrollView
-              style={styles.formScroll}
-              contentContainerStyle={styles.form}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-              automaticallyAdjustKeyboardInsets
+            <TouchableOpacity
+              style={styles.editorClose}
+              onPress={() => setEditVisible(false)}
+              accessibilityLabel="Close edit profile"
             >
-              <Text style={styles.formSectionTitle}>Identity</Text>
-              <Text style={styles.formSectionHint}>How classmates identify you on WeConnect.</Text>
+              <X size={22} color="#111111" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            style={styles.editorScroll}
+            contentContainerStyle={styles.editorContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.editorSection}>
+              <Text style={styles.editorSectionTitle}>Identity</Text>
+              <Text style={styles.editorSectionHint}>How classmates identify you on WeConnect.</Text>
 
               {[
                 ['name', 'Full Name'],
@@ -324,123 +322,132 @@ const ProfileScreen = ({ route, navigation }) => {
                 ['gradYear', 'Class of'],
                 ['location', 'Campus Location'],
               ].map(([key, label]) => (
-                <View key={key}>
-                  <Text style={styles.label}>{label}</Text>
+                <View key={key} style={styles.editorField}>
+                  <Text style={styles.editorLabel}>{label}</Text>
                   <TextInput
-                    style={styles.input}
+                    style={styles.editorInput}
                     value={String(form?.[key] ?? '')}
                     onChangeText={(value) => setForm({ ...form, [key]: value })}
                     placeholder={label}
-                    placeholderTextColor="#9A9A93"
+                    placeholderTextColor="#A1A1AA"
                     keyboardType={key === 'gradYear' ? 'numeric' : 'default'}
                     autoCapitalize={key === 'handle' ? 'none' : 'sentences'}
                     autoCorrect={key !== 'handle'}
                   />
                 </View>
               ))}
+            </View>
 
-              <View style={styles.formSection}>
-                <Text style={styles.formSectionTitle}>About</Text>
-                <Text style={styles.formSectionHint}>Tell people a little about yourself.</Text>
-                <Text style={styles.label}>Bio</Text>
+            <View style={styles.editorSection}>
+              <Text style={styles.editorSectionTitle}>About</Text>
+              <Text style={styles.editorSectionHint}>Give classmates a quick introduction.</Text>
+              <View style={styles.editorField}>
+                <Text style={styles.editorLabel}>Bio</Text>
                 <TextInput
-                  style={[styles.input, styles.multiline]}
+                  style={[styles.editorInput, styles.editorTextarea]}
                   value={form?.bio || ''}
                   onChangeText={(value) => setForm({ ...form, bio: value })}
                   placeholder="A short bio..."
-                  placeholderTextColor="#9A9A93"
+                  placeholderTextColor="#A1A1AA"
                   multiline
                   textAlignVertical="top"
                 />
               </View>
+            </View>
 
-              <View style={styles.formSection}>
-                <Text style={styles.formSectionTitle}>Social & Links</Text>
-                <Text style={styles.formSectionHint}>Add links classmates can use to find your work.</Text>
-                {[
-                  ['website', 'Website'],
-                  ['instagram', 'Instagram Username / URL'],
-                  ['linkedin', 'LinkedIn Username / URL'],
-                  ['github', 'GitHub Username / URL'],
-                  ['whatsapp', 'WhatsApp Number'],
-                  ['resumeLink', 'Resume / Portfolio Link'],
-                ].map(([key, label]) => (
-                  <View key={key}>
-                    <Text style={styles.label}>{label}</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={String(form?.[key] ?? '')}
-                      onChangeText={(value) => setForm({ ...form, [key]: value })}
-                      placeholder={label}
-                      placeholderTextColor="#9A9A93"
-                      keyboardType={key === 'whatsapp' ? 'phone-pad' : key === 'website' || key === 'instagram' || key === 'linkedin' || key === 'github' || key === 'resumeLink' ? 'url' : 'default'}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </View>
-                ))}
-              </View>
+            <View style={styles.editorSection}>
+              <Text style={styles.editorSectionTitle}>Social & Links</Text>
+              <Text style={styles.editorSectionHint}>Add places where classmates can find you.</Text>
 
-              <View style={styles.formSection}>
-                <Text style={styles.formSectionTitle}>Projects & Skills</Text>
-                <Text style={styles.formSectionHint}>Show what you're building and learning.</Text>
+              {[
+                ['website', 'Website'],
+                ['instagram', 'Instagram Username / URL'],
+                ['linkedin', 'LinkedIn Username / URL'],
+                ['github', 'GitHub Username / URL'],
+                ['whatsapp', 'WhatsApp Number'],
+                ['resumeLink', 'Resume / Portfolio Link'],
+              ].map(([key, label]) => (
+                <View key={key} style={styles.editorField}>
+                  <Text style={styles.editorLabel}>{label}</Text>
+                  <TextInput
+                    style={styles.editorInput}
+                    value={String(form?.[key] ?? '')}
+                    onChangeText={(value) => setForm({ ...form, [key]: value })}
+                    placeholder={label}
+                    placeholderTextColor="#A1A1AA"
+                    keyboardType={key === 'whatsapp' ? 'phone-pad' : key === 'website' || key === 'instagram' || key === 'linkedin' || key === 'github' || key === 'resumeLink' ? 'url' : 'default'}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+              ))}
+            </View>
 
-                <Text style={styles.label}>Projects Completed</Text>
+            <View style={styles.editorSection}>
+              <Text style={styles.editorSectionTitle}>Projects & Skills</Text>
+              <Text style={styles.editorSectionHint}>Show what you are building and learning.</Text>
+
+              <View style={styles.editorField}>
+                <Text style={styles.editorLabel}>Projects Completed</Text>
                 <TextInput
-                  style={styles.input}
+                  style={styles.editorInput}
                   value={String(form?.projectsCount ?? '')}
                   onChangeText={(value) => setForm({ ...form, projectsCount: value.replace(/[^0-9]/g, '') })}
                   placeholder="0"
-                  placeholderTextColor="#9A9A93"
+                  placeholderTextColor="#A1A1AA"
                   keyboardType="numeric"
                 />
+              </View>
 
-                <Text style={styles.label}>Currently Learning</Text>
-                <View style={styles.addSkillRow}>
+              <View style={styles.editorField}>
+                <Text style={styles.editorLabel}>Currently Learning</Text>
+                <View style={styles.editorSkillRow}>
                   <TextInput
-                    style={[styles.input, styles.skillInput]}
+                    style={[styles.editorInput, styles.editorSkillInput]}
                     value={newSkill}
                     onChangeText={setNewSkill}
                     placeholder="e.g. Node.js"
-                    placeholderTextColor="#9A9A93"
+                    placeholderTextColor="#A1A1AA"
                     autoCapitalize="words"
                   />
                   <TouchableOpacity
-                    style={styles.addSkill}
+                    style={styles.editorAddSkill}
                     onPress={addSkill}
                     accessibilityLabel="Add skill"
                   >
-                    <Plus size={20} color="#fff" />
+                    <Plus size={20} color="#FFFFFF" />
                   </TouchableOpacity>
                 </View>
+              </View>
 
-                <View style={styles.editSkills}>
-                  {form?.skills?.map((skill) => (
-                    <View style={styles.editSkill} key={skill}>
-                      <Text style={styles.editSkillText}>{skill}</Text>
+              {!!form?.skills?.length && (
+                <View style={styles.editorSkills}>
+                  {form.skills.map((skill) => (
+                    <View style={styles.editorSkillChip} key={skill}>
+                      <Text style={styles.editorSkillText}>{skill}</Text>
                       <TouchableOpacity
                         onPress={() => setForm({ ...form, skills: form.skills.filter((item) => item !== skill) })}
                         accessibilityLabel={`Remove ${skill}`}
                       >
-                        <Trash2 size={14} color="#FF3B30" />
+                        <Trash2 size={14} color="#B4233A" />
                       </TouchableOpacity>
                     </View>
                   ))}
                 </View>
-              </View>
+              )}
+            </View>
 
-              <TouchableOpacity
-                style={styles.saveButton}
-                onPress={saveProfile}
-                disabled={saving}
-                activeOpacity={0.86}
-              >
-                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveText}>Save Changes</Text>}
-              </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.editorSave}
+              onPress={saveProfile}
+              disabled={saving}
+              activeOpacity={0.86}
+            >
+              {saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.editorSaveText}>Save Changes</Text>}
+            </TouchableOpacity>
 
-              <View style={styles.formBottomSpace} />
-            </ScrollView>
-          </View>
+            <View style={styles.editorBottomSpace} />
+          </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -490,29 +497,31 @@ const styles = StyleSheet.create({
   activity: { flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 15, backgroundColor: '#f8fafc' },
   activityTitle: { fontWeight: '800', color: '#0f172a' },
   activitySub: { color: '#64748b', marginTop: 3 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,.52)', justifyContent: 'flex-end' },
-  modal: { height: '92%', backgroundColor: '#F7F7F5', borderTopLeftRadius: 26, borderTopRightRadius: 26, overflow: 'hidden' },
-  modalHeader: { minHeight: 82, paddingHorizontal: 20, paddingVertical: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E5E5DF', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  modalEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.4, color: '#8A8A84', marginBottom: 2 },
-  modalTitle: { fontSize: 22, fontWeight: '900', color: '#111111' },
-  modalClose: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F0F0EB', alignItems: 'center', justifyContent: 'center' },
-  formScroll: { flex: 1 },
-  form: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
-  formSection: { marginTop: 28 },
-  formSectionTitle: { fontSize: 17, fontWeight: '900', color: '#111111', marginBottom: 4 },
-  formSectionHint: { fontSize: 11.5, lineHeight: 17, color: '#85857E', marginBottom: 7 },
-  label: { color: '#62625C', fontSize: 11, fontWeight: '800', marginTop: 14, marginBottom: 7 },
-  input: { minHeight: 49, borderWidth: 1, borderColor: '#E0E0DA', backgroundColor: '#FFFFFF', borderRadius: 13, paddingHorizontal: 14, color: '#111111', fontSize: 14 },
-  multiline: { minHeight: 92, paddingTop: 12 },
-  addSkillRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  skillInput: { flex: 1 },
-  addSkill: { width: 49, height: 49, borderRadius: 13, backgroundColor: '#111111', alignItems: 'center', justifyContent: 'center' },
-  editSkills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  editSkill: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFF4F5', borderWidth: 1, borderColor: '#FFD5D9', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 14 },
-  editSkillText: { color: '#B4233A', fontWeight: '800', fontSize: 12 },
-  saveButton: { height: 54, backgroundColor: '#111111', borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: 30 },
-  saveText: { color: '#FFFFFF', fontWeight: '900', fontSize: 15 },
-  formBottomSpace: { height: 35 },
+  editorScreen: { flex: 1, backgroundColor: '#F6F7F9' },
+  editorHeader: { minHeight: 96, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E5E7EB', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  editorHeaderText: { flex: 1, paddingRight: 12 },
+  editorKicker: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5, color: '#007AFF', marginBottom: 3 },
+  editorTitle: { fontSize: 24, fontWeight: '900', color: '#111827' },
+  editorSubtitle: { marginTop: 3, fontSize: 12, color: '#6B7280' },
+  editorClose: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+  editorScroll: { flex: 1 },
+  editorContent: { padding: 16, paddingBottom: 12 },
+  editorSection: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#E5E7EB' },
+  editorSectionTitle: { fontSize: 18, fontWeight: '900', color: '#111827', marginBottom: 4 },
+  editorSectionHint: { fontSize: 12, lineHeight: 17, color: '#6B7280', marginBottom: 4 },
+  editorField: { marginTop: 13 },
+  editorLabel: { color: '#374151', fontSize: 11, fontWeight: '800', marginBottom: 7 },
+  editorInput: { minHeight: 50, borderWidth: 1, borderColor: '#D1D5DB', backgroundColor: '#FAFAFA', borderRadius: 12, paddingHorizontal: 13, color: '#111827', fontSize: 14 },
+  editorTextarea: { minHeight: 100, paddingTop: 12 },
+  editorSkillRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  editorSkillInput: { flex: 1 },
+  editorAddSkill: { width: 50, height: 50, borderRadius: 12, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center' },
+  editorSkills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  editorSkillChip: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFF1F2', borderWidth: 1, borderColor: '#FECDD3', paddingHorizontal: 11, paddingVertical: 8, borderRadius: 14 },
+  editorSkillText: { color: '#9F1239', fontWeight: '800', fontSize: 12 },
+  editorSave: { height: 56, backgroundColor: '#007AFF', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  editorSaveText: { color: '#FFFFFF', fontWeight: '900', fontSize: 15 },
+  editorBottomSpace: { height: 28 },
 });
 
 export default ProfileScreen;
