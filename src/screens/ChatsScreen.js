@@ -75,7 +75,7 @@ const ChatsScreen = ({ navigation }) => {
 
         // Chat documents can contain an old/null avatar. The users document is
         // the source of truth so profile-photo changes are reflected here too.
-        if (otherUserId && !avatar) {
+        if (otherUserId) {
           try {
             const userSnap = await getDoc(doc(db, 'users', otherUserId));
             if (userSnap.exists()) {
