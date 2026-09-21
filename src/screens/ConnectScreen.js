@@ -269,6 +269,7 @@ const ConnectScreen = ({ navigation }) => {
         isPinchToZoomEnabled: true,
       });
     } catch (error) {
+      if (String(error?.message || '').toLowerCase().includes('cancel')) return;
       console.error('Native QR scanner failed:', error);
       Alert.alert(
         'Scanner unavailable',
