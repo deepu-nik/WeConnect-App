@@ -37,6 +37,13 @@
           }
         }
       ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow WeConnect to use your camera to scan QR codes.",
+          "barcodeScannerEnabled": true
+        }
+      ],
       "expo-font",
       "expo-image",
       "expo-router",
