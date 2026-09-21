@@ -89,6 +89,8 @@ const ProfileScreenNew = ({ route, navigation }) => {
   const [fullScreenAvatar, setFullScreenAvatar] = useState(null);
   const [activeSection, setActiveSection] = useState('Overview');
   const [form, setForm] = useState(null);
+  const [projectEditorVisible, setProjectEditorVisible] = useState(false);
+  const [projectForm, setProjectForm] = useState(null);
 
   const loadProfile = async () => {
     if (!targetUid) return;
@@ -230,6 +232,92 @@ const ProfileScreenNew = ({ route, navigation }) => {
     }
   };
 
+  const openProjectEditor = (project = null) => {
+    if (!isSelf) return;
+    setProjectForm({
+      id: project?.id || '',
+      title: project?.title || '',
+      description: project?.description || '',
+      techStack: Array.isArray(project?.techStack) ? [...project.techStack] : [],
+      github: project?.github || '',
+      liveUrl: project?.liveUrl || '',
+      image: project?.image || '',
+      featured: Boolean(project?.featured),
+    });
+    setProjectEditorVisible(true);
+  };
+
+  const closeProjectEditor = () => {
+    setProjectEditorVisible(false);
+    setProjectForm(null);
+  };
+
+  const updateProjectForm = (key, value) => {
+    setProjectForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const addProjectTech = (value) => {
+    const clean = value.trim();
+    if (!clean || projectForm?.techStack?.includes(clean)) return;
+    updateProjectForm('techStack', [...(projectForm?.techStack || []), clean]);
+  };
+
+  const removeProjectTech = (value) => {
+    updateProjectForm('techStack', (projectForm?.techStack || []).filter((item) => item !== value));
+  };
+
+  const saveProject = async () => {
+    if (!projectForm || !currentUser?.uid || !projectForm.title.trim()) {
+      Alert.alert('Project title required', 'Add a title before saving the project.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const existing = Array.isArray(user?.projects) ? user.projects : [];
+      const project = {
+        id: projectForm.id || ('project_' + Date.now()),
+        title: projectForm.title.trim(),
+        description: projectForm.description.trim(),
+        techStack: projectForm.techStack || [],
+        github: projectForm.github.trim(),
+        liveUrl: projectForm.liveUrl.trim(),
+        image: projectForm.image || '',
+        featured: Boolean(projectForm.featured),
+        updatedAt: new Date().toISOString(),
+      };
+      let projects = projectForm.id
+        ? existing.map((item) => item.id === projectForm.id ? project : item)
+        : [...existing, project];
+      if (project.featured) projects = projects.map((item) => item.id === project.id ? item : { ...item, featured: false });
+      await updateDoc(doc(db, 'users', currentUser.uid), { projects });
+      setUser((prev) => ({ ...prev, projects }));
+      closeProjectEditor();
+    } catch (error) {
+      console.error('Project save failed:', error);
+      Alert.alert('Error', 'Could not save this project.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteProject = (projectId) => {
+    Alert.alert('Delete project?', 'This project will be removed from your profile.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try {
+          setSaving(true);
+          const projects = (user?.projects || []).filter((item) => item.id !== projectId);
+          await updateDoc(doc(db, 'users', currentUser.uid), { projects });
+          setUser((prev) => ({ ...prev, projects }));
+        } catch (error) {
+          console.error('Project delete failed:', error);
+          Alert.alert('Error', 'Could not delete this project.');
+        } finally {
+          setSaving(false);
+        }
+      } },
+    ]);
+  };
   const pickImage = async (type) => {
     if (!isSelf) return;
 
@@ -467,7 +555,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
 
           {activeSection === 'Projects' && (
             <View style={styles.card}>
-              <View style={styles.cardHeader}><Text style={styles.cardTitle}>Projects</Text>{isSelf && <TouchableOpacity onPress={() => Alert.alert('Projects', 'Project editing is coming next.')}><Plus size={18} color={COLORS.ink} /></TouchableOpacity>}</View>
+              <View style={styles.cardHeader}><Text style={styles.cardTitle}>Projects</Text>{isSelf && <TouchableOpacity onPress={() => openProjectEditor()}><Plus size={18} color={COLORS.ink} /></TouchableOpacity>}</View>
               {projects.length ? projects.map((project, index) => (
                 <View style={styles.projectCard} key={project.id || project.title || index}>
                   {!!project.image && <Image source={{ uri: project.image }} style={styles.projectImage} />}
@@ -478,6 +566,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
                     <View style={styles.projectLinks}>
                       {!!project.github && <TouchableOpacity onPress={() => openLink(project.github)}><Github size={18} color={COLORS.ink} /></TouchableOpacity>}
                       {!!project.liveUrl && <TouchableOpacity onPress={() => openLink(project.liveUrl)}><ExternalLink size={18} color={COLORS.ink} /></TouchableOpacity>}
+                      {isSelf && <><TouchableOpacity onPress={() => openProjectEditor(project)}><Edit3 size={18} color={COLORS.ink} /></TouchableOpacity><TouchableOpacity onPress={() => deleteProject(project.id)}><Trash2 size={18} color="#B4233A" /></TouchableOpacity></>}
                     </View>
                   </View>
                 </View>
@@ -604,6 +693,38 @@ const ProfileScreenNew = ({ route, navigation }) => {
 
               <TouchableOpacity style={styles.saveButton} onPress={saveSection} disabled={saving}>
                 {saving ? <ActivityIndicator color={COLORS.ink} /> : <><CheckCircle2 size={18} color={COLORS.ink} /><Text style={styles.saveText}>Save changes</Text></>}
+              </TouchableOpacity>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
+
+      <Modal visible={projectEditorVisible} animationType="slide" onRequestClose={closeProjectEditor}>
+        <SafeAreaView style={styles.editorRoot}>
+          <KeyboardAvoidingView style={styles.editorKeyboard} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+            <View style={styles.editorHeader}>
+              <View>
+                <Text style={styles.editorEyebrow}>PROJECT</Text>
+                <Text style={styles.editorTitle}>{projectForm?.id ? 'Edit Project' : 'Add Project'}</Text>
+                <Text style={styles.editorSubtitle}>Build a clean portfolio entry.</Text>
+              </View>
+              <TouchableOpacity style={styles.closeButton} onPress={closeProjectEditor}><X size={22} color={COLORS.ink} /></TouchableOpacity>
+            </View>
+            <ScrollView style={styles.editorScroll} contentContainerStyle={styles.editorContent} keyboardShouldPersistTaps="handled">
+              <EditorCard title="Project details" hint="Add the information classmates and recruiters can use.">
+                <Field label="Project Title" value={projectForm?.title} onChange={(v) => updateProjectForm('title', v)} placeholder="e.g. WeConnect" />
+                <Field label="Description" value={projectForm?.description} onChange={(v) => updateProjectForm('description', v)} placeholder="What does this project do?" multiline />
+                <Field label="GitHub URL" value={projectForm?.github} onChange={(v) => updateProjectForm('github', v)} autoCapitalize="none" keyboardType="url" placeholder="https://github.com/..." />
+                <Field label="Live Demo URL" value={projectForm?.liveUrl} onChange={(v) => updateProjectForm('liveUrl', v)} autoCapitalize="none" keyboardType="url" placeholder="https://..." />
+                <Text style={styles.fieldLabel}>Tech Stack</Text>
+                <ArrayEditor items={projectForm?.techStack || []} label="Technology" placeholder="e.g. React Native" onAdd={addProjectTech} onRemove={removeProjectTech} />
+                <TouchableOpacity style={styles.featureToggle} onPress={() => updateProjectForm('featured', !projectForm?.featured)}>
+                  <View style={[styles.checkbox, projectForm?.featured && styles.checkboxActive]}>{projectForm?.featured && <CheckCircle2 size={15} color={COLORS.ink} />}</View>
+                  <View style={styles.featureCopy}><Text style={styles.featureTitle}>Featured project</Text><Text style={styles.featureSubtitle}>Highlight this project on your profile.</Text></View>
+                </TouchableOpacity>
+              </EditorCard>
+              <TouchableOpacity style={styles.saveButton} onPress={saveProject} disabled={saving}>
+                {saving ? <ActivityIndicator color={COLORS.ink} /> : <><CheckCircle2 size={18} color={COLORS.ink} /><Text style={styles.saveText}>Save project</Text></>}
               </TouchableOpacity>
             </ScrollView>
           </KeyboardAvoidingView>
@@ -803,6 +924,12 @@ const styles = StyleSheet.create({
     borderColor: '#FECDD3',
   },
   editChipText: { color: '#B4233A', fontSize: 12, fontWeight: '800' },
+  featureToggle: { marginTop: 18, padding: 12, borderRadius: 14, backgroundColor: COLORS.blueSoft, borderWidth: 1, borderColor: '#E8E500', flexDirection: 'row', alignItems: 'center', gap: 10 },
+  checkbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 1.5, borderColor: COLORS.ink, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white },
+  checkboxActive: { backgroundColor: COLORS.blue },
+  featureCopy: { flex: 1 },
+  featureTitle: { color: COLORS.ink, fontSize: 13, fontWeight: '900' },
+  featureSubtitle: { marginTop: 2, color: COLORS.muted, fontSize: 11 },
 });
 
 export default ProfileScreenNew;
