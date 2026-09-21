@@ -141,11 +141,11 @@ service cloud.firestore {
     // CONNECTION REQUESTS
     // -----------------------------------------------------------------------
     match /connectionRequests/{requestId} {
-      allow get, list: if signedIn() &&
+      allow get, list: if verified() &&
         (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid) &&
         resource.data.senderId != resource.data.receiverId;
 
-      allow create: if signedIn() &&
+      allow create: if verified() &&
         request.resource.data.senderId == request.auth.uid &&
         request.resource.data.receiverId != request.auth.uid &&
         request.resource.data.status == 'pending' &&
@@ -154,7 +154,7 @@ service cloud.firestore {
         request.resource.data.get('sender', {}).get('uid', '') == request.auth.uid &&
         request.resource.data.get('receiver', {}).get('uid', '') == request.resource.data.receiverId;
 
-      allow update: if signedIn() &&
+      allow update: if verified() &&
         resource.data.status == 'pending' &&
         resource.data.receiverId == request.auth.uid &&
         request.resource.data.senderId == resource.data.senderId &&
