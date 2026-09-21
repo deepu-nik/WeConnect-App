@@ -21,6 +21,7 @@ import ProfileStats from '../components/profile/ProfileStats';
 import ProfileSection from '../components/profile/ProfileSection';
 import ProfileLinks from '../components/profile/ProfileLinks';
 import ProfileTabs from '../components/profile/ProfileTabs';
+import { LockKeyhole } from 'lucide-react-native';
 
 const SKILL_GROUPS = [
   { title: 'Core', keys: ['C++', 'Python', 'Java', 'JavaScript', 'TypeScript'] },
@@ -70,6 +71,7 @@ const ProfileScreen = ({ route, navigation }) => {
   const [qrVisible, setQrVisible] = useState(false);
 
   const isConnected = isSelf || connectionState === 'connected' || Boolean(user?.connections?.includes(currentUser?.uid));
+  const canSee = (key) => isSelf || user?.privacy?.[key] === 'everyone' || (user?.privacy?.[key] === 'connections' && isConnected);
 
   useEffect(() => {
     let active = true;
@@ -150,6 +152,8 @@ const ProfileScreen = ({ route, navigation }) => {
     loadPosts();
     return () => { active = false; };
   }, [targetUid]);
+
+  const openPrivacy = () => navigation.navigate('ProfilePrivacy');
 
   const openEdit = () => {
     if (!user) return;
@@ -349,30 +353,30 @@ const ProfileScreen = ({ route, navigation }) => {
         <ProfileSection title="About" subtitle="Your campus identity">
           <View style={styles.infoCard}>
             <InfoRow icon={UserRound} label="About" value={user.bio || 'Add a short introduction about yourself.'} multiline />
-            <InfoRow icon={GraduationCap} label="Education" value={(user.course || 'B.Tech Computer Science') + (user.gradYear ? ' • Class of ' + user.gradYear : '')} />
-            <InfoRow icon={MapPin} label="Location" value={user.location || 'Campus'} />
+            {canSee('education') && <InfoRow icon={GraduationCap} label="Education" value={(user.course || 'B.Tech Computer Science') + (user.gradYear ? ' • Class of ' + user.gradYear : '')} />}
+            {canSee('location') && <InfoRow icon={MapPin} label="Location" value={user.location || 'Campus'} />}
           </View>
         </ProfileSection>
 
-        <ProfileSection title="Skills" subtitle="What you build and learn" action={isSelf ? { label: 'Manage', onPress: openEdit } : undefined}>
+        <ProfileSection title="Skills" subtitle="What you build and learn" action={isSelf ? { label: 'Manage', onPress: openEdit } : undefined}>{canSee('skills') && (
           {groupedSkills.length ? groupedSkills.map((group) => (
             <View key={group.title} style={styles.skillGroup}>
               <Text style={styles.skillGroupTitle}>{group.title}</Text>
               <View style={styles.skillRow}>{group.values.map((skill) => <View key={skill} style={styles.skillPill}><Code2 size={13} color="#111" /><Text style={styles.skillText}>{skill}</Text></View>)}</View>
             </View>
           )) : <View style={styles.emptyCard}><Code2 size={20} color="#777770" /><Text style={styles.emptyTitle}>No skills added yet</Text><Text style={styles.emptyText}>Add technologies and interests to help people understand what you do.</Text>{isSelf && <TouchableOpacity style={styles.smallButton} onPress={openEdit}><Text style={styles.smallButtonText}>Add skills</Text></TouchableOpacity>}</View>}
-        </ProfileSection>
+        )}</ProfileSection>
 
-        <ProfileSection title="Education & Experience" subtitle="Build your professional identity">
+        <ProfileSection title="Education & Experience" subtitle="Build your professional identity">{canSee('experience') && (
           <View style={styles.timelineCard}>
             <TimelineItem icon={GraduationCap} title={user.course || 'Computer Science Engineering'} subtitle={(user.gradYear ? 'Class of ' + user.gradYear : 'Student') + ' • ' + (user.location || 'Campus')} />
             {(user.experience || []).map((item, index) => <TimelineItem key={'exp-' + index} icon={BriefcaseBusiness} title={item.title || item.role || 'Experience'} subtitle={[item.company, item.period].filter(Boolean).join(' • ') || item.description || 'Professional experience'} last={index === user.experience.length - 1 && !(user.achievements || []).length} />)}
             {(user.achievements || []).slice(0, 3).map((item, index) => <TimelineItem key={'ach-' + index} icon={Award} title={item.title || 'Achievement'} subtitle={[item.issuer, item.year].filter(Boolean).join(' • ') || item.description || 'Achievement'} last={index === Math.min((user.achievements || []).length, 3) - 1} />)}
             {!user.experience?.length && !user.achievements?.length && <Text style={styles.emptyTimelineText}>{isSelf ? 'Add experience and achievements to build your professional timeline.' : 'No experience or achievements added yet.'}</Text>}
           </View>
-        </ProfileSection>
+        )}</ProfileSection>
 
-        <ProfileSection title="Portfolio" subtitle="Show what you have built" action={isSelf ? { label: 'Edit', onPress: openEdit } : undefined}>
+        <ProfileSection title="Portfolio" subtitle="Show what you have built" action={isSelf ? { label: 'Edit', onPress: openEdit } : undefined}>{canSee('projects') && (
           {(user.projects || []).length ? (user.projects || []).slice(0, 6).map((project, index) => (
             <TouchableOpacity key={'project-' + index} style={styles.projectCard} onPress={() => project.url && openLink(project.url, 'Project')} activeOpacity={0.85}>
               <View style={styles.portfolioIcon}><Code2 size={21} color="#111" /></View>
@@ -380,15 +384,13 @@ const ProfileScreen = ({ route, navigation }) => {
               {project.url ? <ExternalLink size={17} color="#fff" /> : <Text style={styles.arrow}>›</Text>}
             </TouchableOpacity>
           )) : <View style={styles.emptyCard}><Code2 size={22} color="#777770" /><Text style={styles.emptyTitle}>No projects added yet</Text><Text style={styles.emptyText}>{isSelf ? 'Add projects to make your portfolio useful for collaborators and recruiters.' : 'This student has not added projects yet.'}</Text>{isSelf && <TouchableOpacity style={styles.smallButton} onPress={openEdit}><Text style={styles.smallButtonText}>Edit profile</Text></TouchableOpacity>}</View>}
-        </ProfileSection>
+        )}</ProfileSection>
 
-        <ProfileSection title="Links" subtitle="Connect your digital identity">
-          <ProfileLinks user={user} onOpen={openLink} />
-        </ProfileSection>
+        <ProfileSection title="Links" subtitle="Connect your digital identity">{canSee('socialLinks') ? <ProfileLinks user={user} onOpen={openLink} /> : <View style={styles.privateCard}><LockIcon /><Text style={styles.privateText}>Visible to connections only.</Text></View>}</ProfileSection>
 
         <ProfileSection title="Highlights" subtitle="The things you want people to notice">
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlightRow}>
-            <Highlight icon={Code2} title="Projects" value={String(user.projectsCount || 0)} />
+            <Highlight icon={Code2} title="Projects" value={String(user.projects?.length || user.projectsCount || 0)} />
             <Highlight icon={Award} title="Achievements" value="Add" />
             <Highlight icon={QrCode} title="QR Profile" value="Show QR" onPress={() => setQrVisible(true)} />
             <Highlight icon={BookOpen} title="Vault" value={String(vaultCount)} onPress={() => navigation.navigate('Vault')} />
@@ -397,9 +399,9 @@ const ProfileScreen = ({ route, navigation }) => {
 
         <ProfileTabs active={activeTab} onChange={setActiveTab} />
         <View style={styles.tabContent}>
-          {activeTab === 'posts' && (postsLoading ? <View style={styles.tabLoading}><ActivityIndicator size="small" color="#111" /></View> : posts.length ? posts.slice(0, 8).map((post) => <PostCard key={post.id} post={post} />) : <EmptyTab icon={Sparkles} title="No recent posts" text={isSelf ? 'Your recent Updates posts will appear here.' : 'This student has no recent posts.'} />)}
-          {activeTab === 'projects' && ((user.projects || []).length ? user.projects.slice(0, 8).map((project, index) => <ProjectRow key={index} project={project} onOpen={openLink} />) : <EmptyTab icon={Code2} title="No projects yet" text={isSelf ? 'Add projects to showcase your work.' : 'No projects have been added yet.'} />)}
-          {activeTab === 'activity' && <View><ActivityRow icon={CheckCircle2} title={(user.connections?.length || 0) + ' connections'} text="Your current WeConnect network" /><ActivityRow icon={Award} title={(user.achievements?.length || 0) + ' achievements'} text="Achievements and certifications" /><ActivityRow icon={Code2} title={(user.projects?.length || user.projectsCount || 0) + ' projects'} text="Projects and builds" /></View>}
+          {activeTab === 'posts' && (canSee('activity') ? (postsLoading ? <View style={styles.tabLoading}><ActivityIndicator size="small" color="#111" /></View> : posts.length ? posts.slice(0, 8).map((post) => <PostCard key={post.id} post={post} />) : <EmptyTab icon={Sparkles} title="No recent posts" text={isSelf ? 'Your recent Updates posts will appear here.' : 'This student has no recent posts.'} /> ) : <EmptyTab icon={LockKeyhole} title="Activity is private" text="This student has limited activity visibility." />)}
+          {activeTab === 'projects' && (canSee('projects') ? ((user.projects || []).length ? user.projects.slice(0, 8).map((project, index) => <ProjectRow key={index} project={project} onOpen={openLink} />) : <EmptyTab icon={Code2} title="No projects yet" text={isSelf ? 'Add projects to showcase your work.' : 'No projects have been added yet.'} /> ) : <EmptyTab icon={LockKeyhole} title="Projects are private" text="This student has limited project visibility." />)}
+          {activeTab === 'activity' && (canSee('activity') ? <View><ActivityRow icon={CheckCircle2} title={(user.connections?.length || 0) + ' connections'} text="Your current WeConnect network" /><ActivityRow icon={Award} title={(user.achievements?.length || 0) + ' achievements'} text="Achievements and certifications" /><ActivityRow icon={Code2} title={(user.projects?.length || user.projectsCount || 0) + ' projects'} text="Projects and builds" /></View> : <EmptyTab icon={LockKeyhole} title="Activity is private" text="This student has limited activity visibility." />)}
         </View>
         <View style={styles.footerSpace} />
       </ScrollView>
@@ -416,6 +418,7 @@ const ProfileScreen = ({ route, navigation }) => {
         <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setProfileMenuVisible(false)}>
           <View style={styles.menuCard}>
             <Text style={styles.menuTitle}>{user.name}</Text>
+            <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); openPrivacy(); }}><LockKeyhole size={18} color="#111" /><Text>Profile Privacy</Text></TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} onPress={shareProfile}><ShareIcon /><Text>Share profile</Text></TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} onPress={() => { setProfileMenuVisible(false); Alert.alert('Report profile', 'Reporting will be available in the moderation module.'); }}><Text style={styles.menuDanger}>Report profile</Text></TouchableOpacity>
             <TouchableOpacity style={styles.menuCancel} onPress={() => setProfileMenuVisible(false)}><Text style={styles.menuCancelText}>Cancel</Text></TouchableOpacity>
@@ -456,6 +459,7 @@ const EmptyTab=({icon:Icon,title,text})=><View style={styles.emptyTab}><View sty
 const PostCard=({post})=><View style={styles.postCard}>{post.imageUrl?<Image source={{uri:post.imageUrl}} style={styles.postImage} resizeMode="cover"/>:null}<Text style={styles.postType}>{String(post.type||'UPDATE').replace('_',' ').toUpperCase()}</Text><Text style={styles.postText}>{post.content || post.question || post.eventName || 'Campus update'}</Text><View style={styles.postMeta}><Text style={styles.postMetaText}>{post.likes?.length || 0} likes</Text><Text style={styles.postMetaText}>{post.commentCount || 0} comments</Text></View></View>;
 const ProjectRow=({project,onOpen})=><TouchableOpacity style={styles.projectRow} onPress={()=>project.url&&onOpen(project.url,'Project')}><View style={styles.projectRowIcon}><Code2 size={18} color="#111"/></View><View style={styles.projectRowCopy}><Text style={styles.projectRowTitle}>{project.name||project.title||'Project'}</Text><Text style={styles.projectRowText} numberOfLines={2}>{project.description||project.tech||'Project build'}</Text></View>{project.url?<ExternalLink size={16} color="#777"/>:null}</TouchableOpacity>;
 const ActivityRow=({icon:Icon,title,text})=><View style={styles.activityRow}><View style={styles.activityIcon}><Icon size={17} color="#111"/></View><View style={styles.activityCopy}><Text style={styles.activityTitle}>{title}</Text><Text style={styles.activityText}>{text}</Text></View></View>;
+const LockIcon=()=> <LockKeyhole size={17} color="#777770" />;
 const ShareIcon=()=> <Text style={{fontSize:18}}>↗</Text>;
 
 const styles=StyleSheet.create({
