@@ -6,7 +6,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 // Import screens
 import ChatsScreen from '../screens/ChatsScreen';
 import ConnectScreen from '../screens/ConnectScreen';
-import ProfileScreen from '../screens/ProfileScreen';
+import ProfileScreen from '../screens/ProfileScreenNew';
 import UpdatesScreen from '../screens/UpdatesScreen';
 import VaultScreen from '../screens/VaultScreen';
 
