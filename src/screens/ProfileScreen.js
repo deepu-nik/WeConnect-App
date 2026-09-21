@@ -147,9 +147,17 @@ const ProfileScreen = ({ route, navigation }) => {
       const field = type === 'avatar' ? 'photoURL' : 'coverPhoto';
       const patch = { [field]: url };
       if (type === 'avatar') patch.avatar = url;
+
       await updateDoc(doc(db, 'users', currentUser.uid), patch);
-      if (type === 'avatar') await updateProfile(currentUser, { photoURL: url });
-      setUser((prev) => ({ ...prev, [type === 'avatar' ? 'avatar' : 'coverPhoto']: url }));
+      if (type === 'avatar') {
+        await updateProfile(currentUser, { photoURL: url });
+      }
+
+      // Keep the screen immediately in sync with Firestore.
+      setUser((prev) => ({
+        ...prev,
+        [type === 'avatar' ? 'avatar' : 'coverPhoto']: url,
+      }));
     } catch (error) {
       console.error('Image upload failed:', error);
       Alert.alert('Error', 'Could not update the image.');
