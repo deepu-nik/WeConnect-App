@@ -44,9 +44,6 @@ const ConnectScreen = ({ navigation }) => {
   const [qrMode, setQrMode] = useState('my_code');
   const [scanned, setScanned] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
-  const [cameraReady, setCameraReady] = useState(false);
-  const [cameraError, setCameraError] = useState('');
-  const [cameraKey, setCameraKey] = useState(0);
   const [locationPreview, setLocationPreview] = useState(null);
   const scanLineY = useMemo(() => new Animated.Value(0), []);
   const [permission, requestPermission] = useCameraPermissions();
@@ -201,9 +198,6 @@ const ConnectScreen = ({ navigation }) => {
     setQrMode(mode);
     setScanned(false);
     setScanSuccess(false);
-    setCameraReady(false);
-    setCameraError('');
-    if (mode === 'scan') setCameraKey((value) => value + 1);
     setQrVisible(true);
   };
 
@@ -226,45 +220,25 @@ const ConnectScreen = ({ navigation }) => {
       }
     }
 
-    if (CameraView.isModernBarcodeScannerAvailable) {
-      setQrVisible(false);
-      setScanned(false);
-      setScanSuccess(false);
-      try {
-        await CameraView.launchScanner({
-          barcodeTypes: ['qr'],
-          isGuidanceEnabled: true,
-          isHighlightingEnabled: true,
-          isPinchToZoomEnabled: true,
-        });
-      } catch (error) {
-        console.error('Native QR scanner failed:', error);
-        Alert.alert('Scanner unavailable', 'Could not open the device QR scanner.');
-      }
-      return;
-    }
-
-    // Fallback for devices without the native scanner.
-    openQr('scan');
-  };
-
-  const handleCameraReady = () => {
-    setCameraError('');
-    setCameraReady(true);
-  };
-
-  const handleCameraMountError = ({ nativeEvent }) => {
-    const message = nativeEvent?.message || 'The camera could not be started.';
-    console.error('Camera mount failed:', message);
-    setCameraReady(false);
-    setCameraError(message);
-  };
-
-  const retryCamera = () => {
-    setCameraReady(false);
-    setCameraError('');
+    setQrVisible(false);
+    setQrMode('scan');
     setScanned(false);
-    setCameraKey((value) => value + 1);
+    setScanSuccess(false);
+
+    try {
+      await CameraView.launchScanner({
+        barcodeTypes: ['qr'],
+        isGuidanceEnabled: true,
+        isHighlightingEnabled: true,
+        isPinchToZoomEnabled: true,
+      });
+    } catch (error) {
+      console.error('Native QR scanner failed:', error);
+      Alert.alert(
+        'Scanner unavailable',
+        error?.message || 'The device QR scanner could not be opened. Please make sure Camera access is enabled for WeConnect.'
+      );
+    }
   };
 
   const handleScan = useCallback(async ({ data }) => {
@@ -279,17 +253,8 @@ const ConnectScreen = ({ navigation }) => {
       if (profile.uid === currentUser?.uid) throw new Error('You cannot connect with yourself.');
       await connectUsersViaQr(currentUser.uid, profile.uid);
 
-      if (!qrVisible && CameraView.isModernBarcodeScannerAvailable) {
-        await CameraView.dismissScanner().catch(() => {});
-        setScanned(false);
-        setScanSuccess(false);
-        openProfile(navigation, { uid: profile.uid, name: profile.name, avatar: profile.avatar });
-        return;
-      }
-
-      setScanSuccess(true);
-      await new Promise((resolve) => setTimeout(resolve, 1100));
-      setQrVisible(false);
+      await CameraView.dismissScanner().catch(() => {});
+      setScanned(false);
       setScanSuccess(false);
       openProfile(navigation, { uid: profile.uid, name: profile.name, avatar: profile.avatar });
     } catch (error) {
@@ -300,9 +265,9 @@ const ConnectScreen = ({ navigation }) => {
   }, [scanned, scanSuccess, currentUser, navigation]);
 
   useEffect(() => {
-    const subscription = CameraView.onModernBarcodeScanned(async ({ data }) => {
+    const subscription = CameraView.onModernBarcodeScanned(({ data }) => {
       if (!data || scanned || scanSuccess) return;
-      await handleScan({ data });
+      handleScan({ data });
     });
     return () => subscription.remove();
   }, [scanned, scanSuccess, handleScan]);
@@ -386,32 +351,34 @@ const ConnectScreen = ({ navigation }) => {
       </View>
 
       <Text style={styles.sectionLabel}>WHERE ARE YOU?</Text>
-      <FlatList
-        horizontal
-        data={[...LOCATIONS, ['Custom', '✏️', '#111111']]}
-        keyExtractor={([name]) => name}
-        showsHorizontalScrollIndicator={false}
-        style={styles.locationList}
-        contentContainerStyle={styles.locationRow}
-        renderItem={({ item: [name, icon] }) => (
-          <TouchableOpacity
-            style={[styles.locationCard, name !== 'Custom' && myLocation === name && styles.locationCardActive]}
-            onPress={() => name === 'Custom' ? customLocation() : updateLocation(name, icon)}
-            activeOpacity={0.85}
-          >
-            {name !== 'Custom' && myLocationPhoto && myLocation === name ? (
-              <Image source={{ uri: myLocationPhoto }} style={styles.locationCardPhoto} />
-            ) : (
-              <View style={styles.locationCardIconWrap}>
-                <Text style={styles.locationCardIcon}>{icon}</Text>
-              </View>
-            )}
-            <Text style={[styles.locationCardName, name !== 'Custom' && myLocation === name && styles.locationCardNameActive]} numberOfLines={1}>
-              {name}
-            </Text>
-          </TouchableOpacity>
-        )}
-      />
+      <View style={styles.locationViewport}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          bounces={false}
+          contentContainerStyle={styles.locationRow}
+        >
+          {[...LOCATIONS, ['Custom', '✏️', '#111111']].map(([name, icon]) => (
+            <TouchableOpacity
+              key={name}
+              style={[styles.locationCard, name !== 'Custom' && myLocation === name && styles.locationCardActive]}
+              onPress={() => name === 'Custom' ? customLocation() : updateLocation(name, icon)}
+              activeOpacity={0.85}
+            >
+              {name !== 'Custom' && myLocationPhoto && myLocation === name ? (
+                <Image source={{ uri: myLocationPhoto }} style={styles.locationCardPhoto} />
+              ) : (
+                <View style={styles.locationCardIconWrap}>
+                  <Text style={styles.locationCardIcon}>{icon}</Text>
+                </View>
+              )}
+              <Text style={[styles.locationCardName, name !== 'Custom' && myLocation === name && styles.locationCardNameActive]} numberOfLines={1}>
+                {name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
       {myLocation ? (
         <View style={styles.locationStatusRow}>
@@ -522,40 +489,16 @@ const ConnectScreen = ({ navigation }) => {
               <Text style={styles.qrHint}>Let a classmate scan this code to open your profile.</Text>
             </View>
           ) : (
-            <View style={styles.scanner}>
-              <CameraView
-                key={cameraKey}
-                style={styles.camera}
-                facing="back"
-                onCameraReady={handleCameraReady}
-                onMountError={handleCameraMountError}
-                onBarcodeScanned={scanned || !!cameraError ? undefined : handleScan}
-                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-              />
-              <View style={styles.cameraShade} pointerEvents="none" />
-              <View style={styles.scanFrame} pointerEvents="none">
-                <View style={[styles.corner, styles.cornerTL]} />
-                <View style={[styles.corner, styles.cornerTR]} />
-                <View style={[styles.corner, styles.cornerBL]} />
-                <View style={[styles.corner, styles.cornerBR]} />
-                {!scanSuccess && <Animated.View style={[styles.scanBeam, { transform: [{ translateY: scanLineY.interpolate({ inputRange: [0, 1], outputRange: [0, 210] }) }] }]} />}
-              </View>
-              {cameraError ? (
-                <View style={styles.cameraErrorOverlay}>
-                  <Text style={styles.cameraErrorTitle}>Camera unavailable</Text>
-                  <Text style={styles.cameraErrorText}>We couldn't start the camera preview.</Text>
-                  <TouchableOpacity style={styles.cameraRetryButton} onPress={retryCamera}>
-                    <Text style={styles.cameraRetryText}>Try again</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : !cameraReady ? (
-                <View style={styles.cameraLoadingOverlay} pointerEvents="none">
-                  <ActivityIndicator size="large" color="#FFFC00" />
-                  <Text style={styles.cameraLoadingText}>Starting camera…</Text>
-                </View>
-              ) : null}
-              <Text style={styles.scanInstruction}>Point your camera at a WeConnect QR code</Text>
-              {scanSuccess && <View style={styles.scanSuccessOverlay}><View style={styles.successCircle}><Check size={42} color="#111111" strokeWidth={3} /></View><Text style={styles.successTitle}>You’re friends now!</Text><Text style={styles.successSub}>Connection added successfully</Text></View>}
+            <View style={styles.nativeScannerInfo}>
+              <ScanLine size={42} color="#111111" />
+              <Text style={styles.nativeScannerTitle}>QR Scanner</Text>
+              <Text style={styles.nativeScannerText}>
+                Tap below to open the device’s native QR scanner.
+              </Text>
+              <TouchableOpacity style={styles.nativeScannerButton} onPress={openScanner} activeOpacity={0.85}>
+                <ScanLine size={19} color="#111111" />
+                <Text style={styles.nativeScannerButtonText}>Open Scanner</Text>
+              </TouchableOpacity>
             </View>
           )}
         </SafeAreaView>
@@ -570,8 +513,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: '#111111' },
   qrButton: { backgroundColor: '#F0F0EC', padding: 9, borderRadius: 12 },
   sectionLabel: { fontSize: 12, fontWeight: '800', color: '#999999', paddingHorizontal: 20, marginBottom: 8 },
-  locationList: { height: 102, flexGrow: 0, flexShrink: 0 },
-  locationRow: { paddingHorizontal: 15, alignItems: 'flex-start', paddingBottom: 8, gap: 8 },
+  locationViewport: { height: 92, flexGrow: 0, flexShrink: 0, width: '100%' },
+  locationRow: { paddingHorizontal: 15, alignItems: 'flex-start', height: 92, gap: 8 },
   search: { margin: 15, marginTop: 5, height: 46, borderWidth: 1, borderColor: '#E8E8E3', borderRadius: 12, backgroundColor: '#F7F7F5', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, color: '#111111', fontSize: 15 },
   tabs: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#F0F0EC', borderRadius: 12, padding: 4, marginBottom: 10 },
@@ -639,28 +582,11 @@ const styles = StyleSheet.create({
   qrAvatar: { width: 76, height: 76, borderRadius: 38 },
   qrName: { fontSize: 22, fontWeight: '800', color: '#111111' },
   qrHint: { textAlign: 'center', color: '#707070', lineHeight: 20 },
-  scanner: { margin: 20, flex: 1, borderRadius: 24, overflow: 'hidden', backgroundColor: '#000', position: 'relative' },
-  camera: { ...StyleSheet.absoluteFillObject },
-  cameraShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.16)' },
-  scanFrame: { position: 'absolute', width: 230, height: 230, alignSelf: 'center', top: '28%' },
-  corner: { position: 'absolute', width: 34, height: 34, borderColor: '#FFFC00' },
-  cornerTL: { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: 10 },
-  cornerTR: { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: 10 },
-  cornerBL: { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: 10 },
-  cornerBR: { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: 10 },
-  scanBeam: { position: 'absolute', left: 8, right: 8, top: 8, height: 3, backgroundColor: '#FFFC00', shadowColor: '#FFFC00', shadowOpacity: 0.9, shadowRadius: 8, elevation: 5 },
-  scanInstruction: { position: 'absolute', left: 20, right: 20, bottom: 24, textAlign: 'center', color: '#fff', fontSize: 14, fontWeight: '600' },
-  cameraLoadingOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.48)' },
-  cameraLoadingText: { color: '#fff', fontSize: 14, fontWeight: '700', marginTop: 10 },
-  cameraErrorOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30, backgroundColor: 'rgba(0,0,0,0.82)' },
-  cameraErrorTitle: { color: '#fff', fontSize: 20, fontWeight: '900' },
-  cameraErrorText: { color: '#ddd', fontSize: 13, textAlign: 'center', marginTop: 7, lineHeight: 19 },
-  cameraRetryButton: { marginTop: 16, backgroundColor: '#FFFC00', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 18 },
-  cameraRetryText: { color: '#111111', fontSize: 13, fontWeight: '900' },
-  scanSuccessOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,252,0,0.96)', alignItems: 'center', justifyContent: 'center' },
-  successCircle: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  successTitle: { color: '#111111', fontSize: 25, fontWeight: '900' },
-  successSub: { color: '#333', fontSize: 14, marginTop: 6 },
+  nativeScannerInfo: { flex: 1, margin: 20, borderRadius: 24, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 },
+  nativeScannerTitle: { marginTop: 14, fontSize: 22, fontWeight: '900', color: '#111111' },
+  nativeScannerText: { marginTop: 8, textAlign: 'center', color: '#707070', lineHeight: 20 },
+  nativeScannerButton: { marginTop: 22, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFFC00', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 22 },
+  nativeScannerButtonText: { color: '#111111', fontWeight: '900' },
 });
 
 export default ConnectScreen;
