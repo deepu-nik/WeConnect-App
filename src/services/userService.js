@@ -16,7 +16,6 @@ export const normalizeUser = (uid, data = {}) => ({
   location: data.location || 'Campus',
   locationIcon: data.locationIcon || '📍',
   locationPhoto: data.locationPhoto || '',
-  course: data.course || '',
   gradYear: data.gradYear || '',
   skills: Array.isArray(data.skills) ? data.skills : [],
   connections: Array.isArray(data.connections) ? data.connections : [],
