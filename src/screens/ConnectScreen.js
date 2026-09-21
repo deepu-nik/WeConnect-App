@@ -13,7 +13,7 @@ import {
 import QRCode from 'react-native-qrcode-svg';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, query, where } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { acceptConnectionRequest, connectUsersViaQr, declineConnectionRequest, sendConnectionRequest, subscribeToConnectionRequests } from '../services/connectionService';
 import { getUserProfile, normalizeUser } from '../services/userService';
@@ -62,21 +62,43 @@ const ConnectScreen = ({ navigation }) => {
 
   useEffect(() => {
     if (!currentUser) return undefined;
-    const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
-      const next = snapshot.docs
-        .filter((item) => item.id !== currentUser.uid)
-        .map((item) => normalizeUser(item.id, item.data()));
-      const me = snapshot.docs.find((item) => item.id === currentUser.uid);
-      if (me?.data()?.location) setMyLocation(me.data().location);
-      if (me?.data()?.locationIcon) setMyLocationIcon(me.data().locationIcon);
-      if (me?.data()?.locationPhoto) setMyLocationPhoto(me.data().locationPhoto);
-      setUsers(next);
-      setLoading(false);
-    }, (error) => {
-      console.error('Users subscription failed:', error);
-      setLoading(false);
-    });
-    return unsubscribe;
+    let unsubscribe = null;
+    let active = true;
+
+    const subscribeToCampusUsers = async () => {
+      try {
+        const meProfile = await getUserProfile(currentUser.uid);
+        if (!meProfile?.collegeId) {
+          if (active) setLoading(false);
+          return;
+        }
+
+        const usersQuery = query(collection(db, 'users'), where('collegeId', '==', meProfile.collegeId));
+        unsubscribe = onSnapshot(usersQuery, (snapshot) => {
+          const next = snapshot.docs
+            .filter((item) => item.id !== currentUser.uid)
+            .map((item) => normalizeUser(item.id, item.data()));
+          const me = snapshot.docs.find((item) => item.id === currentUser.uid);
+          if (me?.data()?.location) setMyLocation(me.data().location);
+          if (me?.data()?.locationIcon) setMyLocationIcon(me.data().locationIcon);
+          if (me?.data()?.locationPhoto) setMyLocationPhoto(me.data().locationPhoto);
+          setUsers(next);
+          setLoading(false);
+        }, (error) => {
+          console.error('Campus users subscription failed:', error);
+          setLoading(false);
+        });
+      } catch (error) {
+        console.error('Could not load campus profile:', error);
+        if (active) setLoading(false);
+      }
+    };
+
+    subscribeToCampusUsers();
+    return () => {
+      active = false;
+      if (unsubscribe) unsubscribe();
+    };
   }, [currentUser]);
 
   useEffect(() => {
