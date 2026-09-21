@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, updateDoc } from 'firebase/firestore';
+import { deleteField, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { getUserProfile } from '../services/userService';
 import { COLLEGES, DEFAULT_COLLEGE_ID } from '../config/collegeConfig';
@@ -22,6 +22,19 @@ export const AuthProvider = ({ children }) => {
       }
 
       try {
+        const rawProfileSnapshot = await getDoc(doc(db, 'users', nextUser.uid));
+        const rawProfile = rawProfileSnapshot.exists() ? rawProfileSnapshot.data() : null;
+
+        if (rawProfile?.email) {
+          await setDoc(doc(db, 'userPrivate', nextUser.uid), {
+            email: rawProfile.email,
+            migratedAt: new Date(),
+          }, { merge: true });
+          await updateDoc(doc(db, 'users', nextUser.uid), {
+            email: deleteField(),
+          });
+        }
+
         let nextProfile = await getUserProfile(nextUser.uid);
         if (nextProfile && !nextProfile.collegeId) {
           const college = COLLEGES.find((item) => item.id === DEFAULT_COLLEGE_ID);
