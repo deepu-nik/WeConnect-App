@@ -555,7 +555,7 @@ const styles = StyleSheet.create({
   fullPreviewImage: { flex: 1, width: '100%', height: '100%' },
   previewBottomBar: { flexDirection: 'row', alignItems: 'center', padding: 20, backgroundColor: 'rgba(0,0,0,0.5)', position: 'absolute', bottom: 0, width: '100%' },
   captionInput: { flex: 1, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 25, paddingHorizontal: 20, height: 50, fontSize: 16, marginRight: 15 },
-  sendPreviewBtn: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#007AFF', justifyContent: 'center', alignItems: 'center' },,
+  sendPreviewBtn: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#007AFF', justifyContent: 'center', alignItems: 'center' },
   mediaViewer: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
   viewerGestureArea: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   viewerImage: { width: '100%', height: '100%' },
