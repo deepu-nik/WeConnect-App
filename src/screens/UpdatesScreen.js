@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { auth, db } from '../config/firebase';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, arrayRemove, orderBy, increment } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
+import MediaShareSheet from '../components/MediaShareSheet';
 
 const { width } = Dimensions.get('window');
 
@@ -41,6 +42,8 @@ const UpdatesScreen = ({ navigation }) => {
   // Form States
   const [caption, setCaption] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedMedia, setSelectedMedia] = useState([]);
+  const [mediaShareVisible, setMediaShareVisible] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']); 
   const [eventName, setEventName] = useState('');
@@ -86,12 +89,10 @@ const UpdatesScreen = ({ navigation }) => {
   }, [activePostId]);
 
   // --- UPLOAD / CREATE POST LOGIC ---
-  const pickImage = async () => {
-    const options = { mediaTypes: ['images'], allowsEditing: true, quality: 0.8 };
-    let result = await ImagePicker.launchImageLibraryAsync(options);
-    if (!result.canceled && result.assets[0].uri) {
-      setSelectedImage(result.assets[0].uri);
-    }
+  const handleMediaPicked = async (items, mediaCaption) => {
+    setSelectedMedia(items);
+    setSelectedImage(items[0]?.uri || null);
+    if (mediaCaption) setCaption(mediaCaption);
   };
 
   const handleCreatePost = async () => {
@@ -109,9 +110,14 @@ const UpdatesScreen = ({ navigation }) => {
         return alert('Please add a poll question.');
       }
       let imageUrl = null;
-      if ((postType === 'image' || postType === 'spotted') && selectedImage) {
-        imageUrl = await uploadToCloudinary(selectedImage, 'image');
-        if (!imageUrl) throw new Error("Image upload failed");
+      let mediaItems = [];
+      if ((postType === 'image' || postType === 'spotted') && selectedMedia.length) {
+        for (const media of selectedMedia) {
+          const url = await uploadToCloudinary(media.uri, media.type);
+          if (!url) throw new Error('Media upload failed');
+          mediaItems.push({ url, type: media.type });
+        }
+        imageUrl = mediaItems[0]?.url || null;
       }
 
       const newPost = {
@@ -133,6 +139,7 @@ const UpdatesScreen = ({ navigation }) => {
         };
         newPost.content = caption;
         newPost.imageUrl = imageUrl;
+        newPost.mediaItems = mediaItems;
       }
 
       if (postType === 'poll') {
@@ -160,6 +167,7 @@ const UpdatesScreen = ({ navigation }) => {
       setModalVisible(false);
       setCaption('');
       setSelectedImage(null);
+      setSelectedMedia([]);
       setPollQuestion('');
       setPollOptions(['', '']);
       setEventName('');
@@ -314,11 +322,22 @@ const UpdatesScreen = ({ navigation }) => {
             <TouchableOpacity style={styles.moreIcon}><MoreVertical size={20} color="#94a3b8" /></TouchableOpacity>
           </View>
 
-          {item.imageUrl && (
-            <View style={styles.imageWrapper}>
-              <Image source={{ uri: item.imageUrl }} style={styles.premiumImage} resizeMode="cover" />
-            </View>
-          )}
+          {(item.mediaItems?.length || item.imageUrl) ? (
+            <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={styles.mediaCarousel}>
+              {(item.mediaItems?.length ? item.mediaItems : [{ url: item.imageUrl, type: 'image' }]).map((media, index) => (
+                <View key={media.url || index} style={styles.imageWrapper}>
+                  {media.type === 'video' ? (
+                    <View style={[styles.premiumImage, styles.videoPostPlaceholder]}>
+                      <Camera size={34} color="#fff" />
+                      <Text style={styles.videoPostText}>Video</Text>
+                    </View>
+                  ) : (
+                    <Image source={{ uri: media.url }} style={styles.premiumImage} resizeMode="cover" />
+                  )}
+                </View>
+              ))}
+            </ScrollView>
+          ) : null}
 
           <View style={styles.cardFooter}>
             {item.content ? (
@@ -645,13 +664,24 @@ const UpdatesScreen = ({ navigation }) => {
               {/* IMAGE / SPOTTED INPUT */}
               {(postType === 'image' || postType === 'spotted') && (
                 <>
-                  <TouchableOpacity style={styles.imagePickerBtn} onPress={pickImage}>
-                    {selectedImage ? (
-                      <Image source={{ uri: selectedImage }} style={styles.previewImage} resizeMode="cover" />
+                  <TouchableOpacity style={styles.imagePickerBtn} onPress={() => setMediaShareVisible(true)}>
+                    {selectedMedia.length ? (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectedMediaRow}>
+                        {selectedMedia.map((media) => (
+                          <View key={media.uri} style={styles.selectedMediaTile}>
+                            {media.type === 'video' ? (
+                              <View style={styles.videoSelected}><Camera size={24} color="#fff" /></View>
+                            ) : (
+                              <Image source={{ uri: media.uri }} style={styles.previewImage} resizeMode="cover" />
+                            )}
+                          </View>
+                        ))}
+                      </ScrollView>
                     ) : (
                       <View style={styles.imagePickerPlaceholder}>
-                        <Camera size={32} color="#888" />
-                        <Text style={styles.imagePickerText}>Tap to choose a photo</Text>
+                        <ImageIcon size={32} color="#888" />
+                        <Text style={styles.imagePickerText}>Add photos or videos</Text>
+                        <Text style={styles.imagePickerSubtext}>Select up to 10</Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -740,6 +770,15 @@ const UpdatesScreen = ({ navigation }) => {
           </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
+
+      <MediaShareSheet
+        visible={mediaShareVisible}
+        onClose={() => setMediaShareVisible(false)}
+        onShare={handleMediaPicked}
+        title="Add media to your Buzz"
+        shareLabel="Use media"
+        allowMultiple
+      />
 
       {/* --- COMMENTS BOTTOM SHEET MODAL --- */}
       <Modal visible={isCommentsVisible} animationType="slide" transparent={true} onRequestClose={() => setCommentsVisible(false)}>
@@ -934,6 +973,13 @@ const styles = StyleSheet.create({
   previewImage: { width: '100%', height: '100%' },
   imagePickerPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   imagePickerText: { marginTop: 10, fontSize: 15, color: '#888', fontWeight: '500' },
+  imagePickerSubtext: { marginTop: 4, fontSize: 12, color: '#94a3b8' },
+  selectedMediaRow: { padding: 8, gap: 8 },
+  selectedMediaTile: { width: 120, height: 120, borderRadius: 12, overflow: 'hidden', backgroundColor: '#0f172a' },
+  videoSelected: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f172a' },
+  mediaCarousel: { marginBottom: 0 },
+  videoPostPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f172a' },
+  videoPostText: { color: '#fff', fontWeight: '700', marginTop: 7 },
   captionInput: { fontSize: 16, color: '#0f172a', minHeight: 80 },
 
   confessionInputWrapper: { backgroundColor: '#0f172a', borderRadius: 20, padding: 24, minHeight: 250, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 6 },
