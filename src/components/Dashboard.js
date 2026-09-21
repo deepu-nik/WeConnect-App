@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { 
   View, Text, StyleSheet, Animated, TouchableOpacity, TextInput, 
-  ScrollView, Dimensions, LayoutAnimation, Platform, UIManager, Alert 
+  ScrollView, Dimensions, LayoutAnimation, Alert 
 } from 'react-native';
+
 import { 
   Calendar, CheckSquare, Receipt, BookOpen, AlarmClock, 
   X, Plus, Trash2, CheckCircle, Circle, Share2, Clock, Edit3, ChevronUp, Edit2
@@ -12,10 +13,6 @@ import QRCode from 'react-native-qrcode-svg';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH * 0.65; 
 const CARD_SPACING = (SCREEN_WIDTH - CARD_WIDTH) / 2;
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 const Dashboard = ({ onClose }) => {
   const [expandedCard, setExpandedCard] = useState(null);
