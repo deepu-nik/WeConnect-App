@@ -64,6 +64,14 @@ export const declineConnectionRequest = async (request) => {
   });
 };
 
+export const connectUsersViaQr = async (currentUid, otherUid) => {
+  if (!currentUid || !otherUid || currentUid === otherUid) throw new Error('Invalid QR profile.');
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'users', currentUid), { connections: arrayUnion(otherUid) });
+  batch.update(doc(db, 'users', otherUid), { connections: arrayUnion(currentUid) });
+  await batch.commit();
+};
+
 export const subscribeToConnectionRequests = (uid, callback) => {
   const q = query(collection(db, 'connectionRequests'), where('receiverId', '==', uid));
   return onSnapshot(q, (snapshot) => {
