@@ -136,6 +136,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [mediaVisible, setMediaVisible] = useState(false);
   const [detailsVisible, setDetailsVisible] = useState(false);
+  const [messagingAllowed, setMessagingAllowed] = useState(false);
+  const [checkingMessagingAccess, setCheckingMessagingAccess] = useState(true);
 
   const imageMessages = useMemo(
     () => messages.filter((message) => message.mediaUrl && message.mediaType === 'image' && !message.deleted),
@@ -147,6 +149,45 @@ const ChatRoomScreen = ({ route, navigation }) => {
     if (!queryText) return [];
     return messages.filter((message) => message.text?.toLowerCase().includes(queryText));
   }, [messages, searchQuery]);
+
+  useEffect(() => {
+    let active = true;
+    const checkMessagingAccess = async () => {
+      if (!currentUser?.uid || !otherUserId) {
+        setMessagingAllowed(false);
+        setCheckingMessagingAccess(false);
+        return;
+      }
+      try {
+        const [me, other] = await Promise.all([
+          getUserProfile(currentUser.uid),
+          getUserProfile(otherUserId),
+        ]);
+        const connected = Boolean(
+          me?.connections?.includes(otherUserId) && other?.connections?.includes(currentUser.uid)
+        );
+        if (!active) return;
+        setMessagingAllowed(connected);
+        if (!connected) {
+          Alert.alert('Connect first', 'You can message this person after you are connected.', [
+            { text: 'OK', onPress: () => navigation.goBack() },
+          ]);
+        }
+      } catch (error) {
+        console.error('Messaging access check failed:', error);
+        if (active) {
+          setMessagingAllowed(false);
+          Alert.alert('Connect first', 'You can message this person after you are connected.', [
+            { text: 'OK', onPress: () => navigation.goBack() },
+          ]);
+        }
+      } finally {
+        if (active) setCheckingMessagingAccess(false);
+      }
+    };
+    checkMessagingAccess();
+    return () => { active = false; };
+  }, [currentUser?.uid, otherUserId, navigation]);
 
   useEffect(() => {
     let active = true;
@@ -221,6 +262,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
   };
 
   const createChatIfNeeded = async () => {
+    if (!messagingAllowed) throw new Error('You can message this person only after connecting.');
     if (chatId) return chatId;
     if (!currentUser || !otherUserId) throw new Error('Missing chat participants');
 
@@ -246,6 +288,10 @@ const ChatRoomScreen = ({ route, navigation }) => {
   };
 
   const sendMessage = async (mediaUrl = null, mediaType = null, caption = null) => {
+    if (checkingMessagingAccess || !messagingAllowed) {
+      Alert.alert('Connect first', 'You can message this person after you are connected.');
+      return;
+    }
     const messageText = caption ?? inputText.trim();
     if (!messageText && !mediaUrl) return;
 
