@@ -585,7 +585,8 @@ const UpdatesScreen = ({ navigation }) => {
       {loading ? (
         <View style={styles.centerContainer}><ActivityIndicator size="large" color="#007AFF" /></View>
       ) : (
-        <StoriesStrip navigation={navigation} />
+        <>
+          <StoriesStrip navigation={navigation} />
 
       <FlatList
           data={posts}
@@ -600,6 +601,7 @@ const UpdatesScreen = ({ navigation }) => {
             </View>
           }
         />
+        </>
       )}
 
       {/* --- CREATE POST MODAL --- */}
