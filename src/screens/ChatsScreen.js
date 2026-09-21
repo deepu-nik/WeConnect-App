@@ -17,40 +17,6 @@ import { getUserProfile } from '../services/userService';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DASHBOARD_MAX_HEIGHT = SCREEN_HEIGHT * 0.5;
 
-// --- STORY BACKGROUND GRADIENTS (Fallback to solid colors for standard RN Views) ---
-const STORY_BACKGROUNDS = [
-  '#ff7e5f', // Sunset Orange
-  '#00c6ff', // Ocean Blue
-  '#f12711', // Fire Red
-  '#8E2DE2', // Deep Purple
-  '#11998e', // Emerald Green
-  '#111111'  // Dark Slate
-];
-
-// --- CUSTOM DRAGGABLE TEXT COMPONENT ---
-const DraggableText = ({ overlay }) => {
-  const pan = useRef(new Animated.ValueXY({ x: overlay.x, y: overlay.y })).current;
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        pan.setOffset({ x: pan.x._value, y: pan.y._value });
-        pan.setValue({ x: 0, y: 0 });
-      },
-      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
-      onPanResponderRelease: () => { pan.flattenOffset(); }
-    })
-  ).current;
-
-  return (
-    <Animated.View {...panResponder.panHandlers} style={[pan.getLayout(), { position: 'absolute', padding: 10 }]}>
-      <Text style={[styles.draggableText, { color: overlay.color, fontSize: overlay.fontSize }]}>
-        {overlay.text}
-      </Text>
-    </Animated.View>
-  );
-};
 
 const ChatsScreen = ({ navigation }) => {
   const [chats, setChats] = useState([]);
@@ -109,105 +75,6 @@ const ChatsScreen = ({ navigation }) => {
     setIsSearching(false);
     setSearchQuery('');
     navigation.navigate('ChatRoom', { uid: selectedUser.uid, name: selectedUser.name, avatar: selectedUser.avatar });
-  };
-
-  // --- STORY STUDIO LOGIC ---
-  const openStoryStudio = async () => {
-    if (!permission?.granted) {
-      const { granted } = await requestPermission();
-      if (!granted) return alert("Camera permission is required to create a story.");
-    }
-    setStoryImage(null);
-    setTextOverlays([]);
-    setCurrentTextInput('');
-    setTextSize(36);
-    setIsTypingActive(false);
-    setBgIndex(0);
-    setStoryStudioVisible(true);
-  };
-
-  const handleStoryTap = (item) => {
-    if (item.isMe) {
-      if (item.hasNew) {
-        Alert.alert("Your Story", "What would you like to do?", [
-          { text: "View Story", onPress: () => setViewingStory(item.storyData) },
-          { text: "Add New Story", onPress: openStoryStudio },
-          { text: "Cancel", style: "cancel" }
-        ]);
-      } else {
-        openStoryStudio();
-      }
-    } else {
-      if (item.storyData) {
-        setViewingStory(item.storyData);
-      }
-    }
-  };
-
-  const pickStoryImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.8,
-    });
-    if (!result.canceled) {
-      setStoryImage(result.assets[0].uri);
-    }
-  };
-
-  const takePhoto = async () => {
-    if (cameraRef.current) {
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
-      setStoryImage(photo.uri);
-    }
-  };
-
-  const cycleBackground = () => setBgIndex((prev) => (prev + 1) % STORY_BACKGROUNDS.length);
-
-  const handleAddTextDone = () => {
-    if (currentTextInput.trim()) {
-      setTextOverlays([...textOverlays, { 
-        id: Date.now().toString(), 
-        text: currentTextInput.trim(), 
-        color: textColor,
-        fontSize: textSize,
-        x: SCREEN_WIDTH / 2 - 100, // Approximate center
-        y: SCREEN_HEIGHT / 2 - 50 
-      }]);
-    }
-    setCurrentTextInput('');
-    setIsTypingActive(false);
-    Keyboard.dismiss();
-  };
-
-  const shareStory = async () => {
-    if (!storyImage && textOverlays.length === 0) return alert("Add an image or some text first!");
-    
-    setIsUploadingStory(true);
-    try {
-      let imageUrl = null;
-      if (storyImage) imageUrl = await uploadToCloudinary(storyImage, 'image');
-
-      await addDoc(collection(db, 'stories'), {
-        author: {
-          uid: currentUser.uid,
-          name: currentUser.displayName || 'Student',
-          avatar: currentUser.photoURL || 'https://via.placeholder.com/150'
-        },
-        imageUrl: imageUrl, 
-        bgColor: STORY_BACKGROUNDS[bgIndex], 
-        textOverlays: textOverlays, 
-        createdAt: serverTimestamp(),
-        views: []
-      });
-
-      setStoryStudioVisible(false);
-    } catch (error) {
-      console.error(error);
-      alert("Failed to upload story.");
-    } finally {
-      setIsUploadingStory(false);
-    }
   };
 
   const renderChatItem = ({ item }) => (
@@ -346,27 +213,8 @@ const styles = StyleSheet.create({
   avatarModalName: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   avatarModalImage: { width: 260, height: 260, backgroundColor: '#ccc' },
 
-  // --- STORY VIEWER CSS ---
-  viewerContainer: { flex: 1 },
-  viewerOverlay: { ...StyleSheet.absoluteFillObject, padding: 20 },
-  viewerHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 30, alignSelf: 'flex-start' },
-  viewerAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 10 },
-  viewerName: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginRight: 10 },
 
-  // Typing Mode CSS
-  typingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center' },
-  typingTopBar: { position: 'absolute', top: 50, right: 20 },
-  typingDoneBtn: { paddingHorizontal: 15, paddingVertical: 8 },
-  typingDoneText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  typingInput: { fontWeight: 'bold', width: '100%', paddingHorizontal: 20, minHeight: 100 },
-  
-  resizerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', position: 'absolute', bottom: 100, width: '100%', gap: 20 },
-  resizeBtn: { backgroundColor: 'rgba(255,255,255,0.2)', padding: 10, borderRadius: 20 },
-  resizeText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
 
-  colorPickerRow: { flexDirection: 'row', justifyContent: 'center', gap: 15, position: 'absolute', bottom: 40, width: '100%' },
-  colorSwab: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, borderColor: '#fff' },
-  colorSwabActive: { transform: [{scale: 1.3}] }
 });
 
 export default ChatsScreen;
