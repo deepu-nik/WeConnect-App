@@ -358,7 +358,7 @@ const ChatsScreen = ({ navigation }) => {
 
   const renderChatItem = ({ item }) => (
     <View style={styles.chatItem}>
-      <TouchableOpacity onPress={() => openProfile(item)}>
+      <TouchableOpacity onPress={() => setAvatarModalData({ name: item.name, avatar: item.avatar })}>
         <Image source={{ uri: item.avatar }} style={styles.avatar} />
       </TouchableOpacity>
       <TouchableOpacity style={styles.chatDetails} activeOpacity={0.7} onPress={() => navigation.navigate('ChatRoom', { chatId: item.id, name: item.name, avatar: item.avatar, uid: item.otherUserId })}>
@@ -374,7 +374,7 @@ const ChatsScreen = ({ navigation }) => {
 
   const renderSearchItem = ({ item }) => (
     <View style={styles.chatItem}>
-      <TouchableOpacity onPress={() => openProfile(item)}>
+      <TouchableOpacity onPress={() => setAvatarModalData({ name: item.name, avatar: item.avatar || 'https://via.placeholder.com/150' })}>
         <Image source={{ uri: item.avatar || 'https://via.placeholder.com/150' }} style={styles.avatar} />
       </TouchableOpacity>
       <TouchableOpacity style={styles.chatDetails} activeOpacity={0.7} onPress={() => startNewChat(item)}>
