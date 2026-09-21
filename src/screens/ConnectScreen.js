@@ -278,6 +278,15 @@ const ConnectScreen = ({ navigation }) => {
       if (!profile) throw new Error('User not found');
       if (profile.uid === currentUser?.uid) throw new Error('You cannot connect with yourself.');
       await connectUsersViaQr(currentUser.uid, profile.uid);
+
+      if (!qrVisible && CameraView.isModernBarcodeScannerAvailable) {
+        await CameraView.dismissScanner().catch(() => {});
+        setScanned(false);
+        setScanSuccess(false);
+        openProfile(navigation, { uid: profile.uid, name: profile.name, avatar: profile.avatar });
+        return;
+      }
+
       setScanSuccess(true);
       await new Promise((resolve) => setTimeout(resolve, 1100));
       setQrVisible(false);
