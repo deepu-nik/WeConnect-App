@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, Alert, BackHandler, FlatList, Image, Modal, Platform,
+  ActivityIndicator, Alert, BackHandler, FlatList, Image, Modal, Platform, Pressable,
   SafeAreaView as NativeSafeAreaView, ScrollView, Share, StyleSheet, Text,
   TextInput, TouchableOpacity, View,
 } from 'react-native';
@@ -12,10 +12,12 @@ import {
 } from 'lucide-react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { collection, onSnapshot } from 'firebase/firestore';
+import * as ImagePicker from 'expo-image-picker';
+import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { acceptConnectionRequest, declineConnectionRequest, sendConnectionRequest, subscribeToConnectionRequests } from '../services/connectionService';
-import { getAllUsers, getUserProfile, normalizeUser } from '../services/userService';
+import { getUserProfile, normalizeUser } from '../services/userService';
+import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import { openProfile } from '../navigation/navigationHelpers';
 
 const LOCATIONS = [
@@ -34,6 +36,9 @@ const ConnectScreen = ({ navigation }) => {
   const [users, setUsers] = useState([]);
   const [requests, setRequests] = useState([]);
   const [myLocation, setMyLocation] = useState('Classroom');
+  const [myLocationIcon, setMyLocationIcon] = useState('📍');
+  const [myLocationPhoto, setMyLocationPhoto] = useState('');
+  const [uploadingLocationPhoto, setUploadingLocationPhoto] = useState(false);
   const [loading, setLoading] = useState(true);
   const [qrVisible, setQrVisible] = useState(false);
   const [qrMode, setQrMode] = useState('my_code');
@@ -61,6 +66,8 @@ const ConnectScreen = ({ navigation }) => {
         .map((item) => normalizeUser(item.id, item.data()));
       const me = snapshot.docs.find((item) => item.id === currentUser.uid);
       if (me?.data()?.location) setMyLocation(me.data().location);
+      if (me?.data()?.locationIcon) setMyLocationIcon(me.data().locationIcon);
+      if (me?.data()?.locationPhoto) setMyLocationPhoto(me.data().locationPhoto);
       setUsers(next);
       setLoading(false);
     }, (error) => {
@@ -92,15 +99,61 @@ const ConnectScreen = ({ navigation }) => {
     return data.filter((user) => user.name.toLowerCase().includes(term) || user.handle.toLowerCase().includes(term));
   }, [activeTab, connectedUsers, discoverUsers, requests, searchQuery]);
 
-  const updateLocation = async (name, icon) => {
+  const updateLocation = async (name, icon, locationPhoto = myLocationPhoto) => {
     setMyLocation(name);
+    setMyLocationIcon(icon);
+    if (locationPhoto !== undefined) setMyLocationPhoto(locationPhoto);
     try {
-      await import('firebase/firestore').then(({ doc, updateDoc }) =>
-        updateDoc(doc(db, 'users', currentUser.uid), { location: name, locationIcon: icon })
-      );
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        location: name,
+        locationIcon: icon,
+        locationPhoto: locationPhoto || '',
+      });
     } catch (error) {
       console.error('Location update failed:', error);
       Alert.alert('Error', 'Could not update your location.');
+    }
+  };
+
+  const pickLocationPhoto = async () => {
+    if (!currentUser) return;
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission required', 'Photo library access is needed to add a location photo.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets?.[0]?.uri) return;
+
+      setUploadingLocationPhoto(true);
+      const url = await uploadToCloudinary(result.assets[0].uri, 'image');
+      if (!url) throw new Error('Upload failed.');
+
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        locationPhoto: url,
+      });
+      setMyLocationPhoto(url);
+    } catch (error) {
+      console.error('Location photo update failed:', error);
+      Alert.alert('Error', 'Could not upload that location photo.');
+    } finally {
+      setUploadingLocationPhoto(false);
+    }
+  };
+
+  const removeLocationPhoto = async () => {
+    try {
+      await updateDoc(doc(db, 'users', currentUser.uid), { locationPhoto: '' });
+      setMyLocationPhoto('');
+    } catch (error) {
+      console.error('Location photo removal failed:', error);
     }
   };
 
@@ -252,17 +305,52 @@ const ConnectScreen = ({ navigation }) => {
 
       <Text style={styles.sectionLabel}>WHERE ARE YOU?</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.locationRow}>
-        {LOCATIONS.map(([name, icon, color]) => (
+        {LOCATIONS.map(([name, icon]) => (
           <TouchableOpacity
             key={name}
-            style={[styles.locationChip, myLocation === name && styles.locationChipActive]}
+            style={[styles.locationCard, myLocation === name && styles.locationCardActive]}
             onPress={() => updateLocation(name, icon)}
+            activeOpacity={0.85}
           >
-            <Text style={[styles.locationText, myLocation === name && styles.locationTextActive]}>{icon} {name}</Text>
+            {myLocationPhoto && myLocation === name ? (
+              <Image source={{ uri: myLocationPhoto }} style={styles.locationCardPhoto} />
+            ) : (
+              <View style={styles.locationCardIconWrap}>
+                <Text style={styles.locationCardIcon}>{icon}</Text>
+              </View>
+            )}
+            <Text style={[styles.locationCardName, myLocation === name && styles.locationCardNameActive]} numberOfLines={1}>
+              {name}
+            </Text>
           </TouchableOpacity>
         ))}
-        <TouchableOpacity style={styles.locationChip} onPress={customLocation}><Text style={styles.locationText}>✏️ Custom</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.locationCard} onPress={customLocation} activeOpacity={0.85}>
+          <View style={styles.locationCardIconWrap}><Text style={styles.locationCardIcon}>✏️</Text></View>
+          <Text style={styles.locationCardName} numberOfLines={1}>Custom</Text>
+        </TouchableOpacity>
       </ScrollView>
+
+      {myLocation ? (
+        <View style={styles.locationStatusRow}>
+          <View style={styles.locationStatusLeft}>
+            <Text style={styles.locationStatusIcon}>{myLocationIcon}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.locationStatusTitle}>You're at {myLocation}</Text>
+              <Text style={styles.locationStatusSub}>Share a quick photo so friends can see your spot.</Text>
+            </View>
+          </View>
+          <View style={styles.locationPhotoActions}>
+            <TouchableOpacity style={styles.locationPhotoButton} onPress={pickLocationPhoto} disabled={uploadingLocationPhoto}>
+              {uploadingLocationPhoto ? <ActivityIndicator size="small" color="#111111" /> : <Text style={styles.locationPhotoButtonText}>{myLocationPhoto ? 'Change' : 'Add photo'}</Text>}
+            </TouchableOpacity>
+            {myLocationPhoto ? (
+              <TouchableOpacity style={styles.locationPhotoRemove} onPress={removeLocationPhoto}>
+                <Text style={styles.locationPhotoRemoveText}>×</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+      ) : null>
 
       <View style={styles.search}>
         <Search size={18} color="#888" />
@@ -348,11 +436,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: '#111111' },
   qrButton: { backgroundColor: '#F0F0EC', padding: 9, borderRadius: 12 },
   sectionLabel: { fontSize: 12, fontWeight: '800', color: '#999999', paddingHorizontal: 20, marginBottom: 8 },
-  locationRow: { paddingHorizontal: 15, gap: 8, paddingBottom: 12 },
-  locationChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#E8E8E3', backgroundColor: '#F7F7F5' },
-  locationText: { color: '#475569', fontWeight: '600', fontSize: 13 },
-  locationChipActive: { backgroundColor: '#FFFDE0', borderColor: '#bfdbfe' },
-  locationTextActive: { color: '#111111' },
+  locationRow: { paddingHorizontal: 15, gap: 8, paddingBottom: 8 },
   search: { margin: 15, marginTop: 5, height: 46, borderWidth: 1, borderColor: '#E8E8E3', borderRadius: 12, backgroundColor: '#F7F7F5', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, color: '#111111', fontSize: 15 },
   tabs: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#F0F0EC', borderRadius: 12, padding: 4, marginBottom: 10 },
@@ -360,6 +444,24 @@ const styles = StyleSheet.create({
   activeTab: { backgroundColor: '#fff' },
   tabText: { color: '#707070', fontWeight: '600', fontSize: 13 },
   activeTabText: { color: '#111111', fontWeight: '800' },
+
+  locationCard: { width: 78, height: 86, borderRadius: 16, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E8E8E3', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, marginRight: 2, overflow: 'hidden' },
+  locationCardActive: { backgroundColor: '#FFFC00', borderColor: '#111111' },
+  locationCardIconWrap: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F7F7F5' },
+  locationCardIcon: { fontSize: 25 },
+  locationCardPhoto: { width: 48, height: 48, borderRadius: 14 },
+  locationCardName: { fontSize: 11, fontWeight: '800', color: '#111111', maxWidth: 64, textAlign: 'center' },
+  locationCardNameActive: { color: '#111111' },
+  locationStatusRow: { marginHorizontal: 15, marginBottom: 10, padding: 10, borderRadius: 14, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E8E8E3', flexDirection: 'row', alignItems: 'center' },
+  locationStatusLeft: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  locationStatusIcon: { fontSize: 20, marginRight: 9 },
+  locationStatusTitle: { fontSize: 13, fontWeight: '800', color: '#111111' },
+  locationStatusSub: { fontSize: 10, color: '#707070', marginTop: 2 },
+  locationPhotoActions: { flexDirection: 'row', alignItems: 'center', marginLeft: 8 },
+  locationPhotoButton: { backgroundColor: '#FFFC00', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 7, minWidth: 62, alignItems: 'center' },
+  locationPhotoButtonText: { color: '#111111', fontSize: 11, fontWeight: '800' },
+  locationPhotoRemove: { marginLeft: 5, width: 28, height: 28, borderRadius: 14, backgroundColor: '#F0F0EC', alignItems: 'center', justifyContent: 'center' },
+  locationPhotoRemoveText: { color: '#707070', fontSize: 18, lineHeight: 18 },
   content: { flex: 1, backgroundColor: '#F7F7F5' },
   list: { padding: 15, paddingBottom: 100 },
   card: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 16, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: '#E8E8E3' },
@@ -384,7 +486,7 @@ const styles = StyleSheet.create({
   qrTab: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7, paddingVertical: 10, borderRadius: 9 },
   qrTabActive: { backgroundColor: '#FFFC00' },
   qrTabText: { color: '#707070', fontWeight: '700' },
-  qrTabTextActive: { color: '#fff' },
+  qrTabTextActive: { color: '#111111' },
   qrCard: { margin: 20, padding: 30, borderRadius: 24, backgroundColor: '#fff', alignItems: 'center', gap: 14 },
   qrAvatar: { width: 76, height: 76, borderRadius: 38 },
   qrName: { fontSize: 22, fontWeight: '800', color: '#111111' },
