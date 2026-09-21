@@ -513,7 +513,7 @@ const ProfileScreen = ({ route, navigation }) => {
           )}
         </ProfileSection>
 
-        <ProfileSection title="Links" subtitle="Connect your digital identity">{canSee('socialLinks') ? <ProfileLinks user={user} onOpen={openLink} /> : <View style={styles.privateCard}><LockIcon /><Text style={styles.privateText}>Visible to connections only.</Text></View>}</ProfileSection>
+        <ProfileSection title="Links" subtitle="Connect your digital identity" action={isSelf ? { label: 'Edit', onPress: () => openEdit('links') } : undefined}>{canSee('socialLinks') ? <ProfileLinks user={user} onOpen={openLink} /> : <View style={styles.privateCard}><LockIcon /><Text style={styles.privateText}>Visible to connections only.</Text></View>}</ProfileSection>
 
         <ProfileSection title="Highlights" subtitle="The things you want people to notice">
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlightRow}>
