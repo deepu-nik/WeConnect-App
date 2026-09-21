@@ -18,6 +18,7 @@ import { auth, db } from '../config/firebase';
 import { collection, query, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, arrayRemove, orderBy, increment } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import MediaShareSheet from '../components/MediaShareSheet';
+import StoriesStrip from '../components/StoriesStrip';
 
 const { width } = Dimensions.get('window');
 
@@ -584,7 +585,9 @@ const UpdatesScreen = ({ navigation }) => {
       {loading ? (
         <View style={styles.centerContainer}><ActivityIndicator size="large" color="#007AFF" /></View>
       ) : (
-        <FlatList
+        <StoriesStrip navigation={navigation} />
+
+      <FlatList
           data={posts}
           keyExtractor={(item) => item.id}
           renderItem={renderPost}
