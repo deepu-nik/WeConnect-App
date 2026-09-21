@@ -25,13 +25,22 @@ const initials = (name = 'Student') => name.split(' ').filter(Boolean).slice(0, 
 const Avatar = ({ uri, name, size = 56, onPress }) => {
   const [imageError, setImageError] = useState(false);
   const imageUri = typeof uri === 'string' && uri.trim() ? uri.trim() : null;
+
+  // Chat data can arrive in two stages: the chat document first, then the
+  // current user profile. Reset the error whenever the actual URI changes so
+  // a failed/stale URI can never permanently hide a newly loaded avatar.
+  useEffect(() => {
+    setImageError(false);
+  }, [imageUri]);
+
   const showImage = Boolean(imageUri) && !imageError;
 
   const body = (
     <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
       {showImage ? (
         <Image
-          source={{ uri: imageUri }}
+          key={imageUri}
+          source={{ uri: imageUri, cache: 'reload' }}
           style={{ width: size, height: size, borderRadius: size / 2 }}
           resizeMode="cover"
           onError={() => setImageError(true)}
