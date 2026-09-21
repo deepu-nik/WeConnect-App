@@ -23,27 +23,19 @@ const dateLabel = (date) => {
 const initials = (name = 'Student') => name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
 
 const Avatar = ({ uri, name, size = 56, onPress }) => {
-  const [imageError, setImageError] = useState(false);
   const imageUri = typeof uri === 'string' && uri.trim() ? uri.trim() : null;
 
-  // Chat data can arrive in two stages: the chat document first, then the
-  // current user profile. Reset the error whenever the actual URI changes so
-  // a failed/stale URI can never permanently hide a newly loaded avatar.
-  useEffect(() => {
-    setImageError(false);
-  }, [imageUri]);
-
-  const showImage = Boolean(imageUri) && !imageError;
-
+  // Keep this component intentionally identical to the working ChatRoom avatar:
+  // a valid profile URL is rendered directly. Initials are only used when no
+  // profile URL exists, rather than hiding a valid image after an onError event.
   const body = (
     <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
-      {showImage ? (
+      {imageUri ? (
         <Image
           key={imageUri}
-          source={{ uri: imageUri, cache: 'reload' }}
+          source={{ uri: imageUri }}
           style={{ width: size, height: size, borderRadius: size / 2 }}
           resizeMode="cover"
-          onError={() => setImageError(true)}
         />
       ) : (
         <View style={styles.avatarFallback}>
