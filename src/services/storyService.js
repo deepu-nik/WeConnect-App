@@ -1,4 +1,4 @@
-import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query, serverTimestamp, updateDoc, arrayUnion } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query, serverTimestamp, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 
@@ -47,4 +47,33 @@ export const getActiveStories = async () => {
     const created = story.createdAt?.toDate ? story.createdAt.toDate().getTime() : new Date(story.createdAt || 0).getTime();
     return created >= cutoff;
   });
+};
+export const reactToStory = async (storyId, emoji) => {
+  const uid = auth.currentUser?.uid;
+  if (!storyId || !uid || !emoji) return;
+  const ref = doc(db, 'stories', storyId);
+  const snapshot = await getDoc(ref);
+  if (!snapshot.exists()) return;
+  const reactions = { ...(snapshot.data().reactions || {}) };
+  const users = Array.isArray(reactions[emoji]) ? reactions[emoji] : [];
+  reactions[emoji] = users.includes(uid) ? users.filter((id) => id !== uid) : [...users, uid];
+  if (!reactions[emoji].length) delete reactions[emoji];
+  await updateDoc(ref, { reactions });
+};
+
+export const replyToStory = async (storyId, text) => {
+  const uid = auth.currentUser?.uid;
+  if (!storyId || !uid || !text?.trim()) return;
+  return addDoc(collection(db, 'stories', storyId, 'replies'), {
+    senderId: uid,
+    senderName: auth.currentUser.displayName || 'Student',
+    text: text.trim(),
+    createdAt: serverTimestamp(),
+  });
+};
+
+export const subscribeToStoryReplies = (storyId, onReplies, onError) => {
+  if (!storyId) return () => {};
+  const q = query(collection(db, 'stories', storyId, 'replies'), orderBy('createdAt', 'asc'));
+  return onSnapshot(q, (snapshot) => onReplies(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))), onError);
 };
