@@ -51,11 +51,13 @@ export const deleteMessage = async (chatId, messageId) => {
 export const toggleMessageReaction = async (chatId, messageId, uid, emoji) => {
   if (!chatId || !messageId || !uid || !emoji) return;
   const ref = doc(db, 'chats', chatId, 'messages', messageId);
-  const snapshot = await import('firebase/firestore').then(({ getDoc }) => getDoc(ref));
-  if (!snapshot.exists()) return;
-  const reactions = { ...(snapshot.data().reactions || {}) };
-  const users = Array.isArray(reactions[emoji]) ? reactions[emoji] : [];
-  reactions[emoji] = users.includes(uid) ? users.filter((id) => id !== uid) : [...users, uid];
-  if (!reactions[emoji].length) delete reactions[emoji];
-  await updateDoc(ref, { reactions });
+  await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    if (!snapshot.exists()) return;
+    const reactions = { ...(snapshot.data().reactions || {}) };
+    const users = Array.isArray(reactions[emoji]) ? reactions[emoji] : [];
+    reactions[emoji] = users.includes(uid) ? users.filter((id) => id !== uid) : [...users, uid];
+    if (!reactions[emoji].length) delete reactions[emoji];
+    transaction.update(ref, { reactions });
+  });
 };
