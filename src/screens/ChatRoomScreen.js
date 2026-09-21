@@ -17,6 +17,7 @@ import { getUserProfile } from '../services/userService';
 import { collection, query, where, addDoc, onSnapshot, orderBy, serverTimestamp, doc, updateDoc, getDocs, increment } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import { openProfile } from '../navigation/navigationHelpers';
+import MediaShareSheet from '../components/MediaShareSheet';
 
 const TypingIndicator = () => {
   const dot1 = useRef(new Animated.Value(0)).current;
@@ -66,6 +67,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [previewImage, setPreviewImage] = useState(null);
   const [imageCaption, setImageCaption] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [mediaShareVisible, setMediaShareVisible] = useState(false);
   const typingTimeout = useRef(null);
 
   const currentUser = auth.currentUser;
@@ -192,13 +194,12 @@ const ChatRoomScreen = ({ route, navigation }) => {
     if (!result.canceled && result.assets[0].uri) setPreviewImage(result.assets[0].uri);
   };
 
-  const uploadAndSendImage = async () => {
-    if (!previewImage) return;
-    setIsUploading(true);
-    const secureUrl = await uploadToCloudinary(previewImage, 'image');
-    if (secureUrl) await sendMessage(secureUrl, 'image', imageCaption);
-    else Alert.alert('Upload failed', 'Could not upload this image. Please try again.');
-    setIsUploading(false);
+  const shareMedia = async (items, caption) => {
+    for (const item of items) {
+      const secureUrl = await uploadToCloudinary(item.uri, item.type);
+      if (!secureUrl) throw new Error('Media upload failed');
+      await sendMessage(secureUrl, item.type, caption);
+    }
   };
 
   const renderMessage = ({ item }) => {
@@ -269,7 +270,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
         />
 
         <View style={styles.inputBar}>
-          <TouchableOpacity style={styles.cameraBtn} onPress={() => pickImage(true)}><Camera size={22} color="#888" /></TouchableOpacity>
+          <TouchableOpacity style={styles.cameraBtn} onPress={() => setMediaShareVisible(true)}><Camera size={22} color="#888" /></TouchableOpacity>
           <View style={styles.inputWrapper}>
             <TextInput style={styles.textInput} placeholder="Send a chat..." placeholderTextColor="#999" value={inputText} onChangeText={handleTextChange} multiline maxLength={500} />
             <TouchableOpacity style={styles.insideInputBtn}><Smile size={20} color="#888" /></TouchableOpacity>
@@ -278,32 +279,14 @@ const ChatRoomScreen = ({ route, navigation }) => {
              <TouchableOpacity style={styles.sendBtn} onPress={() => sendMessage()}><Send size={18} color="#fff" style={{ marginLeft: 2 }} /></TouchableOpacity>
           ) : (
             <View style={styles.rightIconsRow}>
-              <TouchableOpacity style={styles.actionBtn} onPress={() => pickImage(false)}><ImageIcon size={24} color="#888" /></TouchableOpacity>
+              <TouchableOpacity style={styles.actionBtn} onPress={() => setMediaShareVisible(true)}><ImageIcon size={24} color="#888" /></TouchableOpacity>
 
             </View>
           )}
         </View>
       </KeyboardAvoidingView>
 
-      <Modal visible={!!previewImage} animationType="fade" transparent={false} onRequestClose={() => setPreviewImage(null)}>
-        <SafeAreaView style={styles.previewModalContainer}>
-          <StatusBar barStyle="light-content" />
-          <View style={styles.previewHeader}>
-            <TouchableOpacity onPress={() => setPreviewImage(null)} style={styles.previewIconBtn}><X size={28} color="#fff" /></TouchableOpacity>
-            <View style={styles.previewToolsRow}>
-
-            </View>
-          </View>
-          <Image source={{ uri: previewImage }} style={styles.fullPreviewImage} resizeMode="contain" />
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.previewBottomBar}>
-            <TextInput style={styles.captionInput} placeholder="Add a caption..." placeholderTextColor="#ccc" value={imageCaption} onChangeText={setImageCaption} color="#fff" />
-            <TouchableOpacity style={styles.sendPreviewBtn} onPress={uploadAndSendImage} disabled={isUploading}>
-              {isUploading ? <ActivityIndicator size="small" color="#fff" /> : <Send size={24} color="#fff" />}
-            </TouchableOpacity>
-          </KeyboardAvoidingView>
-        </SafeAreaView>
-      </Modal>
-    </SafeAreaView>
+ </SafeAreaView>
   );
 };
 
@@ -354,4 +337,12 @@ const styles = StyleSheet.create({
   sendPreviewBtn: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#007AFF', justifyContent: 'center', alignItems: 'center' },
 });
 
-export default ChatRoomScreen;
+export default ChatRoomScreen      <MediaShareSheet
+        visible={mediaShareVisible}
+        onClose={() => setMediaShareVisible(false)}
+        onShare={shareMedia}
+        title={`Share with ${otherUserName}`}
+        shareLabel="Send"
+        allowMultiple
+      />
+;
