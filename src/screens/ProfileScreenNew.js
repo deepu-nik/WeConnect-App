@@ -197,8 +197,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
     updateForm('skills', (form?.skills || []).filter((item) => item !== value));
   };
 
-  const saveSection = async () => {    if (!form || !editSection || !currentUser?.uid) return;
-    setSaving(true);
+  const saveSection = async () => {    if (!form || !editSection || !currentUser?.uid) return;    setSaving(true);
     try {
       const fields = sectionFields[editSection] || [];
       const patch = {};
@@ -397,8 +396,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
             <View style={styles.completionCard}>
               <View style={styles.completionTop}>
                 <View>                  <Text style={styles.completionTitle}>Profile strength</Text>
-                  <Text style={styles.completionSubtitle}>{completion}% complete</Text>
-                </View>
+                  <Text style={styles.completionSubtitle}>{completion}% complete</Text>                </View>
                 <Text style={styles.completionPercent}>{completion}%</Text>
               </View>
               <View style={styles.progressTrack}><View style={[styles.progressFill, { width: completion + '%' }]} /></View>
@@ -438,7 +436,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
               </View>
 
               <View style={styles.card}>
-                <View style={styles.cardHeader}><Text style={styles.cardTitle}>Skills</Text>{isSelf && <TouchableOpacity onPress={() => openSectionEdit('identity')}><Edit3 size={16} color={COLORS.muted} /></TouchableOpacity>}</View>
+                <View style={styles.cardHeader}><Text style={styles.cardTitle}>Skills</Text>{isSelf && <TouchableOpacity onPress={() => openSectionEdit('skills')}><Edit3 size={16} color={COLORS.muted} /></TouchableOpacity>}</View>
                 {skills.length ? <View style={styles.chips}>{skills.map((skill) => <View style={styles.skillChip} key={skill}><Code2 size={13} color={COLORS.blue} /><Text style={styles.skillText}>{skill}</Text></View>)}</View> : <EmptyState icon={Code2} title="No skills added" text="Add technologies and skills you are learning." />}
               </View>
 
@@ -597,8 +595,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
               {editSection === 'skills' && <EditorCard title="Skills" hint="Add the technologies and capabilities you actually use or learn.">
                 <ArrayEditor items={form?.skills || []} label="Skill" placeholder="e.g. React Native" onAdd={addSkill} onRemove={removeSkill} />              </EditorCard>}
 
-              {editSection === 'links' && <EditorCard title="Social & Links" hint="Keep your public work easy to discover.">
-                <Field label="GitHub" value={form?.github} onChange={(v) => updateForm('github', v)} autoCapitalize="none" keyboardType="url" />
+              {editSection === 'links' && <EditorCard title="Social & Links" hint="Keep your public work easy to discover.">                <Field label="GitHub" value={form?.github} onChange={(v) => updateForm('github', v)} autoCapitalize="none" keyboardType="url" />
                 <Field label="LinkedIn" value={form?.linkedin} onChange={(v) => updateForm('linkedin', v)} autoCapitalize="none" keyboardType="url" />
                 <Field label="Instagram" value={form?.instagram} onChange={(v) => updateForm('instagram', v)} autoCapitalize="none" keyboardType="url" />
                 <Field label="Website" value={form?.website} onChange={(v) => updateForm('website', v)} autoCapitalize="none" keyboardType="url" />
