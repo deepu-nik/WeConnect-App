@@ -13,7 +13,8 @@ import ChatRoomScreen from '../screens/ChatRoomScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
 // EXISTING NAVIGATOR (Your Main Tabs)
-import MainTabNavigator from './MainTabNavigator'; 
+import MainTabNavigator from './MainTabNavigator';
+import { navigationRef } from './navigationHelpers';
 
 const Stack = createStackNavigator();
 
@@ -77,7 +78,7 @@ const AppNavigator = () => {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       {user ? (
         // IF LOGGED IN: Show the Authenticated Stack (Tabs + Chats + Profile)
         <AuthenticatedStack /> 
