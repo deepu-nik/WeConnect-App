@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, Image, Modal, RefreshControl, ScrollView, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CheckCheck, ChevronRight, MessageCircle, Plus, Search, Sparkles, UserRoundPlus, X } from 'lucide-react-native';
 import { auth, db } from '../config/firebase';
-import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { markChatRead } from '../services/chatService';
 import Dashboard from '../components/Dashboard';
 
@@ -23,10 +23,25 @@ const initials = (name = 'Student') => name.split(' ').filter(Boolean).slice(0, 
 
 const Avatar = ({ uri, name, size = 56, onPress }) => {
   const [imageError, setImageError] = useState(false);
+  const imageUri = typeof uri === 'string' && uri.trim() ? uri.trim() : null;
+  const showImage = Boolean(imageUri) && !imageError;
+
   const body = (
     <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
-      <Image source={{ uri: uri || FALLBACK_AVATAR }} style={{ width: size, height: size, borderRadius: size / 2 }} />
-      <View style={styles.avatarFallback}><Text style={[styles.avatarInitials, { fontSize: Math.max(11, size * 0.25) }]}>{initials(name)}</Text></View>
+      {showImage ? (
+        <Image
+          source={{ uri: imageUri }}
+          style={{ width: size, height: size, borderRadius: size / 2 }}
+          resizeMode="cover"
+          onError={() => setImageError(true)}
+        />
+      ) : (
+        <View style={styles.avatarFallback}>
+          <Text style={[styles.avatarInitials, { fontSize: Math.max(11, size * 0.25) }]}>
+            {initials(name)}
+          </Text>
+        </View>
+      )}
     </View>
   );
   return onPress ? <TouchableOpacity onPress={onPress} activeOpacity={0.82}>{body}</TouchableOpacity> : body;
@@ -49,22 +64,41 @@ const ChatsScreen = ({ navigation }) => {
     setLoading(true);
     const q = query(collection(db, 'chats'), where('participants', 'array-contains', currentUser.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const next = snapshot.docs.map((chatDoc) => {
+      const next = await Promise.all(snapshot.docs.map(async (chatDoc) => {
         const data = chatDoc.data() || {};
         const participants = Array.isArray(data.participants) ? data.participants : [];
         const otherUserId = participants.find((uid) => uid !== currentUser.uid);
         const otherInfo = data.usersInfo?.[otherUserId] || {};
+
+        let avatar = otherInfo.avatar || otherInfo.photoURL || '';
+        let name = otherInfo.name || 'Student';
+
+        // Chat documents can contain an old/null avatar. The users document is
+        // the source of truth so profile-photo changes are reflected here too.
+        if (otherUserId && !avatar) {
+          try {
+            const userSnap = await getDoc(doc(db, 'users', otherUserId));
+            if (userSnap.exists()) {
+              const user = userSnap.data() || {};
+              avatar = user.photoURL || user.avatar || '';
+              name = user.displayName || user.name || name;
+            }
+          } catch (error) {
+            console.warn('Could not load chat avatar:', otherUserId, error);
+          }
+        }
+
         return {
           id: chatDoc.id,
           otherUserId,
-          name: otherInfo.name || 'Student',
-          avatar: otherInfo.avatar || FALLBACK_AVATAR,
+          name,
+          avatar,
           lastMessage: data.lastMessage || 'Start the conversation',
           timestamp: data.updatedAt?.toDate?.() || new Date(0),
           unreadCount: Number(data.unreadCount?.[currentUser.uid] || 0),
           typing: Boolean(data.typing?.[otherUserId]),
         };
-      }).sort((a, b) => b.timestamp - a.timestamp);
+      })).then((items) => items.sort((a, b) => b.timestamp - a.timestamp));
       setChats(next); setLoading(false); setRefreshing(false);
     }, (error) => { console.error('Chats subscription failed:', error); setChats([]); setLoading(false); setRefreshing(false); });
     return unsubscribe;
@@ -237,7 +271,7 @@ const styles = StyleSheet.create({
   chatCard: { minHeight: 78, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5DF', flexDirection: 'row', alignItems: 'center' },
   chatCardUnread: { borderColor: '#E2E2D8', backgroundColor: '#FFFEE6' },
   avatar: { backgroundColor: '#E7E7E1', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginRight: 11 },
-  avatarFallback: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E7E7E1' },
+  avatarFallback: { flex: 1, width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: '#E7E7E1' },
   avatarInitials: { color: '#55554F', fontWeight: '900' },
   chatContent: { flex: 1, minWidth: 0, paddingRight: 8 },
   chatTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 },
