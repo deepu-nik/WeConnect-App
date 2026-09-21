@@ -1,11 +1,18 @@
-import { createNavigationContainerRef, StackActions } from '@react-navigation/native';
+export const openProfile = (navigation, params = {}) => {
+  const state = navigation.getState?.();
+  const currentRoute = state?.routes?.[state?.index]?.name;
 
-export const navigationRef = createNavigationContainerRef();
+  // Screens inside MainTabNavigator's tabs can bubble this action to the
+  // stack that owns ProfileDetails.
+  if (currentRoute && currentRoute !== 'ChatRoom') {
+    navigation.navigate('ProfileDetails', params);
+    return;
+  }
 
-export const openProfile = (_navigation, params = {}) => {
-  if (!navigationRef.isReady()) return;
-
-  navigationRef.dispatch(
-    StackActions.push('ProfileDetails', params)
-  );
+  // ChatRoom lives in the root stack, so explicitly enter MainTabs and then
+  // push ProfileDetails inside its stack. No reset, ref, or manual state.
+  navigation.navigate('MainTabs', {
+    screen: 'ProfileDetails',
+    params,
+  });
 };
