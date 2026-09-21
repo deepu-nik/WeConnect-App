@@ -268,7 +268,7 @@ const UpdatesScreen = ({ navigation }) => {
           <View style={styles.eventBody}>
             <Text style={styles.eventTitle}>{item.eventName}</Text>
             <View style={styles.eventDateRow}>
-               <Calendar size={14} color="#64748b" />
+               <Calendar size={14} color="#707070" />
                <Text style={styles.eventDateText}>{item.eventDate}</Text>
             </View>
             
@@ -276,15 +276,15 @@ const UpdatesScreen = ({ navigation }) => {
             
             <View style={styles.eventAuthorRow}>
                <TouchableOpacity onPress={() => openProfile(item.author)}><Image source={{ uri: item.author.avatar }} style={styles.eventAvatar} /></TouchableOpacity>
-               <Text style={styles.eventAuthorText}>Posted by <Text onPress={() => openProfile(item.author)} style={{fontWeight: 'bold', color: '#0f172a'}}>{item.author.name}</Text> • {formatTime(item.createdAt)}</Text>
+               <Text style={styles.eventAuthorText}>Posted by <Text onPress={() => openProfile(item.author)} style={{fontWeight: 'bold', color: '#111111'}}>{item.author.name}</Text> • {formatTime(item.createdAt)}</Text>
             </View>
 
             <View style={styles.eventFooter}>
                <View style={{flexDirection: 'row', alignItems: 'center', gap: 15}}>
                  <Text style={styles.eventRsvpCount}>🎟️ {likeCount} attending</Text>
                  <TouchableOpacity onPress={() => openComments(item.id)} style={{flexDirection: 'row', alignItems: 'center'}}>
-                    <MessageCircle size={20} color="#64748b" />
-                    <Text style={{marginLeft: 5, color: '#64748b', fontWeight: 'bold'}}>{commentCount}</Text>
+                    <MessageCircle size={20} color="#707070" />
+                    <Text style={{marginLeft: 5, color: '#707070', fontWeight: 'bold'}}>{commentCount}</Text>
                  </TouchableOpacity>
                </View>
 
@@ -320,7 +320,7 @@ const UpdatesScreen = ({ navigation }) => {
               </View>
               <Text style={styles.postTime}>{formatTime(item.createdAt)}</Text>
             </View>
-            <TouchableOpacity style={styles.moreIcon}><MoreVertical size={20} color="#94a3b8" /></TouchableOpacity>
+            <TouchableOpacity style={styles.moreIcon}><MoreVertical size={20} color="#999999" /></TouchableOpacity>
           </View>
 
           {(item.mediaItems?.length || item.imageUrl) ? (
@@ -351,16 +351,16 @@ const UpdatesScreen = ({ navigation }) => {
             <View style={styles.premiumActionRow}>
               <View style={styles.actionLeft}>
                 <TouchableOpacity onPress={() => toggleLike(item.id, item.likes || [])} style={styles.actionBtnPremium}>
-                  <Heart size={22} color={isLiked ? "#FF3B30" : "#64748b"} fill={isLiked ? "#FF3B30" : "transparent"} />
+                  <Heart size={22} color={isLiked ? "#FF3B30" : "#707070"} fill={isLiked ? "#FF3B30" : "transparent"} />
                   <Text style={[styles.actionCount, isLiked && {color: '#FF3B30'}]}>{likeCount}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => openComments(item.id)} style={styles.actionBtnPremium}>
-                  <MessageCircle size={22} color="#64748b" />
+                  <MessageCircle size={22} color="#707070" />
                   <Text style={styles.actionCount}>{commentCount}</Text>
                 </TouchableOpacity>
               </View>
               <TouchableOpacity style={styles.actionBtnPremiumShare} onPress={() => sharePost(item)}>
-                <Send size={20} color="#64748b" />
+                <Send size={20} color="#707070" />
               </TouchableOpacity>
             </View>
           </View>
@@ -441,7 +441,7 @@ const UpdatesScreen = ({ navigation }) => {
               <Text style={styles.postTime}>{formatTime(item.createdAt)}</Text>
             </View>
             <View style={styles.planBadge}>
-              <Rocket size={14} color="#007AFF" />
+              <Rocket size={14} color="#111111" />
               <Text style={styles.planBadgeText}>Flash Plan</Text>
             </View>
           </View>
@@ -454,8 +454,8 @@ const UpdatesScreen = ({ navigation }) => {
             <View style={{flexDirection: 'row', alignItems: 'center', gap: 15}}>
               <Text style={styles.planJoinCount}>🔥 {likeCount} people are in</Text>
               <TouchableOpacity onPress={() => openComments(item.id)} style={{flexDirection: 'row', alignItems: 'center'}}>
-                 <MessageCircle size={20} color="#64748b" />
-                 <Text style={{marginLeft: 5, color: '#64748b', fontWeight: 'bold'}}>{commentCount}</Text>
+                 <MessageCircle size={20} color="#707070" />
+                 <Text style={{marginLeft: 5, color: '#707070', fontWeight: 'bold'}}>{commentCount}</Text>
               </TouchableOpacity>
             </View>
             
@@ -486,7 +486,7 @@ const UpdatesScreen = ({ navigation }) => {
               <Text style={styles.authorName}>{item.author.name}</Text>
               <Text style={styles.postTime}>{formatTime(item.createdAt)} • Poll</Text>
             </View>
-            <TouchableOpacity style={styles.moreIcon}><MoreVertical size={20} color="#94a3b8" /></TouchableOpacity>
+            <TouchableOpacity style={styles.moreIcon}><MoreVertical size={20} color="#999999" /></TouchableOpacity>
           </View>
           
           <View style={styles.pollWrapper}>
@@ -505,12 +505,12 @@ const UpdatesScreen = ({ navigation }) => {
                   activeOpacity={hasVoted ? 1 : 0.7}
                 >
                   {hasVoted && (
-                    <View style={[styles.pollPremiumProgress, { width: `${percent}%`, backgroundColor: isMyVote ? '#E6F4FE' : '#f1f5f9' }]} />
+                    <View style={[styles.pollPremiumProgress, { width: `${percent}%`, backgroundColor: isMyVote ? '#E6F4FE' : '#F0F0EC' }]} />
                   )}
                   
                   <View style={styles.pollPremiumOptionContent}>
-                    <Text style={[styles.pollPremiumOptionText, isMyVote && {fontWeight: '700', color: '#007AFF'}]}>{option}</Text>
-                    {hasVoted && <Text style={[styles.pollPremiumPercent, isMyVote && {color: '#007AFF'}]}>{percent}%</Text>}
+                    <Text style={[styles.pollPremiumOptionText, isMyVote && {fontWeight: '700', color: '#111111'}]}>{option}</Text>
+                    {hasVoted && <Text style={[styles.pollPremiumPercent, isMyVote && {color: '#111111'}]}>{percent}%</Text>}
                   </View>
                 </TouchableOpacity>
               );
@@ -520,11 +520,11 @@ const UpdatesScreen = ({ navigation }) => {
                <Text style={styles.pollTotalVotes}>{totalVotes} total votes</Text>
                <View style={{flexDirection: 'row', alignItems: 'center', gap: 15}}>
                  <TouchableOpacity onPress={() => toggleLike(item.id, item.likes || [])} style={styles.actionBtnPremium}>
-                   <Heart size={18} color={isLiked ? "#FF3B30" : "#64748b"} fill={isLiked ? "#FF3B30" : "transparent"} />
+                   <Heart size={18} color={isLiked ? "#FF3B30" : "#707070"} fill={isLiked ? "#FF3B30" : "transparent"} />
                    <Text style={[styles.actionCount, isLiked && {color: '#FF3B30'}]}>{likeCount}</Text>
                  </TouchableOpacity>
                  <TouchableOpacity onPress={() => openComments(item.id)} style={styles.actionBtnPremium}>
-                    <MessageCircle size={18} color="#64748b" />
+                    <MessageCircle size={18} color="#707070" />
                     <Text style={styles.actionCount}>{commentCount}</Text>
                  </TouchableOpacity>
                </View>
@@ -583,7 +583,7 @@ const UpdatesScreen = ({ navigation }) => {
 
       {/* MAIN FEED */}
       {loading ? (
-        <View style={styles.centerContainer}><ActivityIndicator size="large" color="#007AFF" /></View>
+        <View style={styles.centerContainer}><ActivityIndicator size="large" color="#111111" /></View>
       ) : (
         <>
           <StoriesStrip navigation={navigation} />
@@ -611,7 +611,7 @@ const UpdatesScreen = ({ navigation }) => {
             <TouchableOpacity onPress={() => setModalVisible(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
             <Text style={styles.modalTitle}>New Buzz</Text>
             <TouchableOpacity onPress={handleCreatePost} disabled={isUploading}>
-              {isUploading ? <ActivityIndicator size="small" color="#007AFF" /> : <Text style={styles.postText}>Share</Text>}
+              {isUploading ? <ActivityIndicator size="small" color="#111111" /> : <Text style={styles.postText}>Share</Text>}
             </TouchableOpacity>
           </View>
 
@@ -623,11 +623,11 @@ const UpdatesScreen = ({ navigation }) => {
                 <Text style={[styles.typeTabText, postType === 'event' && {color: '#AF52DE'}]}>Event Drop</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.typeTab, postType === 'plan' && styles.typeTabActive]} onPress={() => setPostType('plan')}>
-                <Rocket size={16} color={postType === 'plan' ? "#007AFF" : "#888"} />
-                <Text style={[styles.typeTabText, postType === 'plan' && {color: '#007AFF'}]}>Flash Plan</Text>
+                <Rocket size={16} color={postType === 'plan' ? "#111111" : "#888"} />
+                <Text style={[styles.typeTabText, postType === 'plan' && {color: '#111111'}]}>Flash Plan</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.typeTab, postType === 'image' && styles.typeTabActive]} onPress={() => setPostType('image')}>
-                <ImageIcon size={16} color={postType === 'image' ? "#007AFF" : "#888"} />
+                <ImageIcon size={16} color={postType === 'image' ? "#111111" : "#888"} />
                 <Text style={[styles.typeTabText, postType === 'image' && styles.typeTabTextActive]}>Photo</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.typeTab, postType === 'poll' && styles.typeTabActive]} onPress={() => setPostType('poll')}>
@@ -659,21 +659,21 @@ const UpdatesScreen = ({ navigation }) => {
                   <TextInput
                     style={styles.eventTitleInput}
                     placeholder="e.g., Smart India Hackathon"
-                    placeholderTextColor="#94a3b8"
+                    placeholderTextColor="#999999"
                     value={eventName}
                     onChangeText={setEventName}
                   />
                   <TextInput
                     style={styles.eventDateInput}
                     placeholder="When? (e.g., Tomorrow, 6 PM)"
-                    placeholderTextColor="#94a3b8"
+                    placeholderTextColor="#999999"
                     value={eventDate}
                     onChangeText={setEventDate}
                   />
                   <TextInput
                     style={styles.eventDescInput}
                     placeholder="Add details, link, or location..."
-                    placeholderTextColor="#94a3b8"
+                    placeholderTextColor="#999999"
                     multiline
                     value={caption}
                     onChangeText={setCaption}
@@ -748,11 +748,11 @@ const UpdatesScreen = ({ navigation }) => {
               {/* FLASH PLAN INPUT */}
               {postType === 'plan' && (
                 <View style={styles.planInputWrapper}>
-                  <Rocket size={32} color="#007AFF" style={{marginBottom: 10}} />
+                  <Rocket size={32} color="#111111" style={{marginBottom: 10}} />
                   <TextInput
                     style={styles.planInput}
                     placeholder="What's the plan? (e.g. Need 2 for Futsal at 6 PM)"
-                    placeholderTextColor="#94a3b8"
+                    placeholderTextColor="#999999"
                     multiline
                     value={caption}
                     onChangeText={setCaption}
@@ -779,7 +779,7 @@ const UpdatesScreen = ({ navigation }) => {
                   ))}
                   {pollOptions.length < 4 && (
                     <TouchableOpacity style={styles.addOptionBtn} onPress={() => setPollOptions([...pollOptions, ''])}>
-                      <Plus size={16} color="#007AFF" />
+                      <Plus size={16} color="#111111" />
                       <Text style={styles.addOptionText}>Add Option</Text>
                     </TouchableOpacity>
                   )}
@@ -808,7 +808,7 @@ const UpdatesScreen = ({ navigation }) => {
           <View style={styles.commentsContainer}>
             <View style={styles.commentsHeader}>
               <Text style={styles.commentsTitle}>Comments</Text>
-              <TouchableOpacity onPress={() => setCommentsVisible(false)}><X size={24} color="#0f172a" /></TouchableOpacity>
+              <TouchableOpacity onPress={() => setCommentsVisible(false)}><X size={24} color="#111111" /></TouchableOpacity>
             </View>
 
             <FlatList
@@ -826,13 +826,13 @@ const UpdatesScreen = ({ navigation }) => {
               <TextInput
                 style={styles.commentInputBox}
                 placeholder="Add a comment..."
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor="#999999"
                 value={newComment}
                 onChangeText={setNewComment}
                 multiline
               />
               <TouchableOpacity style={styles.postCommentBtn} onPress={postComment} disabled={isPostingComment || newComment.trim() === ''}>
-                {isPostingComment ? <ActivityIndicator size="small" color="#007AFF" /> : <Send size={20} color={newComment.trim() === '' ? "#94a3b8" : "#007AFF"} />}
+                {isPostingComment ? <ActivityIndicator size="small" color="#111111" /> : <Send size={20} color={newComment.trim() === '' ? "#999999" : "#111111"} />}
               </TouchableOpacity>
             </View>
           </View>
@@ -843,15 +843,15 @@ const UpdatesScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' }, 
+  container: { flex: 1, backgroundColor: '#F7F7F5' }, 
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 },
-  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#0f172a' },
-  emptySubtitle: { marginTop: 6, textAlign: 'center', color: '#64748b', lineHeight: 21 },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: '#111111' },
+  emptySubtitle: { marginTop: 6, textAlign: 'center', color: '#707070', lineHeight: 21 },
   
   // Premium Header
-  premiumHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15, backgroundColor: '#f8fafc' },
+  premiumHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15, backgroundColor: '#F7F7F5' },
   headerTitleRow: { flexDirection: 'row', alignItems: 'center' },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: '#0f172a', letterSpacing: -0.5 },
+  headerTitle: { fontSize: 26, fontWeight: '800', color: '#111111', letterSpacing: -0.5 },
   headerZapIcon: { marginLeft: 6, marginTop: 2 },
   headerIconBtn: { padding: 4 },
   headerPlusWrapper: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
@@ -864,50 +864,50 @@ const styles = StyleSheet.create({
   eventBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.2)', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   eventBadgeText: { color: '#fff', fontSize: 12, fontWeight: 'bold', marginLeft: 6 },
   eventBody: { padding: 20 },
-  eventTitle: { fontSize: 20, fontWeight: '800', color: '#0f172a', marginBottom: 8 },
+  eventTitle: { fontSize: 20, fontWeight: '800', color: '#111111', marginBottom: 8 },
   eventDateRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
-  eventDateText: { fontSize: 14, fontWeight: '600', color: '#64748b', marginLeft: 6 },
+  eventDateText: { fontSize: 14, fontWeight: '600', color: '#707070', marginLeft: 6 },
   eventDesc: { fontSize: 15, color: '#334155', lineHeight: 22, marginBottom: 15 },
-  eventAuthorRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingBottom: 15, marginBottom: 15 },
+  eventAuthorRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F0F0EC', paddingBottom: 15, marginBottom: 15 },
   eventAvatar: { width: 24, height: 24, borderRadius: 12, marginRight: 8 },
-  eventAuthorText: { fontSize: 12, color: '#64748b' },
+  eventAuthorText: { fontSize: 12, color: '#707070' },
   eventFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  eventRsvpCount: { fontSize: 14, fontWeight: 'bold', color: '#0f172a' },
-  eventRsvpBtn: { backgroundColor: '#f1f5f9', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  eventRsvpCount: { fontSize: 14, fontWeight: 'bold', color: '#111111' },
+  eventRsvpBtn: { backgroundColor: '#F0F0EC', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
   eventRsvpBtnActive: { backgroundColor: '#AF52DE' },
   eventRsvpBtnText: { fontSize: 13, fontWeight: '800', color: '#475569' },
 
   // --- 1. PREMIUM WHITE CARDS (Image, Spotted) ---
   premiumCard: { backgroundColor: '#fff', borderRadius: 24, marginHorizontal: 16, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.05, shadowRadius: 15, elevation: 4, overflow: 'hidden' },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 },
-  authorAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f1f5f9', marginRight: 12 },
+  authorAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F0F0EC', marginRight: 12 },
   authorInfo: { flex: 1 },
-  authorName: { fontSize: 15, fontWeight: '700', color: '#0f172a' },
-  postTime: { fontSize: 12, color: '#64748b', marginTop: 2, fontWeight: '500' },
+  authorName: { fontSize: 15, fontWeight: '700', color: '#111111' },
+  postTime: { fontSize: 12, color: '#707070', marginTop: 2, fontWeight: '500' },
   moreIcon: { padding: 4 },
   
   spottedBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF3B30', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, marginLeft: 8 },
   spottedText: { color: '#fff', fontSize: 10, fontWeight: '800', marginLeft: 3, textTransform: 'uppercase' },
 
   imageWrapper: { paddingHorizontal: 12, paddingBottom: 12 },
-  premiumImage: { width: '100%', aspectRatio: 1, borderRadius: 16, backgroundColor: '#f8fafc' },
+  premiumImage: { width: '100%', aspectRatio: 1, borderRadius: 16, backgroundColor: '#F7F7F5' },
 
   cardFooter: { paddingHorizontal: 16, paddingBottom: 16 },
   premiumCaption: { fontSize: 15, color: '#334155', lineHeight: 22, marginBottom: 12 },
-  captionAuthor: { fontWeight: '700', color: '#0f172a' },
+  captionAuthor: { fontWeight: '700', color: '#111111' },
 
-  premiumActionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
+  premiumActionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F0F0EC' },
   actionLeft: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   actionBtnPremium: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  actionCount: { fontSize: 14, fontWeight: '600', color: '#64748b' },
+  actionCount: { fontSize: 14, fontWeight: '600', color: '#707070' },
   actionBtnPremiumShare: { padding: 4 },
 
   // --- 2. PREMIUM DARK CONFESSION CARD ---
-  confessionPremiumCard: { backgroundColor: '#0f172a', borderRadius: 24, marginHorizontal: 16, marginBottom: 20, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 8 },
+  confessionPremiumCard: { backgroundColor: '#FFFC00', borderRadius: 24, marginHorizontal: 16, marginBottom: 20, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 8 },
   confessionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   confessionLabelBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(175, 82, 222, 0.15)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
   confessionLabelText: { color: '#AF52DE', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', marginLeft: 6 },
-  confessionTime: { color: '#64748b', fontSize: 12, fontWeight: '600' },
+  confessionTime: { color: '#707070', fontSize: 12, fontWeight: '600' },
   confessionText: { color: '#fff', fontSize: 22, fontWeight: '600', lineHeight: 32, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif', marginBottom: 25 },
   confessionActionRow: { flexDirection: 'row', alignItems: 'center', gap: 24, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)', paddingTop: 15 },
   confessionActionCount: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.6)' },
@@ -925,46 +925,46 @@ const styles = StyleSheet.create({
   hotTakeActionCount: { fontSize: 14, fontWeight: '600', color: 'rgba(255,255,255,0.7)' },
 
   // --- 4. FLASH PLAN CARD ---
-  flashPlanCard: { backgroundColor: '#fff', borderRadius: 24, marginHorizontal: 16, marginBottom: 20, shadowColor: '#007AFF', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5, overflow: 'hidden', borderWidth: 1, borderColor: '#e6f4fe' },
-  planBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#e6f4fe', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
-  planBadgeText: { color: '#007AFF', fontSize: 12, fontWeight: '800', marginLeft: 4 },
+  flashPlanCard: { backgroundColor: '#fff', borderRadius: 24, marginHorizontal: 16, marginBottom: 20, shadowColor: '#111111', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5, overflow: 'hidden', borderWidth: 1, borderColor: '#FFFC00' },
+  planBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFC00', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
+  planBadgeText: { color: '#111111', fontSize: 12, fontWeight: '800', marginLeft: 4 },
   planContentBox: { paddingHorizontal: 20, paddingBottom: 20 },
-  planText: { fontSize: 18, fontWeight: '700', color: '#0f172a', lineHeight: 26 },
-  planFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', paddingHorizontal: 20, paddingVertical: 15, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
-  planJoinCount: { fontSize: 14, fontWeight: '600', color: '#64748b' },
-  planJoinBtn: { backgroundColor: '#e2e8f0', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  planJoinBtnActive: { backgroundColor: '#007AFF' },
+  planText: { fontSize: 18, fontWeight: '700', color: '#111111', lineHeight: 26 },
+  planFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F7F7F5', paddingHorizontal: 20, paddingVertical: 15, borderTopWidth: 1, borderTopColor: '#F0F0EC' },
+  planJoinCount: { fontSize: 14, fontWeight: '600', color: '#707070' },
+  planJoinBtn: { backgroundColor: '#E8E8E3', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  planJoinBtnActive: { backgroundColor: '#FFFC00' },
   planJoinBtnText: { fontSize: 14, fontWeight: '800', color: '#475569' },
 
   // --- 5. PREMIUM POLL WIDGET ---
   pollWrapper: { paddingHorizontal: 16, paddingBottom: 16 },
-  pollPremiumQuestion: { fontSize: 18, fontWeight: '800', color: '#0f172a', marginBottom: 16, lineHeight: 24 },
-  pollPremiumOption: { minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 10, justifyContent: 'center', overflow: 'hidden', backgroundColor: '#fff' },
-  pollPremiumOptionVoted: { borderColor: '#f1f5f9', backgroundColor: '#f8fafc' },
-  pollPremiumOptionMine: { borderColor: '#007AFF', backgroundColor: '#fff' },
+  pollPremiumQuestion: { fontSize: 18, fontWeight: '800', color: '#111111', marginBottom: 16, lineHeight: 24 },
+  pollPremiumOption: { minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: '#E8E8E3', marginBottom: 10, justifyContent: 'center', overflow: 'hidden', backgroundColor: '#fff' },
+  pollPremiumOptionVoted: { borderColor: '#F0F0EC', backgroundColor: '#F7F7F5' },
+  pollPremiumOptionMine: { borderColor: '#111111', backgroundColor: '#fff' },
   pollPremiumProgress: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 12 },
   pollPremiumOptionContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, zIndex: 1 },
   pollPremiumOptionText: { fontSize: 15, color: '#334155', fontWeight: '500', flex: 1, paddingRight: 10 },
-  pollPremiumPercent: { fontSize: 14, fontWeight: '700', color: '#64748b' },
-  pollFooterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f1f5f9' },
-  pollTotalVotes: { fontSize: 13, fontWeight: '600', color: '#94a3b8' },
+  pollPremiumPercent: { fontSize: 14, fontWeight: '700', color: '#707070' },
+  pollFooterRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F0F0EC' },
+  pollTotalVotes: { fontSize: 13, fontWeight: '600', color: '#999999' },
 
   // --- COMMENTS MODAL STYLES ---
   commentsOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   commentsCloseZone: { flex: 1, width: '100%' },
   commentsContainer: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '75%' },
-  commentsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  commentsTitle: { fontSize: 18, fontWeight: 'bold', color: '#0f172a' },
-  noCommentsText: { textAlign: 'center', color: '#94a3b8', marginTop: 40 },
+  commentsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#F0F0EC' },
+  commentsTitle: { fontSize: 18, fontWeight: 'bold', color: '#111111' },
+  noCommentsText: { textAlign: 'center', color: '#999999', marginTop: 40 },
   commentRow: { flexDirection: 'row', marginBottom: 20 },
-  commentAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#f1f5f9', marginRight: 12 },
-  commentContent: { flex: 1, backgroundColor: '#f8fafc', padding: 12, borderRadius: 16 },
-  commentAuthor: { fontSize: 14, fontWeight: 'bold', color: '#0f172a', marginBottom: 4 },
-  commentTime: { fontWeight: 'normal', color: '#94a3b8', fontSize: 12 },
+  commentAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F0F0EC', marginRight: 12 },
+  commentContent: { flex: 1, backgroundColor: '#F7F7F5', padding: 12, borderRadius: 16 },
+  commentAuthor: { fontSize: 14, fontWeight: 'bold', color: '#111111', marginBottom: 4 },
+  commentTime: { fontWeight: 'normal', color: '#999999', fontSize: 12 },
   commentText: { fontSize: 15, color: '#334155', lineHeight: 20 },
-  commentInputRow: { flexDirection: 'row', alignItems: 'center', padding: 15, borderTopWidth: 1, borderTopColor: '#f1f5f9', backgroundColor: '#fff' },
+  commentInputRow: { flexDirection: 'row', alignItems: 'center', padding: 15, borderTopWidth: 1, borderTopColor: '#F0F0EC', backgroundColor: '#fff' },
   commentInputAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 10 },
-  commentInputBox: { flex: 1, backgroundColor: '#f1f5f9', borderRadius: 20, paddingHorizontal: 15, paddingTop: 10, paddingBottom: 10, minHeight: 40, maxHeight: 100, fontSize: 15, color: '#0f172a' },
+  commentInputBox: { flex: 1, backgroundColor: '#F0F0EC', borderRadius: 20, paddingHorizontal: 15, paddingTop: 10, paddingBottom: 10, minHeight: 40, maxHeight: 100, fontSize: 15, color: '#111111' },
   postCommentBtn: { marginLeft: 15, padding: 5 },
 
   // --- CREATE POST MODAL STYLES ---
@@ -972,37 +972,37 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderBottomWidth: 1, borderBottomColor: '#eee' },
   cancelText: { fontSize: 16, color: '#000' },
   modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#000' },
-  postText: { fontSize: 16, fontWeight: 'bold', color: '#007AFF' },
+  postText: { fontSize: 16, fontWeight: 'bold', color: '#111111' },
   
-  tabsWrapper: { backgroundColor: '#f8fafc', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  tabsWrapper: { backgroundColor: '#F7F7F5', borderBottomWidth: 1, borderBottomColor: '#F0F0EC' },
   typeTabsScroll: { paddingHorizontal: 15, paddingVertical: 12, gap: 10 },
-  typeTab: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: '#f1f5f9', gap: 6 },
+  typeTab: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, backgroundColor: '#F0F0EC', gap: 6 },
   typeTabActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3, elevation: 3 },
-  typeTabText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
-  typeTabTextActive: { color: '#007AFF' },
+  typeTabText: { fontSize: 14, fontWeight: '600', color: '#707070' },
+  typeTabTextActive: { color: '#111111' },
 
   modalBody: { flex: 1, padding: 15 },
   
-  eventInputWrapper: { backgroundColor: '#f8fafc', padding: 20, borderRadius: 20, borderWidth: 1, borderColor: '#f1f5f9' },
-  eventInputTitle: { fontSize: 18, fontWeight: 'bold', color: '#0f172a', marginBottom: 15 },
-  eventTitleInput: { backgroundColor: '#fff', height: 50, borderRadius: 12, paddingHorizontal: 15, fontSize: 16, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0', fontWeight: 'bold' },
-  eventDateInput: { backgroundColor: '#fff', height: 50, borderRadius: 12, paddingHorizontal: 15, fontSize: 16, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0' },
-  eventDescInput: { backgroundColor: '#fff', height: 100, borderRadius: 12, paddingHorizontal: 15, paddingTop: 15, fontSize: 16, borderWidth: 1, borderColor: '#e2e8f0' },
+  eventInputWrapper: { backgroundColor: '#F7F7F5', padding: 20, borderRadius: 20, borderWidth: 1, borderColor: '#F0F0EC' },
+  eventInputTitle: { fontSize: 18, fontWeight: 'bold', color: '#111111', marginBottom: 15 },
+  eventTitleInput: { backgroundColor: '#fff', height: 50, borderRadius: 12, paddingHorizontal: 15, fontSize: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E8E8E3', fontWeight: 'bold' },
+  eventDateInput: { backgroundColor: '#fff', height: 50, borderRadius: 12, paddingHorizontal: 15, fontSize: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E8E8E3' },
+  eventDescInput: { backgroundColor: '#fff', height: 100, borderRadius: 12, paddingHorizontal: 15, paddingTop: 15, fontSize: 16, borderWidth: 1, borderColor: '#E8E8E3' },
 
-  imagePickerBtn: { width: '100%', aspectRatio: 1, backgroundColor: '#f1f5f9', borderRadius: 16, overflow: 'hidden', marginBottom: 15 },
+  imagePickerBtn: { width: '100%', aspectRatio: 1, backgroundColor: '#F0F0EC', borderRadius: 16, overflow: 'hidden', marginBottom: 15 },
   previewImage: { width: '100%', height: '100%' },
   imagePickerPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   imagePickerText: { marginTop: 10, fontSize: 15, color: '#888', fontWeight: '500' },
-  imagePickerSubtext: { marginTop: 4, fontSize: 12, color: '#94a3b8' },
+  imagePickerSubtext: { marginTop: 4, fontSize: 12, color: '#999999' },
   selectedMediaRow: { padding: 8, gap: 8 },
-  selectedMediaTile: { width: 120, height: 120, borderRadius: 12, overflow: 'hidden', backgroundColor: '#0f172a' },
-  videoSelected: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f172a' },
+  selectedMediaTile: { width: 120, height: 120, borderRadius: 12, overflow: 'hidden', backgroundColor: '#FFFC00' },
+  videoSelected: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFC00' },
   mediaCarousel: { marginBottom: 0 },
-  videoPostPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f172a' },
+  videoPostPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFC00' },
   videoPostText: { color: '#fff', fontWeight: '700', marginTop: 7 },
-  captionInput: { fontSize: 16, color: '#0f172a', minHeight: 80 },
+  captionInput: { fontSize: 16, color: '#111111', minHeight: 80 },
 
-  confessionInputWrapper: { backgroundColor: '#0f172a', borderRadius: 20, padding: 24, minHeight: 250, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 6 },
+  confessionInputWrapper: { backgroundColor: '#FFFC00', borderRadius: 20, padding: 24, minHeight: 250, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 6 },
   confessionWarning: { color: '#AF52DE', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', marginBottom: 20, textAlign: 'center', letterSpacing: 0.5 },
   confessionInput: { color: '#fff', fontSize: 24, fontWeight: '600', lineHeight: 32, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' },
 
@@ -1010,14 +1010,14 @@ const styles = StyleSheet.create({
   hotTakeWarning: { color: '#fff', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', marginBottom: 20, textAlign: 'center', letterSpacing: 0.5 },
   hotTakeInput: { color: '#fff', fontSize: 24, fontWeight: '800', lineHeight: 32, fontStyle: 'italic' },
 
-  planInputWrapper: { backgroundColor: '#f8fafc', padding: 24, borderRadius: 20, borderWidth: 2, borderColor: '#e6f4fe', minHeight: 200, alignItems: 'center', justifyContent: 'center' },
-  planInput: { fontSize: 20, fontWeight: '700', color: '#0f172a', textAlign: 'center', width: '100%' },
+  planInputWrapper: { backgroundColor: '#F7F7F5', padding: 24, borderRadius: 20, borderWidth: 2, borderColor: '#FFFC00', minHeight: 200, alignItems: 'center', justifyContent: 'center' },
+  planInput: { fontSize: 20, fontWeight: '700', color: '#111111', textAlign: 'center', width: '100%' },
 
-  pollInputWrapper: { backgroundColor: '#fff', padding: 20, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: '#f1f5f9' },
-  pollQuestionInput: { fontSize: 18, fontWeight: '700', color: '#0f172a', marginBottom: 20 },
-  pollOptionInput: { backgroundColor: '#f8fafc', height: 50, borderRadius: 12, paddingHorizontal: 15, fontSize: 16, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0' },
+  pollInputWrapper: { backgroundColor: '#fff', padding: 20, borderRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: '#F0F0EC' },
+  pollQuestionInput: { fontSize: 18, fontWeight: '700', color: '#111111', marginBottom: 20 },
+  pollOptionInput: { backgroundColor: '#F7F7F5', height: 50, borderRadius: 12, paddingHorizontal: 15, fontSize: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E8E8E3' },
   addOptionBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingVertical: 10, paddingHorizontal: 5 },
-  addOptionText: { color: '#007AFF', fontWeight: '700', marginLeft: 6, fontSize: 15 }
+  addOptionText: { color: '#111111', fontWeight: '700', marginLeft: 6, fontSize: 15 }
 });
 
 export default UpdatesScreen;
