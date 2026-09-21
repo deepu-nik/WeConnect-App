@@ -364,14 +364,41 @@ const ProfileScreen = ({ route, navigation }) => {
           </View>
         </ProfileSection>
 
-        <ProfileSection title="Skills" subtitle="What you build and learn" action={isSelf ? { label: 'Manage', onPress: openEdit } : undefined}>{canSee('skills') && (
-          (groupedSkills.length ? groupedSkills.map((group) => (
-            <View key={group.title} style={styles.skillGroup}>
-              <Text style={styles.skillGroupTitle}>{group.title}</Text>
-              <View style={styles.skillRow}>{group.values.map((skill) => <View key={skill} style={styles.skillPill}><Code2 size={13} color="#111" /><Text style={styles.skillText}>{skill}</Text></View>)}</View>
+        <ProfileSection title="Skills" subtitle="What you build and learn" action={isSelf ? { label: 'Manage', onPress: openEdit } : undefined}>
+          {canSee('skills') ? (
+            groupedSkills.length ? (
+              groupedSkills.map((group) => (
+                <View key={group.title} style={styles.skillGroup}>
+                  <Text style={styles.skillGroupTitle}>{group.title}</Text>
+                  <View style={styles.skillRow}>
+                    {group.values.map((skill) => (
+                      <View key={skill} style={styles.skillPill}>
+                        <Code2 size={13} color="#111" />
+                        <Text style={styles.skillText}>{skill}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyCard}>
+                <Code2 size={20} color="#777770" />
+                <Text style={styles.emptyTitle}>No skills added yet</Text>
+                <Text style={styles.emptyText}>Add technologies and interests to help people understand what you do.</Text>
+                {isSelf && (
+                  <TouchableOpacity style={styles.smallButton} onPress={openEdit}>
+                    <Text style={styles.smallButtonText}>Add skills</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )
+          ) : (
+            <View style={styles.privateCard}>
+              <LockIcon />
+              <Text style={styles.privateText}>Skills are private.</Text>
             </View>
-          )) : <View style={styles.emptyCard}><Code2 size={20} color="#777770" /><Text style={styles.emptyTitle}>No skills added yet</Text><Text style={styles.emptyText}>Add technologies and interests to help people understand what you do.</Text>{isSelf && <TouchableOpacity style={styles.smallButton} onPress={openEdit}><Text style={styles.smallButtonText}>Add skills</Text></TouchableOpacity>}</View>}
-        ))}</ProfileSection>
+          )}
+        </ProfileSection>
 
         <ProfileSection title="Education & Experience" subtitle="Build your professional identity">{canSee('experience') && (
           <View style={styles.timelineCard}>
