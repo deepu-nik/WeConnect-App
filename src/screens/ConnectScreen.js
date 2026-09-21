@@ -44,6 +44,7 @@ const ConnectScreen = ({ navigation }) => {
   const [qrMode, setQrMode] = useState('my_code');
   const [scanned, setScanned] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
+  const [locationPreview, setLocationPreview] = useState(null);
   const scanLineY = useMemo(() => new Animated.Value(0), []);
   const [permission, requestPermission] = useCameraPermissions();
 
@@ -287,7 +288,13 @@ const ConnectScreen = ({ navigation }) => {
         <TouchableOpacity style={styles.cardInfo} onPress={() => item.uid && openProfile(navigation, { uid: item.uid })}>
           <Text style={styles.name}>{item.name}</Text>
           <Text style={styles.meta}>{activeTab === 'network' ? item.location : (item.bio || item.handle || 'Student')}</Text>
-          {activeTab === 'network' && <Text style={styles.location}>{item.locationIcon} {item.location}</Text>}
+          {activeTab === 'network' && (
+            <TouchableOpacity style={styles.locationPreviewRow} onPress={() => setLocationPreview(item)} activeOpacity={0.8}>
+              {item.locationPhoto ? <Image source={{ uri: item.locationPhoto }} style={styles.networkLocationThumb} /> : <Text style={styles.locationIcon}>{item.locationIcon}</Text>}
+              <Text style={styles.location} numberOfLines={1}>{item.location}</Text>
+              {item.locationPhoto ? <Text style={styles.viewLocationText}>View</Text> : null}
+            </TouchableOpacity>
+          )}
         </TouchableOpacity>
         {activeTab === 'network' ? (
           <>
@@ -400,6 +407,26 @@ const ConnectScreen = ({ navigation }) => {
         )}
       </View>
 
+      <Modal visible={!!locationPreview} transparent animationType="fade" onRequestClose={() => setLocationPreview(null)}>
+        <View style={styles.locationModalOverlay}>
+          <TouchableOpacity style={styles.locationModalBackdrop} activeOpacity={1} onPress={() => setLocationPreview(null)} />
+          <View style={styles.locationModalCard}>
+            <View style={styles.locationModalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.locationModalTitle}>{locationPreview?.name || 'Location'}</Text>
+                <Text style={styles.locationModalSubtitle}>{locationPreview?.locationIcon} {locationPreview?.location || 'Campus'}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setLocationPreview(null)}><X size={22} color="#111111" /></TouchableOpacity>
+            </View>
+            {locationPreview?.locationPhoto ? (
+              <Image source={{ uri: locationPreview.locationPhoto }} style={styles.locationModalImage} />
+            ) : (
+              <View style={styles.locationModalEmpty}><Text style={{ fontSize: 48 }}>{locationPreview?.locationIcon || '📍'}</Text><Text style={styles.locationModalEmptyText}>No location photo shared</Text></View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       <Modal visible={qrVisible} animationType="slide" onRequestClose={() => setQrVisible(false)}>
         <NativeSafeAreaView style={styles.qrModal}>
           <View style={styles.qrHeader}>
@@ -491,7 +518,11 @@ const styles = StyleSheet.create({
   cardInfo: { flex: 1 },
   name: { fontSize: 16, fontWeight: '700', color: '#111111' },
   meta: { color: '#707070', fontSize: 13, marginTop: 3 },
-  location: { color: '#111111', fontSize: 12, marginTop: 3, fontWeight: '600' },
+  locationPreviewRow: { flexDirection: 'row', alignItems: 'center', marginTop: 5 },
+  networkLocationThumb: { width: 34, height: 34, borderRadius: 9, marginRight: 7 },
+  locationIcon: { fontSize: 18, marginRight: 6 },
+  location: { color: '#111111', fontSize: 12, fontWeight: '700', flex: 1 },
+  viewLocationText: { color: '#707070', fontSize: 10, fontWeight: '800', marginLeft: 5 },
   connect: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFC00', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 18, gap: 5 },
   connectText: { color: '#111111', fontWeight: '700' },
   wave: { padding: 9, backgroundColor: '#fffbeb', borderRadius: 12, marginRight: 6 },
@@ -501,6 +532,15 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 70 },
   emptyTitle: { fontSize: 18, fontWeight: '800', color: '#334155', marginTop: 12 },
   emptyText: { color: '#999999', marginTop: 5 },
+  locationModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 20 },
+  locationModalBackdrop: { ...StyleSheet.absoluteFillObject },
+  locationModalCard: { backgroundColor: '#fff', borderRadius: 22, overflow: 'hidden' },
+  locationModalHeader: { flexDirection: 'row', alignItems: 'center', padding: 16 },
+  locationModalTitle: { fontSize: 18, fontWeight: '900', color: '#111111' },
+  locationModalSubtitle: { fontSize: 13, color: '#707070', marginTop: 3, fontWeight: '600' },
+  locationModalImage: { width: '100%', height: 300, backgroundColor: '#F0F0EC' },
+  locationModalEmpty: { height: 260, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F7F7F5' },
+  locationModalEmptyText: { color: '#707070', marginTop: 10 },
   qrModal: { flex: 1, backgroundColor: '#F7F7F5' },
   qrHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18, backgroundColor: '#fff' },
   qrTitle: { fontSize: 18, fontWeight: '800', color: '#111111' },
