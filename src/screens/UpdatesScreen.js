@@ -67,8 +67,7 @@ const UpdatesScreen = ({ navigation }) => {
 
         const q = query(
           collection(db, 'buzz_posts'),
-          where('collegeId', '==', profile.collegeId),
-          orderBy('createdAt', 'desc')
+          where('collegeId', '==', profile.collegeId)
         );
 
         unsubscribe = onSnapshot(q, (snapshot) => {
@@ -78,6 +77,7 @@ const UpdatesScreen = ({ navigation }) => {
 
           const fetchedPosts = snapshot.docs
             .map(postDoc => ({ id: postDoc.id, ...postDoc.data() }))
+            .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))
             .filter(post => {
               if (!post.createdAt) return true;
               const postTime = post.createdAt.toMillis ? post.createdAt.toMillis() : post.createdAt.toDate().getTime();
