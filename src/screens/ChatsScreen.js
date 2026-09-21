@@ -22,6 +22,24 @@ const ChatsScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const currentUser = auth.currentUser;
 
+  useEffect(() => {
+    if (!currentUser?.uid) { setChats([]); setLoading(false); return undefined; }
+    setLoading(true);
+    const chatsQuery = query(collection(db, 'chats'), where('participants', 'array-contains', currentUser.uid));
+    const unsubscribe = onSnapshot(chatsQuery, (snapshot) => {
+      const nextChats = snapshot.docs.map((chatDoc) => {
+        const data = chatDoc.data() || {};
+        const participants = Array.isArray(data.participants) ? data.participants : [];
+        const otherUserId = participants.find((uid) => uid !== currentUser.uid);
+        const otherInfo = data.usersInfo?.[otherUserId] || {};
+        const timestamp = data.updatedAt?.toDate?.() || new Date(0);
+        return { id: chatDoc.id, otherUserId, name: otherInfo.name || 'Student', avatar: otherInfo.avatar || 'https://via.placeholder.com/150', lastMessage: data.lastMessage || 'No messages yet', timestamp, unreadCount: Number(data.unreadCount?.[currentUser.uid] || 0) };
+      }).sort((a, b) => b.timestamp - a.timestamp);
+      setChats(nextChats); setLoading(false);
+    }, (error) => { console.error('Chats subscription failed:', error); setChats([]); setLoading(false); });
+    return unsubscribe;
+  }, [currentUser?.uid]);
+
   // Search States
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
