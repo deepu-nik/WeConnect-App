@@ -1,118 +1,385 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, 
-  KeyboardAvoidingView, Platform, Image, ActivityIndicator, StatusBar, 
-  Modal, Animated, Alert, Keyboard
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  FlatList,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  Share,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { 
-  ArrowLeft, Send, Image as ImageIcon, Camera, 
-  Smile, X, Video
+import {
+  ArrowLeft,
+  Camera,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Ellipsis,
+  Image as ImageIcon,
+  Search,
+  Send,
+  Smile,
+  X,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
-
+import { PinchGestureHandler, State } from 'react-native-gesture-handler';
 import { auth, db } from '../config/firebase';
 import { markChatRead } from '../services/chatService';
-import { subscribeToMessages, sendChatMessage as sendPersistedMessage, toggleMessageReaction, deleteMessage } from '../services/chatMessageService';
+import {
+  deleteMessage,
+  sendChatMessage as sendPersistedMessage,
+  subscribeToMessages,
+  toggleMessageReaction,
+} from '../services/chatMessageService';
 import { getUserProfile } from '../services/userService';
-import { collection, query, where, addDoc, onSnapshot, orderBy, serverTimestamp, doc, updateDoc, getDocs, increment } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  doc,
+  getDocs,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+} from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import { openProfile } from '../navigation/navigationHelpers';
-import MediaShareSheet from '../components/MediaShareSheet';
-import { PinchGestureHandler, State } from 'react-native-gesture-handler';
+
+const QUICK_REACTIONS = ['❤️', '😂', '👍', '🔥', '😮', '👏'];
+const COMPOSER_EMOJIS = [
+  ['😀', '😂', '🤣', '😊', '😍', '🥰', '😎', '🤩'],
+  ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍'],
+  ['👍', '👎', '👏', '🙌', '🙏', '🔥', '💯', '✨'],
+  ['😭', '😢', '😡', '🤔', '😮', '😴', '🤗', '😅'],
+];
+
+const FALLBACK_AVATAR = 'https://via.placeholder.com/150';
 
 const TypingIndicator = () => {
-  const dot1 = useRef(new Animated.Value(0)).current;
-  const dot2 = useRef(new Animated.Value(0)).current;
-  const dot3 = useRef(new Animated.Value(0)).current;
+  const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
 
   useEffect(() => {
-    const animateDot = (dot, delay) => {
+    const animations = dots.map((dot, index) =>
       Animated.loop(
         Animated.sequence([
-          Animated.timing(dot, { toValue: 1, duration: 300, delay, useNativeDriver: true }),
-          Animated.timing(dot, { toValue: 0, duration: 300, useNativeDriver: true }),
+          Animated.delay(index * 140),
+          Animated.timing(dot, { toValue: 1, duration: 280, useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0, duration: 280, useNativeDriver: true }),
         ])
-      ).start();
-    };
-    animateDot(dot1, 0); animateDot(dot2, 150); animateDot(dot3, 300);
+      )
+    );
+    animations.forEach((animation) => animation.start());
+    return () => animations.forEach((animation) => animation.stop());
   }, []);
 
-  const translateY = (dot) => dot.interpolate({ inputRange: [0, 1], outputRange: [0, -5] });
-
   return (
-    <View style={styles.typingContainer}>
-      <Animated.View style={[styles.typingDot, { transform: [{ translateY: translateY(dot1) }] }]} />
-      <Animated.View style={[styles.typingDot, { transform: [{ translateY: translateY(dot2) }] }]} />
-      <Animated.View style={[styles.typingDot, { transform: [{ translateY: translateY(dot3) }] }]} />
+    <View style={styles.typingDots}>
+      {dots.map((dot, index) => (
+        <Animated.View
+          key={index}
+          style={[
+            styles.typingDot,
+            {
+              transform: [{
+                translateY: dot.interpolate({ inputRange: [0, 1], outputRange: [0, -4] }),
+              }],
+            },
+          ]}
+        />
+      ))}
     </View>
   );
 };
 
 const ChatRoomScreen = ({ route, navigation }) => {
-  const { 
+  const {
     chatId: initialChatId,
     uid: otherUserId,
     name: routeName = 'Student',
-    avatar: routeAvatar = 'https://via.placeholder.com/150' 
+    avatar: routeAvatar = FALLBACK_AVATAR,
   } = route.params || {};
 
+  const currentUser = auth.currentUser;
+  const listRef = useRef(null);
+  const typingTimeout = useRef(null);
+  const viewerScale = useRef(new Animated.Value(1)).current;
+  const pinchScale = useRef(new Animated.Value(1)).current;
+  const pinchStartScale = useRef(1);
+
+  const [chatId, setChatId] = useState(initialChatId || null);
   const [messages, setMessages] = useState([]);
   const [otherUserName, setOtherUserName] = useState(routeName);
   const [otherUserAvatar, setOtherUserAvatar] = useState(routeAvatar);
-  const [inputText, setInputText] = useState('');
-  const [chatId, setChatId] = useState(initialChatId || null);
-  
   const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
-  const [isOnline, setIsOnline] = useState(true); 
-  
-  const [previewImage, setPreviewImage] = useState(null);
-  const [imageCaption, setImageCaption] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
-  const [mediaShareVisible, setMediaShareVisible] = useState(false);
-  const [fullScreenImage, setFullScreenImage] = useState(null);
-  const [fullScreenImageIndex, setFullScreenImageIndex] = useState(0);
-  const [viewerScale] = useState(() => new Animated.Value(1));
-  const [pinchScale] = useState(() => new Animated.Value(1));
-  const pinchStartScale = useRef(1);
-  const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
-  const [isGalleryUploading, setIsGalleryUploading] = useState(false);
-  const emojiRows = [
-    ['😀', '😂', '🤣', '😊', '😍', '🥰', '😎', '🤩'],
-    ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍'],
-    ['👍', '👎', '👏', '🙌', '🙏', '🔥', '💯', '✨'],
-    ['😭', '😢', '😡', '🤔', '😮', '😴', '🤗', '😅'],
-  ];
-  const [fullScreenAvatar, setFullScreenAvatar] = useState(null);
+  const [inputText, setInputText] = useState('');
   const [replyingTo, setReplyingTo] = useState(null);
   const [selectedMessageId, setSelectedMessageId] = useState(null);
-  const typingTimeout = useRef(null);
+  const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+  const [fullScreenImage, setFullScreenImage] = useState(null);
+  const [fullScreenImageIndex, setFullScreenImageIndex] = useState(0);
+  const [fullScreenAvatar, setFullScreenAvatar] = useState(null);
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [mediaVisible, setMediaVisible] = useState(false);
+  const [detailsVisible, setDetailsVisible] = useState(false);
 
-  const currentUser = auth.currentUser;
+  const imageMessages = useMemo(
+    () => messages.filter((message) => message.mediaUrl && message.mediaType === 'image' && !message.deleted),
+    [messages]
+  );
 
-  const imageMessages = messages.filter((message) => message.mediaUrl && message.mediaType === 'image');
+  const searchResults = useMemo(() => {
+    const queryText = searchQuery.trim().toLowerCase();
+    if (!queryText) return [];
+    return messages.filter((message) => message.text?.toLowerCase().includes(queryText));
+  }, [messages, searchQuery]);
+
+  useEffect(() => {
+    let active = true;
+    const loadOtherUser = async () => {
+      if (!otherUserId) return;
+      try {
+        const profile = await getUserProfile(otherUserId);
+        if (!active || !profile) return;
+        setOtherUserName(profile.name || routeName || 'Student');
+        setOtherUserAvatar(profile.avatar || routeAvatar || FALLBACK_AVATAR);
+      } catch (error) {
+        console.error('Other user profile load failed:', error);
+      }
+    };
+    loadOtherUser();
+    return () => { active = false; };
+  }, [otherUserId, routeName, routeAvatar]);
+
+  useEffect(() => {
+    const findExistingChat = async () => {
+      if (chatId || !otherUserId || !currentUser) return;
+      try {
+        const q = query(collection(db, 'chats'), where('participants', 'array-contains', currentUser.uid));
+        const snapshot = await getDocs(q);
+        const existing = snapshot.docs.find((item) => item.data()?.participants?.includes(otherUserId));
+        if (existing) setChatId(existing.id);
+      } catch (error) {
+        console.error('Chat lookup failed:', error);
+      }
+    };
+    findExistingChat();
+  }, [chatId, otherUserId, currentUser]);
+
+  useEffect(() => {
+    if (!chatId || !currentUser) return;
+
+    markChatRead(chatId, currentUser.uid).catch((error) => console.error('Failed to mark chat read:', error));
+
+    const unsubscribeMessages = subscribeToMessages(
+      chatId,
+      (nextMessages) => setMessages(nextMessages),
+      (error) => console.error('Message subscription failed:', error)
+    );
+
+    const unsubscribeChat = onSnapshot(doc(db, 'chats', chatId), (snapshot) => {
+      if (!snapshot.exists()) return;
+      const data = snapshot.data();
+      setIsOtherUserTyping(Boolean(data.typing?.[otherUserId]));
+    });
+
+    return () => {
+      unsubscribeMessages();
+      unsubscribeChat();
+    };
+  }, [chatId, currentUser, otherUserId]);
+
+  useEffect(() => () => {
+    if (typingTimeout.current) clearTimeout(typingTimeout.current);
+  }, []);
+
+  const setTyping = (value) => {
+    if (!chatId || !currentUser) return;
+    updateDoc(doc(db, 'chats', chatId), { ['typing.' + currentUser.uid]: value }).catch(() => {});
+  };
+
+  const handleTextChange = (text) => {
+    setInputText(text);
+    if (!chatId || !currentUser) return;
+    setTyping(true);
+    if (typingTimeout.current) clearTimeout(typingTimeout.current);
+    typingTimeout.current = setTimeout(() => setTyping(false), 1200);
+  };
+
+  const createChatIfNeeded = async () => {
+    if (chatId) return chatId;
+    if (!currentUser || !otherUserId) throw new Error('Missing chat participants');
+
+    const chatRef = await addDoc(collection(db, 'chats'), {
+      participants: [currentUser.uid, otherUserId],
+      updatedAt: serverTimestamp(),
+      lastMessage: '',
+      typing: { [currentUser.uid]: false, [otherUserId]: false },
+      unreadCount: { [currentUser.uid]: 0, [otherUserId]: 0 },
+      usersInfo: {
+        [currentUser.uid]: {
+          name: currentUser.displayName || 'You',
+          avatar: currentUser.photoURL || FALLBACK_AVATAR,
+        },
+        [otherUserId]: {
+          name: otherUserName,
+          avatar: otherUserAvatar,
+        },
+      },
+    });
+    setChatId(chatRef.id);
+    return chatRef.id;
+  };
+
+  const sendMessage = async (mediaUrl = null, mediaType = null, caption = null) => {
+    const messageText = caption ?? inputText.trim();
+    if (!messageText && !mediaUrl) return;
+
+    const reply = replyingTo;
+    setInputText('');
+    setReplyingTo(null);
+    setEmojiPickerVisible(false);
+    setTyping(false);
+
+    try {
+      const activeChatId = await createChatIfNeeded();
+      const messageId = Date.now().toString() + '-' + Math.random().toString(36).slice(2, 8);
+
+      await sendPersistedMessage({
+        chatId: activeChatId,
+        message: {
+          id: messageId,
+          text: messageText,
+          mediaUrl,
+          mediaType,
+          replyTo: reply
+            ? {
+                id: reply.id,
+                text: reply.text || (reply.mediaType === 'video' ? '🎥 Video' : '📷 Photo'),
+                senderId: reply.senderId,
+              }
+            : null,
+        },
+      });
+    } catch (error) {
+      setInputText(messageText);
+      setReplyingTo(reply);
+      Alert.alert('Message not sent', 'Please check your connection and try again.');
+      console.error('Message send failed:', error);
+    }
+  };
+
+  const uploadAndSendItems = async (items) => {
+    if (!items?.length || isUploading) return;
+    const selected = items.slice(0, 10);
+    setIsUploading(true);
+    setUploadProgress({ current: 0, total: selected.length });
+    setEmojiPickerVisible(false);
+    Keyboard.dismiss();
+
+    try {
+      for (let index = 0; index < selected.length; index += 1) {
+        const item = selected[index];
+        const secureUrl = await uploadToCloudinary(item.uri, item.type);
+        if (!secureUrl) throw new Error('Media upload failed');
+        await sendMessage(secureUrl, item.type);
+        setUploadProgress({ current: index + 1, total: selected.length });
+      }
+    } catch (error) {
+      console.error('Media send failed:', error);
+      Alert.alert('Could not send media', 'Some media could not be sent. Please try again.');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress({ current: 0, total: 0 });
+    }
+  };
+
+  const openGalleryAndSend = async () => {
+    if (isUploading) return;
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Gallery permission needed', 'Allow WeConnect to access photos and videos.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images', 'videos'],
+        allowsMultipleSelection: true,
+        selectionLimit: 10,
+        quality: 0.85,
+      });
+      if (!result.canceled && result.assets?.length) {
+        await uploadAndSendItems(result.assets.map((asset) => ({
+          uri: asset.uri,
+          type: asset.type === 'video' ? 'video' : 'image',
+        })));
+      }
+    } catch (error) {
+      console.error('Gallery picker failed:', error);
+      Alert.alert('Gallery error', 'Unable to open the gallery right now.');
+    }
+  };
+
+  const openCameraAndSend = async () => {
+    if (isUploading) return;
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Camera permission needed', 'Allow WeConnect to use your camera.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images', 'videos'],
+        videoMaxDuration: 60,
+        quality: 0.85,
+      });
+      if (!result.canceled && result.assets?.length) {
+        await uploadAndSendItems(result.assets.map((asset) => ({
+          uri: asset.uri,
+          type: asset.type === 'video' ? 'video' : 'image',
+        })));
+      }
+    } catch (error) {
+      console.error('Camera failed:', error);
+      Alert.alert('Camera error', 'Unable to open the camera right now.');
+    }
+  };
 
   const openFullScreenImage = (url) => {
     const index = Math.max(0, imageMessages.findIndex((message) => message.mediaUrl === url));
     setFullScreenImageIndex(index);
     setFullScreenImage(url);
     viewerScale.setValue(1);
+    pinchScale.setValue(1);
   };
 
   const closeFullScreenImage = () => {
     setFullScreenImage(null);
     viewerScale.setValue(1);
+    pinchScale.setValue(1);
   };
 
   const showAdjacentImage = (direction) => {
-    if (!imageMessages.length) return;
-    const next = fullScreenImageIndex + direction;
-    if (next < 0 || next >= imageMessages.length) return;
-    setFullScreenImageIndex(next);
-    setFullScreenImage(imageMessages[next].mediaUrl);
+    const nextIndex = fullScreenImageIndex + direction;
+    if (nextIndex < 0 || nextIndex >= imageMessages.length) return;
+    setFullScreenImageIndex(nextIndex);
+    setFullScreenImage(imageMessages[nextIndex].mediaUrl);
     viewerScale.setValue(1);
-    viewerTranslateX.setValue(0);
-    viewerTranslateY.setValue(0);
+    pinchScale.setValue(1);
   };
 
   const onPinchGestureEvent = Animated.event(
@@ -134,204 +401,29 @@ const ChatRoomScreen = ({ route, navigation }) => {
     }
   };
 
-
-  useEffect(() => {
-    let active = true;
-    const loadOtherUser = async () => {
-      if (!otherUserId) return;
-      try {
-        const profile = await getUserProfile(otherUserId);
-        if (!active || !profile) return;
-        setOtherUserName(profile.name || routeName || 'Student');
-        setOtherUserAvatar(profile.avatar || routeAvatar || 'https://via.placeholder.com/150');
-      } catch (error) {
-        console.error('Other user profile load failed:', error);
-      }
-    };
-    loadOtherUser();
-    return () => { active = false; };
-  }, [otherUserId, routeName, routeAvatar]);
-
-  useEffect(() => {
-    const findOrCreateChat = async () => {
-      if (chatId || !otherUserId || !currentUser) return; 
-      const q = query(collection(db, 'chats'), where('participants', 'array-contains', currentUser.uid));
-      const querySnapshot = await getDocs(q);
-      
-      let existingChatId = null;
-      querySnapshot.forEach((doc) => {
-        if (doc.data().participants.includes(otherUserId)) existingChatId = doc.id;
-      });
-      if (existingChatId) setChatId(existingChatId);
-    };
-    findOrCreateChat();
-  }, [otherUserId, currentUser, chatId]);
-
-  useEffect(() => {
-    if (!chatId || !currentUser) return;
-    markChatRead(chatId, currentUser.uid).catch((error) => console.error('Failed to mark chat read:', error));
-    const unsubscribeMsgs = subscribeToMessages(chatId, (fetchedMessages) => {
-      setMessages(fetchedMessages);
-    }, (error) => console.error('Message subscription failed:', error));
-
-    const chatDocRef = doc(db, 'chats', chatId);
-    const unsubscribeTyping = onSnapshot(chatDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data.typing && data.typing[otherUserId]) setIsOtherUserTyping(true);
-        else setIsOtherUserTyping(false);
-      }
-    });
-
-    return () => { unsubscribeMsgs(); unsubscribeTyping(); };
-  }, [chatId, currentUser]);
-
-  useEffect(() => () => {
-    if (typingTimeout.current) clearTimeout(typingTimeout.current);
-  }, []);
-
-  const handleTextChange = async (text) => {
-    setInputText(text);
-    if (!chatId) return;
-    try {
-      await updateDoc(doc(db, 'chats', chatId), { ['typing.' + currentUser.uid]: true });
-    } catch (error) {
-      console.error('Typing state update failed:', error);
-    }
-
-    if (typingTimeout.current) clearTimeout(typingTimeout.current);
-    typingTimeout.current = setTimeout(async () => {
-      try {
-        await updateDoc(doc(db, 'chats', chatId), { ['typing.' + currentUser.uid]: false });
-      } catch (error) {
-        console.error('Typing state update failed:', error);
-      }
-    }, 1200);
-  };
-
-  const sendMessage = async (mediaUrl = null, mediaType = null, caption = null) => {
-    const messageText = caption || inputText.trim();
-    const reply = replyingTo;
-    setReplyingTo(null);
-    if (!messageText && !mediaUrl) return;
-
-    let currentChatId = chatId;
-    setInputText(''); 
-    setPreviewImage(null);
-    setImageCaption('');
-
-    try {
-      if (!currentChatId) {
-        const newChatRef = await addDoc(collection(db, 'chats'), {
-          participants: [currentUser.uid, otherUserId],
-          updatedAt: serverTimestamp(),
-          lastMessage: mediaUrl ? (mediaType === 'video' ? '🎥 Video' : '📷 Photo') : messageText,
-          typing: { [currentUser.uid]: false, [otherUserId]: false },
-          usersInfo: {
-            [currentUser.uid]: { name: currentUser.displayName || 'You', avatar: currentUser.photoURL || 'https://via.placeholder.com/150' },
-            [otherUserId]: { name: otherUserName, avatar: otherUserAvatar }
-          }
-        });
-        currentChatId = newChatRef.id;
-        setChatId(currentChatId);
-      } else {
-        await updateDoc(doc(db, 'chats', currentChatId), { [`typing.${currentUser.uid}`]: false });
-      }
-
-      const messageId = String(Date.now()) + '-' + Math.random().toString(36).slice(2, 8);
-      await sendPersistedMessage({
-        chatId: currentChatId,
-        message: {
-          id: messageId,
-          text: messageText,
-          mediaUrl,
-          mediaType,
-          replyTo: reply ? {
-            id: reply.id,
-            text: reply.text || (reply.mediaType === 'video' ? '🎥 Video' : '📷 Photo'),
-            senderId: reply.senderId,
-          } : null,
-        },
-      });
-    } catch (error) { console.error('Error sending:', error); }
-  };
-
-  const uploadAndSendItems = async (items) => {
-    if (!items?.length || isGalleryUploading) return;
-    setIsGalleryUploading(true);
-    setEmojiPickerVisible(false);
+  const handleMessageLongPress = (messageId) => {
     Keyboard.dismiss();
+    setEmojiPickerVisible(false);
+    setSelectedMessageId(messageId);
+  };
 
+  const handleShareMessage = async (item) => {
+    setSelectedMessageId(null);
+    const text = item.text || (item.mediaType === 'video' ? '🎥 Video from WeConnect' : item.mediaType === 'image' ? '📷 Photo from WeConnect' : '');
+    if (!text) return;
     try {
-      for (const item of items.slice(0, 10)) {
-        const secureUrl = await uploadToCloudinary(item.uri, item.type);
-        if (!secureUrl) throw new Error('Media upload failed');
-        await sendMessage(secureUrl, item.type);
-      }
+      await Share.share({ message: text });
     } catch (error) {
-      console.error('Media send failed:', error);
-      Alert.alert('Could not send media', 'One or more files could not be uploaded. Please try again.');
-    } finally {
-      setIsGalleryUploading(false);
+      console.error('Share failed:', error);
     }
   };
 
-  const openGalleryAndSend = async () => {
-    if (isGalleryUploading) return;
+  const handleDeleteMessage = async (item) => {
+    setSelectedMessageId(null);
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('Gallery permission needed', 'Allow WeConnect to access your photos and videos.');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images', 'videos'],
-        allowsMultipleSelection: true,
-        selectionLimit: 10,
-        quality: 0.85,
-      });
-
-      if (!result.canceled && result.assets?.length) {
-        await uploadAndSendItems(
-          result.assets.map((asset) => ({
-            uri: asset.uri,
-            type: asset.type === 'video' ? 'video' : 'image',
-          }))
-        );
-      }
+      await deleteMessage(chatId, item.id);
     } catch (error) {
-      console.error('Gallery picker failed:', error);
-      Alert.alert('Gallery error', 'Unable to open the gallery right now.');
-    }
-  };
-
-  const openCameraAndSend = async () => {
-    if (isGalleryUploading) return;
-    try {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('Camera permission needed', 'Allow WeConnect to use your camera.');
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images', 'videos'],
-        videoMaxDuration: 60,
-        quality: 0.85,
-      });
-
-      if (!result.canceled && result.assets?.length) {
-        await uploadAndSendItems(
-          result.assets.map((asset) => ({
-            uri: asset.uri,
-            type: asset.type === 'video' ? 'video' : 'image',
-          }))
-        );
-      }
-    } catch (error) {
-      console.error('Camera failed:', error);
-      Alert.alert('Camera error', 'Unable to open the camera right now.');
+      Alert.alert('Could not delete', 'The message could not be deleted.');
     }
   };
 
@@ -339,14 +431,18 @@ const ChatRoomScreen = ({ route, navigation }) => {
     setInputText((value) => value + emoji);
   };
 
-
   const renderMessage = ({ item }) => {
     const isMe = item.senderId === currentUser?.uid;
-    const reactions = Object.entries(item.reactions || {}).filter(([, users]) => users?.length);
+    const reactions = Object.entries(item.reactions || {}).filter(([, users]) => Array.isArray(users) && users.length);
     const replyPreview = item.replyTo?.text;
 
     return (
-      <View style={[styles.messageRow, isMe ? styles.myRow : styles.theirRow]}>
+      <Pressable
+        style={[styles.messageRow, isMe ? styles.myRow : styles.theirRow]}
+        onLongPress={() => handleMessageLongPress(item.id)}
+        delayLongPress={300}
+        android_ripple={{ color: 'rgba(0,0,0,0.04)' }}
+      >
         {!isMe && (
           <TouchableOpacity
             style={styles.avatarWrap}
@@ -357,46 +453,60 @@ const ChatRoomScreen = ({ route, navigation }) => {
         )}
 
         <View style={[styles.messageColumn, isMe ? styles.messageColumnMine : styles.messageColumnTheirs]}>
-          <TouchableOpacity
-            activeOpacity={0.92}
-            onLongPress={() => setSelectedMessageId(item.id)}
-            delayLongPress={350}
-            style={[styles.messageBubble, isMe ? styles.myBubble : styles.theirBubble]}
-          >
+          <View style={[styles.messageBubble, isMe ? styles.myBubble : styles.theirBubble]}>
             {replyPreview ? (
               <View style={[styles.quotedReply, isMe ? styles.quotedReplyMine : styles.quotedReplyTheirs]}>
-                <Text style={[styles.quotedReplyLabel, isMe ? styles.quotedReplyLabelMine : null]}>
+                <Text style={[styles.quotedReplyLabel, isMe && styles.quotedReplyLabelMine]}>
                   {item.replyTo?.senderId === currentUser?.uid ? 'You' : otherUserName}
                 </Text>
-                <Text style={[styles.quotedReplyText, isMe ? styles.quotedReplyTextMine : null]} numberOfLines={1}>
+                <Text style={[styles.quotedReplyText, isMe && styles.quotedReplyTextMine]} numberOfLines={2}>
                   {replyPreview}
                 </Text>
               </View>
             ) : null}
 
-            {item.mediaUrl && item.mediaType === 'image' && (
-              <TouchableOpacity activeOpacity={0.95} onPress={() => openFullScreenImage(item.mediaUrl)}>
-                <Image source={{ uri: item.mediaUrl }} style={styles.messageImage} resizeMode="cover" />
-              </TouchableOpacity>
+            {item.deleted ? (
+              <Text style={[styles.deletedText, isMe && styles.myDeletedText]}>This message was deleted</Text>
+            ) : (
+              <>
+                {item.mediaUrl && item.mediaType === 'image' ? (
+                  <Pressable
+                    onPress={() => openFullScreenImage(item.mediaUrl)}
+                    onLongPress={() => handleMessageLongPress(item.id)}
+                    delayLongPress={300}
+                  >
+                    <Image source={{ uri: item.mediaUrl }} style={styles.messageImage} resizeMode="cover" />
+                  </Pressable>
+                ) : null}
+
+                {item.mediaUrl && item.mediaType === 'video' ? (
+                  <Pressable
+                    style={styles.messageVideo}
+                    onLongPress={() => handleMessageLongPress(item.id)}
+                    delayLongPress={300}
+                  >
+                    <View style={styles.videoPlayCircle}>
+                      <Text style={styles.videoPlayGlyph}>▶</Text>
+                    </View>
+                    <Text style={styles.messageVideoText}>Video</Text>
+                  </Pressable>
+                ) : null}
+
+                {item.text ? (
+                  <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.theirMessageText]}>
+                    {item.text}
+                  </Text>
+                ) : null}
+              </>
             )}
 
-            {item.mediaUrl && item.mediaType === 'video' && (
-              <View style={styles.messageVideo}>
-                <Video size={32} color="#fff" />
-                <Text style={styles.messageVideoText}>Video</Text>
-              </View>
-            )}
-
-            {item.text ? (
-              <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.theirMessageText]}>
-                {item.text}
+            <View style={styles.messageMeta}>
+              <Text style={[styles.timeText, isMe ? styles.myTimeText : styles.theirTimeText]}>
+                {item.createdAt?.toLocaleTimeString?.([], { hour: '2-digit', minute: '2-digit' }) || ''}
               </Text>
-            ) : null}
-
-            <Text style={[styles.timeText, isMe ? styles.myTimeText : styles.theirTimeText]}>
-              {item.createdAt?.toLocaleTimeString?.([], { hour: '2-digit', minute: '2-digit' }) || ''}
-            </Text>
-          </TouchableOpacity>
+              {isMe && !item.deleted ? <Check size={13} color="rgba(255,255,255,0.72)" /> : null}
+            </View>
+          </View>
 
           {reactions.length > 0 ? (
             <View style={[styles.reactionPillRow, isMe ? styles.reactionPillRowMine : styles.reactionPillRowTheirs]}>
@@ -416,7 +526,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
           {selectedMessageId === item.id ? (
             <View style={[styles.messageActions, isMe ? styles.messageActionsMine : styles.messageActionsTheirs]}>
               <View style={styles.reactionActionRow}>
-                {['❤️', '😂', '👍', '🔥', '😮'].map((emoji) => (
+                {QUICK_REACTIONS.map((emoji) => (
                   <TouchableOpacity
                     key={emoji}
                     style={styles.reactionAction}
@@ -429,64 +539,86 @@ const ChatRoomScreen = ({ route, navigation }) => {
                   </TouchableOpacity>
                 ))}
               </View>
-              <View style={styles.messageActionDivider} />
-              <TouchableOpacity style={styles.textActionButton} onPress={() => { setReplyingTo(item); setSelectedMessageId(null); }}>
+              <View style={styles.actionDivider} />
+              <TouchableOpacity style={styles.actionChip} onPress={() => { setReplyingTo(item); setSelectedMessageId(null); }}>
                 <Text style={styles.replyActionText}>Reply</Text>
               </TouchableOpacity>
-              {isMe ? (
-                <TouchableOpacity
-                  style={styles.textActionButton}
-                  onPress={async () => {
-                    try {
-                      await deleteMessage(chatId, item.id);
-                    } finally {
-                      setSelectedMessageId(null);
-                    }
-                  }}
-                >
+              {!item.deleted ? (
+                <TouchableOpacity style={styles.actionChip} onPress={() => handleShareMessage(item)}>
+                  <Text style={styles.shareActionText}>Share</Text>
+                </TouchableOpacity>
+              ) : null}
+              {isMe && !item.deleted ? (
+                <TouchableOpacity style={styles.actionChip} onPress={() => handleDeleteMessage(item)}>
                   <Text style={styles.deleteActionText}>Delete</Text>
                 </TouchableOpacity>
               ) : null}
-              <TouchableOpacity style={styles.textActionButton} onPress={() => setSelectedMessageId(null)}>
-                <Text style={styles.cancelActionText}>Cancel</Text>
+              <TouchableOpacity style={styles.actionChip} onPress={() => setSelectedMessageId(null)}>
+                <Text style={styles.cancelActionText}>×</Text>
               </TouchableOpacity>
             </View>
           ) : null}
         </View>
-      </View>
+      </Pressable>
     );
   };
-
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" />
 
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => {
-            if (navigation.canGoBack()) navigation.goBack();
-          }}>
-            <ArrowLeft size={26} color="#000" />
-          </TouchableOpacity>
+        <TouchableOpacity style={styles.headerBack} onPress={() => navigation.canGoBack() && navigation.goBack()}>
+          <ArrowLeft size={24} color="#111827" />
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.headerProfileClick}
-            activeOpacity={0.7}
-            onPress={() => openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar })}
-          >
-            <TouchableOpacity onPress={() => setFullScreenAvatar({ name: otherUserName, uri: otherUserAvatar })}>
-              <Image source={{ uri: otherUserAvatar }} style={styles.headerAvatar} />
-            </TouchableOpacity>
-            <View>
-              <Text style={styles.headerName} numberOfLines={1}>{otherUserName}</Text>
-              <Text style={[styles.headerStatus, isOnline && { color: '#34C759' }]}>
-                {isOnline ? 'Online' : 'Offline'}
-              </Text>
+        <TouchableOpacity
+          style={styles.headerProfile}
+          activeOpacity={0.75}
+          onPress={() => openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar })}
+        >
+          <Image source={{ uri: otherUserAvatar }} style={styles.headerAvatar} />
+          <View style={styles.headerIdentity}>
+            <Text style={styles.headerName} numberOfLines={1}>{otherUserName}</Text>
+            <View style={styles.onlineRow}>
+              <View style={styles.onlineDot} />
+              <Text style={styles.headerStatus}>{isOtherUserTyping ? 'typing…' : 'online'}</Text>
             </View>
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.headerAction} onPress={() => setSearchVisible((value) => !value)}>
+            <Search size={20} color="#111827" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerAction} onPress={() => setMediaVisible(true)}>
+            <ImageIcon size={20} color="#111827" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerAction} onPress={() => setDetailsVisible(true)}>
+            <Ellipsis size={20} color="#111827" />
           </TouchableOpacity>
         </View>
       </View>
+
+      {searchVisible ? (
+        <View style={styles.searchBar}>
+          <Search size={18} color="#94a3b8" />
+          <TextInput
+            autoFocus
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search messages"
+            placeholderTextColor="#94a3b8"
+            style={styles.searchInput}
+          />
+          {searchQuery ? (
+            <Text style={styles.searchCount}>{searchResults.length}</Text>
+          ) : null}
+          <TouchableOpacity onPress={() => { setSearchVisible(false); setSearchQuery(''); }}>
+            <X size={18} color="#64748b" />
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
@@ -494,6 +626,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
         keyboardVerticalOffset={0}
       >
         <FlatList
+          ref={listRef}
           data={messages}
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
@@ -510,6 +643,15 @@ const ChatRoomScreen = ({ route, navigation }) => {
               </View>
             ) : null
           }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <View style={styles.emptyAvatarRing}>
+                <Image source={{ uri: otherUserAvatar }} style={styles.emptyAvatar} />
+              </View>
+              <Text style={styles.emptyTitle}>Say hi to {otherUserName.split(' ')[0]}</Text>
+              <Text style={styles.emptySubtitle}>Send a message, photo or video to start the conversation.</Text>
+            </View>
+          }
         />
 
         {replyingTo ? (
@@ -517,14 +659,25 @@ const ChatRoomScreen = ({ route, navigation }) => {
             <View style={styles.replyAccent} />
             <View style={styles.replyContent}>
               <Text style={styles.replyLabel}>Replying to {replyingTo.senderId === currentUser?.uid ? 'yourself' : otherUserName}</Text>
-              <Text style={styles.replyText} numberOfLines={1}>{replyingTo.text || (replyingTo.mediaType === 'video' ? '🎥 Video' : '📷 Photo')}</Text>
+              <Text style={styles.replyText} numberOfLines={1}>
+                {replyingTo.text || (replyingTo.mediaType === 'video' ? '🎥 Video' : '📷 Photo')}
+              </Text>
             </View>
-            <TouchableOpacity onPress={() => setReplyingTo(null)}><X size={20} color="#64748b" /></TouchableOpacity>
+            <TouchableOpacity onPress={() => setReplyingTo(null)}>
+              <X size={19} color="#64748b" />
+            </TouchableOpacity>
           </View>
         ) : null}
+
         {emojiPickerVisible ? (
           <View style={styles.emojiPanel}>
-            {emojiRows.map((row, rowIndex) => (
+            <View style={styles.emojiPanelHeader}>
+              <Text style={styles.emojiPanelTitle}>Quick emojis</Text>
+              <TouchableOpacity onPress={() => setEmojiPickerVisible(false)}>
+                <X size={16} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+            {COMPOSER_EMOJIS.map((row, rowIndex) => (
               <View key={rowIndex} style={styles.emojiRow}>
                 {row.map((emoji) => (
                   <TouchableOpacity key={emoji} style={styles.emojiButton} onPress={() => insertEmoji(emoji)}>
@@ -536,54 +689,71 @@ const ChatRoomScreen = ({ route, navigation }) => {
           </View>
         ) : null}
 
-        <View style={styles.inputBar}>
-          <TouchableOpacity style={styles.cameraBtn} onPress={openCameraAndSend} disabled={isGalleryUploading}>
-            {isGalleryUploading ? <ActivityIndicator size="small" color="#007AFF" /> : <Camera size={22} color="#64748b" />}
-          </TouchableOpacity>
-
-          <View style={styles.inputWrapper}>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Send a chat..."
-              placeholderTextColor="#999"
-              value={inputText}
-              onChangeText={handleTextChange}
-              multiline
-              maxLength={500}
-            />
-            <TouchableOpacity
-              style={styles.insideInputBtn}
-              onPress={() => setEmojiPickerVisible((visible) => !visible)}
-              accessibilityLabel="Open emoji picker"
-            >
-              <Smile size={20} color={emojiPickerVisible ? '#007AFF' : '#64748b'} />
+        <View style={styles.composerShell}>
+          <View style={styles.composer}>
+            <TouchableOpacity style={styles.composerIcon} onPress={openCameraAndSend} disabled={isUploading}>
+              <Camera size={21} color="#475569" />
             </TouchableOpacity>
+
+            <TouchableOpacity style={styles.composerIcon} onPress={openGalleryAndSend} disabled={isUploading}>
+              {isUploading ? (
+                <ActivityIndicator size="small" color="#2563eb" />
+              ) : (
+                <ImageIcon size={21} color="#475569" />
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.textInputShell}>
+              <TextInput
+                value={inputText}
+                onChangeText={handleTextChange}
+                placeholder="Message…"
+                placeholderTextColor="#94a3b8"
+                multiline
+                maxLength={1000}
+                style={styles.textInput}
+                onFocus={() => setEmojiPickerVisible(false)}
+              />
+              <TouchableOpacity
+                style={styles.emojiToggle}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setEmojiPickerVisible((value) => !value);
+                }}
+              >
+                <Smile size={20} color={emojiPickerVisible ? "#2563eb" : "#64748b"} />
+              </TouchableOpacity>
+            </View>
+
+            {inputText.trim() ? (
+              <TouchableOpacity style={styles.sendButton} onPress={() => sendMessage()}>
+                <Send size={18} color="#fff" />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.sendButtonGhost} onPress={openGalleryAndSend} disabled={isUploading}>
+                <ImageIcon size={20} color="#2563eb" />
+              </TouchableOpacity>
+            )}
           </View>
 
-          {inputText.trim().length > 0 ? (
-            <TouchableOpacity style={styles.sendBtn} onPress={() => sendMessage()}>
-              <Send size={18} color="#fff" style={{ marginLeft: 2 }} />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={openGalleryAndSend}
-              disabled={isGalleryUploading}
-              accessibilityLabel="Open gallery"
-            >
-              {isGalleryUploading ? <ActivityIndicator size="small" color="#007AFF" /> : <ImageIcon size={24} color="#64748b" />}
-            </TouchableOpacity>
-          )}
+          {isUploading ? (
+            <View style={styles.uploadStatus}>
+              <ActivityIndicator size="small" color="#2563eb" />
+              <Text style={styles.uploadStatusText}>
+                Sending {uploadProgress.current}/{uploadProgress.total}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </KeyboardAvoidingView>
 
       <Modal visible={!!fullScreenImage} transparent animationType="fade" onRequestClose={closeFullScreenImage}>
         <View style={styles.mediaViewer}>
           <TouchableOpacity style={styles.viewerClose} onPress={closeFullScreenImage}>
-            <X size={28} color="#fff" />
+            <X size={27} color="#fff" />
           </TouchableOpacity>
 
-          {fullScreenImage && (
+          {fullScreenImage ? (
             <PinchGestureHandler
               onGestureEvent={onPinchGestureEvent}
               onHandlerStateChange={onPinchStateChange}
@@ -598,124 +768,248 @@ const ChatRoomScreen = ({ route, navigation }) => {
                 />
               </Animated.View>
             </PinchGestureHandler>
-          )}
+          ) : null}
 
-          {imageMessages.length > 1 && (
+          {fullScreenImageIndex > 0 ? (
+            <TouchableOpacity style={[styles.viewerArrow, styles.viewerArrowLeft]} onPress={() => showAdjacentImage(-1)}>
+              <ChevronLeft size={28} color="#fff" />
+            </TouchableOpacity>
+          ) : null}
+          {fullScreenImageIndex < imageMessages.length - 1 ? (
+            <TouchableOpacity style={[styles.viewerArrow, styles.viewerArrowRight]} onPress={() => showAdjacentImage(1)}>
+              <ChevronRight size={28} color="#fff" />
+            </TouchableOpacity>
+          ) : null}
+
+          {imageMessages.length > 1 ? (
             <View style={styles.viewerCounter}>
               <Text style={styles.viewerCounterText}>{fullScreenImageIndex + 1} / {imageMessages.length}</Text>
             </View>
-          )}
-
+          ) : null}
           <View style={styles.viewerHintPill}>
-            <Text style={styles.viewerHint}>Pinch to zoom</Text>
+            <Text style={styles.viewerHint}>Pinch to zoom • tap arrows to browse</Text>
           </View>
         </View>
       </Modal>
 
       <Modal visible={!!fullScreenAvatar} transparent animationType="fade" onRequestClose={() => setFullScreenAvatar(null)}>
         <View style={styles.fullScreenMediaOverlay}>
-          <TouchableOpacity style={styles.fullScreenClose} onPress={() => setFullScreenAvatar(null)}><X size={28} color="#fff" /></TouchableOpacity>
-          {fullScreenAvatar?.uri && <Image source={{ uri: fullScreenAvatar.uri }} style={styles.fullScreenAvatar} resizeMode="contain" />}
-          {!!fullScreenAvatar?.name && <Text style={styles.fullScreenAvatarName}>{fullScreenAvatar.name}</Text>}
+          <TouchableOpacity style={styles.fullScreenClose} onPress={() => setFullScreenAvatar(null)}>
+            <X size={28} color="#fff" />
+          </TouchableOpacity>
+          {fullScreenAvatar?.uri ? (
+            <Image source={{ uri: fullScreenAvatar.uri }} style={styles.fullScreenAvatar} resizeMode="contain" />
+          ) : null}
+          <Text style={styles.fullScreenAvatarName}>{fullScreenAvatar?.name || ''}</Text>
         </View>
       </Modal>
 
+      <Modal visible={searchVisible && false} transparent>
+        <View />
+      </Modal>
+
+      <Modal visible={mediaVisible} animationType="slide" onRequestClose={() => setMediaVisible(false)}>
+        <SafeAreaView style={styles.modalPage}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Shared photos</Text>
+            <TouchableOpacity onPress={() => setMediaVisible(false)}>
+              <X size={24} color="#111827" />
+            </TouchableOpacity>
+          </View>
+          {imageMessages.length ? (
+            <FlatList
+              data={imageMessages}
+              numColumns={3}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.mediaGrid}
+              renderItem={({ item }) => (
+                <TouchableOpacity style={styles.gridImageWrap} onPress={() => { setMediaVisible(false); openFullScreenImage(item.mediaUrl); }}>
+                  <Image source={{ uri: item.mediaUrl }} style={styles.gridImage} />
+                </TouchableOpacity>
+              )}
+            />
+          ) : (
+            <View style={styles.modalEmpty}>
+              <ImageIcon size={40} color="#cbd5e1" />
+              <Text style={styles.modalEmptyTitle}>No photos yet</Text>
+            </View>
+          )}
+        </SafeAreaView>
+      </Modal>
+
+      <Modal visible={detailsVisible} transparent animationType="fade" onRequestClose={() => setDetailsVisible(false)}>
+        <Pressable style={styles.detailsOverlay} onPress={() => setDetailsVisible(false)}>
+          <Pressable style={styles.detailsCard} onPress={() => {}}>
+            <Image source={{ uri: otherUserAvatar }} style={styles.detailsAvatar} />
+            <Text style={styles.detailsName}>{otherUserName}</Text>
+            <Text style={styles.detailsMeta}>Conversation</Text>
+            <TouchableOpacity
+              style={styles.detailsAction}
+              onPress={() => {
+                setDetailsVisible(false);
+                openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar });
+              }}
+            >
+              <Text style={styles.detailsActionText}>View profile</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.detailsAction}
+              onPress={() => {
+                setDetailsVisible(false);
+                setMediaVisible(true);
+              }}
+            >
+              <Text style={styles.detailsActionText}>Shared photos</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.detailsCancel} onPress={() => setDetailsVisible(false)}>
+              <Text style={styles.detailsCancelText}>Close</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
   keyboardAvoid: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f0f0f0', zIndex: 10 },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  headerProfileClick: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  iconBtn: { padding: 8 },
-  headerAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#ccc', marginRight: 10, marginLeft: 2 },
-  headerName: { fontSize: 18, fontWeight: '700', color: '#000' },
-  headerStatus: { fontSize: 12, fontWeight: '600', marginTop: 1 },
-  listContent: { paddingHorizontal: 15, paddingVertical: 15 },
-  messageRow: { flexDirection: 'row', alignItems: 'flex-end', marginVertical: 5, width: '100%' },
-  myRow: { justifyContent: 'flex-end' },
-  theirRow: { justifyContent: 'flex-start' },
-  avatarWrap: { width: 30, marginRight: 6, alignItems: 'center' },
-  tinyAvatar: { width: 26, height: 26, borderRadius: 13, marginBottom: 2 },
-  messageColumn: { maxWidth: '78%', flexDirection: 'column' },
+  header: {
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#edf2f7',
+  },
+  headerBack: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  headerProfile: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 3 },
+  headerAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#e2e8f0' },
+  headerIdentity: { marginLeft: 10, flex: 1 },
+  headerName: { fontSize: 16, fontWeight: '800', color: '#0f172a' },
+  onlineRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  onlineDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#22c55e', marginRight: 5 },
+  headerStatus: { fontSize: 11, fontWeight: '600', color: '#64748b' },
+  headerActions: { flexDirection: 'row', alignItems: 'center' },
+  headerAction: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 12, marginVertical: 7, paddingHorizontal: 12, minHeight: 40, borderRadius: 20, backgroundColor: '#eef2f7' },
+  searchInput: { flex: 1, paddingHorizontal: 8, fontSize: 14, color: '#0f172a' },
+  searchCount: { fontSize: 12, fontWeight: '800', color: '#2563eb', marginRight: 8 },
+  listContent: { paddingHorizontal: 10, paddingTop: 12, paddingBottom: 12 },
+  messageRow: { width: '100%', flexDirection: 'row', alignItems: 'flex-end', minHeight: 44, paddingVertical: 3 },
+  myRow: { justifyContent: 'flex-end', paddingLeft: 44 },
+  theirRow: { justifyContent: 'flex-start', paddingRight: 44 },
+  avatarWrap: { width: 32, alignItems: 'center', marginRight: 6 },
+  tinyAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#e2e8f0' },
+  messageColumn: { maxWidth: '82%', flexDirection: 'column' },
   messageColumnMine: { alignItems: 'flex-end' },
   messageColumnTheirs: { alignItems: 'flex-start' },
-  messageBubble: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20, minWidth: 52 },
-  myBubble: { backgroundColor: '#007AFF', borderBottomRightRadius: 5 },
-  theirBubble: { backgroundColor: '#F2F3F5', borderBottomLeftRadius: 5 },
-  messageText: { fontSize: 16, lineHeight: 22 },
-  myMessageText: { color: '#fff' },
-  theirMessageText: { color: '#000' },
-  timeText: { fontSize: 10, alignSelf: 'flex-end', marginTop: 4 },
-  myTimeText: { color: 'rgba(255,255,255,0.72)' },
-  theirTimeText: { color: '#8a8a8a' },
-  messageImage: { width: 230, height: 230, borderRadius: 15, marginBottom: 4 },
-  messageVideo: { width: 230, height: 170, borderRadius: 15, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  messageVideoText: { color: '#fff', fontSize: 13, fontWeight: '700', marginTop: 7 },
-  quotedReply: { borderLeftWidth: 3, borderRadius: 7, paddingLeft: 8, paddingVertical: 5, paddingRight: 4, marginBottom: 6, backgroundColor: 'rgba(0,0,0,0.05)' },
-  quotedReplyMine: { backgroundColor: 'rgba(255,255,255,0.13)' },
-  quotedReplyTheirs: { borderLeftColor: '#007AFF' },
-  quotedReplyLabel: { color: '#007AFF', fontSize: 11, fontWeight: '800' },
+  messageBubble: { paddingHorizontal: 11, paddingVertical: 8, borderRadius: 21, minWidth: 56, overflow: 'hidden' },
+  myBubble: { backgroundColor: '#2563eb', borderBottomRightRadius: 6 },
+  theirBubble: { backgroundColor: '#fff', borderBottomLeftRadius: 6, borderWidth: 1, borderColor: '#e7edf4' },
+  quotedReply: { borderLeftWidth: 3, borderRadius: 8, paddingLeft: 8, paddingVertical: 5, paddingRight: 5, marginBottom: 6, backgroundColor: 'rgba(15,23,42,0.06)' },
+  quotedReplyMine: { backgroundColor: 'rgba(255,255,255,0.14)', borderLeftColor: '#fff' },
+  quotedReplyTheirs: { borderLeftColor: '#2563eb' },
+  quotedReplyLabel: { fontSize: 10, fontWeight: '900', color: '#2563eb' },
   quotedReplyLabelMine: { color: '#fff' },
-  quotedReplyText: { color: '#475569', fontSize: 12, marginTop: 1 },
-  quotedReplyTextMine: { color: 'rgba(255,255,255,0.86)' },
-  reactionPillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: -2, zIndex: 2 },
+  quotedReplyText: { marginTop: 2, fontSize: 12, color: '#64748b' },
+  quotedReplyTextMine: { color: 'rgba(255,255,255,0.85)' },
+  messageImage: { width: 240, height: 240, borderRadius: 15, marginBottom: 3, backgroundColor: '#e2e8f0' },
+  messageVideo: { width: 240, height: 175, borderRadius: 15, backgroundColor: '#0f172a', alignItems: 'center', justifyContent: 'center', marginBottom: 3 },
+  videoPlayCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  videoPlayGlyph: { color: '#fff', fontSize: 20, marginLeft: 3 },
+  messageVideoText: { color: '#fff', fontSize: 12, fontWeight: '800', marginTop: 7 },
+  messageText: { fontSize: 16, lineHeight: 21 },
+  myMessageText: { color: '#fff' },
+  theirMessageText: { color: '#0f172a' },
+  deletedText: { fontSize: 14, fontStyle: 'italic', color: '#64748b' },
+  myDeletedText: { color: 'rgba(255,255,255,0.75)' },
+  messageMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 3, gap: 2 },
+  timeText: { fontSize: 9, fontWeight: '600' },
+  myTimeText: { color: 'rgba(255,255,255,0.72)' },
+  theirTimeText: { color: '#94a3b8' },
+  reactionPillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: -1, zIndex: 3 },
   reactionPillRowMine: { alignSelf: 'flex-end' },
   reactionPillRowTheirs: { alignSelf: 'flex-start' },
-  reactionPill: { flexDirection: 'row', alignItems: 'center', minHeight: 27, paddingHorizontal: 7, borderRadius: 14, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', elevation: 2, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } },
-  reactionPillEmoji: { fontSize: 15 },
-  reactionPillCount: { fontSize: 11, fontWeight: '700', color: '#64748b', marginLeft: 3 },
-  messageActions: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 6, paddingHorizontal: 7, paddingVertical: 6, borderRadius: 17, backgroundColor: '#fff', elevation: 5, shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 7, shadowOffset: { width: 0, height: 2 }, zIndex: 10 },
+  reactionPill: { flexDirection: 'row', alignItems: 'center', minHeight: 26, paddingHorizontal: 7, borderRadius: 14, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', elevation: 2 },
+  reactionPillEmoji: { fontSize: 14 },
+  reactionPillCount: { fontSize: 10, fontWeight: '800', color: '#64748b', marginLeft: 3 },
+  messageActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', alignSelf: 'flex-start', marginTop: 5, padding: 5, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', elevation: 7, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, zIndex: 20, maxWidth: '100%' },
   messageActionsMine: { alignSelf: 'flex-end' },
   messageActionsTheirs: { alignSelf: 'flex-start' },
-  reactionActionRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  reactionAction: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
-  reactionEmoji: { fontSize: 20 },
-  messageActionDivider: { width: 1, height: 22, backgroundColor: '#e5e7eb', marginHorizontal: 5 },
-  textActionButton: { paddingHorizontal: 8, paddingVertical: 6 },
-  replyActionText: { fontSize: 12, fontWeight: '800', color: '#007AFF' },
-  deleteActionText: { fontSize: 12, fontWeight: '800', color: '#FF3B30' },
-  cancelActionText: { fontSize: 12, fontWeight: '700', color: '#64748b' },
-  typingIndicatorRow: { flexDirection: 'row', alignItems: 'flex-end', marginVertical: 5, marginLeft: 2 },
-  typingBubble: { backgroundColor: '#F2F3F5', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20, borderBottomLeftRadius: 4, width: 65, height: 35, justifyContent: 'center' },
-  typingContainer: { flexDirection: 'row', justifyContent: 'space-between', width: 30, alignItems: 'center' },
-  typingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#888' },
-  replyBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 10, marginBottom: 5, padding: 9, borderRadius: 12, backgroundColor: '#f1f5f9' },
-  replyAccent: { width: 3, alignSelf: 'stretch', backgroundColor: '#007AFF', borderRadius: 2, marginRight: 9 },
+  reactionActionRow: { flexDirection: 'row', alignItems: 'center' },
+  reactionAction: { width: 31, height: 31, alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
+  reactionEmoji: { fontSize: 19 },
+  actionDivider: { width: 1, height: 23, backgroundColor: '#e2e8f0', marginHorizontal: 3 },
+  actionChip: { paddingHorizontal: 8, paddingVertical: 7 },
+  replyActionText: { fontSize: 11, fontWeight: '900', color: '#2563eb' },
+  shareActionText: { fontSize: 11, fontWeight: '900', color: '#0f766e' },
+  deleteActionText: { fontSize: 11, fontWeight: '900', color: '#ef4444' },
+  cancelActionText: { fontSize: 18, fontWeight: '800', color: '#64748b' },
+  typingIndicatorRow: { flexDirection: 'row', alignItems: 'flex-end', marginVertical: 5, marginLeft: 3 },
+  typingBubble: { width: 64, height: 38, marginLeft: 6, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e7edf4', alignItems: 'center', justifyContent: 'center' },
+  typingDots: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  typingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#94a3b8' },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 45, paddingVertical: 150 },
+  emptyAvatarRing: { width: 92, height: 92, borderRadius: 46, padding: 3, backgroundColor: '#dbeafe' },
+  emptyAvatar: { width: 86, height: 86, borderRadius: 43 },
+  emptyTitle: { marginTop: 15, fontSize: 18, fontWeight: '900', color: '#0f172a' },
+  emptySubtitle: { marginTop: 6, fontSize: 13, lineHeight: 19, color: '#64748b', textAlign: 'center' },
+  replyBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 10, marginBottom: 6, padding: 9, borderRadius: 15, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0' },
+  replyAccent: { width: 3, alignSelf: 'stretch', backgroundColor: '#2563eb', borderRadius: 2, marginRight: 9 },
   replyContent: { flex: 1 },
-  replyLabel: { fontSize: 11, fontWeight: '800', color: '#007AFF' },
+  replyLabel: { fontSize: 10, fontWeight: '900', color: '#2563eb' },
   replyText: { marginTop: 2, fontSize: 13, color: '#475569' },
-  emojiPanel: { backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#edf0f2', paddingHorizontal: 8, paddingTop: 8, paddingBottom: 6 },
-  emojiRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 3 },
-  emojiButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19 },
-  emojiButtonText: { fontSize: 25 },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, paddingVertical: 10, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f0f0f0' },
-  cameraBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f2f3f5', justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
-  inputWrapper: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#f2f3f5', borderRadius: 20, marginHorizontal: 10, paddingLeft: 15, paddingRight: 5, minHeight: 40, maxHeight: 100 },
-  textInput: { flex: 1, fontSize: 16, color: '#000', paddingTop: 8, paddingBottom: 8, textAlignVertical: 'center' },
-  insideInputBtn: { padding: 8 },
-  rightIconsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  actionBtn: { paddingHorizontal: 8 },
-  sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#007AFF', justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
-  previewModalContainer: { flex: 1, backgroundColor: '#000' },
-  previewHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20, zIndex: 10, position: 'absolute', width: '100%' },
-  previewToolsRow: { flexDirection: 'row' },
-  previewIconBtn: { padding: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.8, shadowRadius: 4, elevation: 5 },
-  fullPreviewImage: { flex: 1, width: '100%', height: '100%' },
-  previewBottomBar: { flexDirection: 'row', alignItems: 'center', padding: 20, backgroundColor: 'rgba(0,0,0,0.5)', position: 'absolute', bottom: 0, width: '100%' },
-  captionInput: { flex: 1, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 25, paddingHorizontal: 20, height: 50, fontSize: 16, marginRight: 15 },
-  sendPreviewBtn: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#007AFF', justifyContent: 'center', alignItems: 'center' },
+  emojiPanel: { backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingHorizontal: 7, paddingTop: 6, paddingBottom: 5 },
+  emojiPanelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 8, paddingBottom: 4 },
+  emojiPanelTitle: { fontSize: 11, fontWeight: '900', color: '#64748b' },
+  emojiRow: { flexDirection: 'row', justifyContent: 'space-around' },
+  emojiButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  emojiButtonText: { fontSize: 24 },
+  composerShell: { paddingHorizontal: 8, paddingTop: 6, paddingBottom: Platform.OS === 'ios' ? 7 : 5, backgroundColor: '#f8fafc' },
+  composer: { minHeight: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, paddingVertical: 5, borderRadius: 27, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', elevation: 3, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
+  composerIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19 },
+  textInputShell: { flex: 1, minHeight: 40, maxHeight: 100, flexDirection: 'row', alignItems: 'center', marginHorizontal: 2, paddingLeft: 8, borderRadius: 20, backgroundColor: '#f1f5f9' },
+  textInput: { flex: 1, color: '#0f172a', fontSize: 15, paddingVertical: 8, paddingRight: 3, textAlignVertical: 'center' },
+  emojiToggle: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  sendButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2563eb' },
+  sendButtonGhost: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#eff6ff' },
+  uploadStatus: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingTop: 4, gap: 7 },
+  uploadStatusText: { fontSize: 11, fontWeight: '700', color: '#2563eb' },
+  searchCount: { fontSize: 12, fontWeight: '800', color: '#2563eb', marginRight: 8 },
   mediaViewer: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
   viewerGestureArea: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   viewerImage: { width: '100%', height: '100%' },
-  viewerClose: { position: 'absolute', top: 48, right: 18, zIndex: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,.6)', alignItems: 'center', justifyContent: 'center' },
-  viewerCounter: { position: 'absolute', top: 58, left: 18, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(0,0,0,.6)' },
-  viewerCounterText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  viewerHintPill: { position: 'absolute', bottom: 28, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(0,0,0,.55)' },
-  viewerHint: { color: 'rgba(255,255,255,.85)', fontSize: 12, fontWeight: '600' },
+  viewerClose: { position: 'absolute', top: 50, right: 17, zIndex: 30, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
+  viewerArrow: { position: 'absolute', top: '48%', zIndex: 30, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  viewerArrowLeft: { left: 12 },
+  viewerArrowRight: { right: 12 },
+  viewerCounter: { position: 'absolute', top: 60, left: 16, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.55)' },
+  viewerCounterText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  viewerHintPill: { position: 'absolute', bottom: 27, paddingHorizontal: 13, paddingVertical: 7, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.55)' },
+  viewerHint: { color: 'rgba(255,255,255,0.86)', fontSize: 11, fontWeight: '700' },
+  fullScreenMediaOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.96)', alignItems: 'center', justifyContent: 'center' },
+  fullScreenClose: { position: 'absolute', top: 50, right: 18, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  fullScreenAvatar: { width: '90%', height: '65%' },
+  fullScreenAvatarName: { marginTop: 18, color: '#fff', fontSize: 17, fontWeight: '800' },
+  modalPage: { flex: 1, backgroundColor: '#f8fafc' },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingVertical: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  modalTitle: { fontSize: 18, fontWeight: '900', color: '#0f172a' },
+  mediaGrid: { padding: 3 },
+  gridImageWrap: { width: '33.333%', aspectRatio: 1, padding: 3 },
+  gridImage: { flex: 1, borderRadius: 7, backgroundColor: '#e2e8f0' },
+  modalEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  modalEmptyTitle: { marginTop: 10, fontSize: 15, fontWeight: '800', color: '#64748b' },
+  detailsOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.35)', justifyContent: 'flex-end' },
+  detailsCard: { backgroundColor: '#fff', borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 22, paddingTop: 24, paddingBottom: 30, alignItems: 'center' },
+  detailsAvatar: { width: 82, height: 82, borderRadius: 41 },
+  detailsName: { marginTop: 12, fontSize: 19, fontWeight: '900', color: '#0f172a' },
+  detailsMeta: { marginTop: 3, fontSize: 12, color: '#94a3b8' },
+  detailsAction: { width: '100%', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#eef2f7', alignItems: 'center' },
+  detailsActionText: { fontSize: 14, fontWeight: '800', color: '#2563eb' },
+  detailsCancel: { marginTop: 12, paddingVertical: 10 },
+  detailsCancelText: { fontSize: 14, fontWeight: '800', color: '#64748b' },
 });
 
 export default ChatRoomScreen;
