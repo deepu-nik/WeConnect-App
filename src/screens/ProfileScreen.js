@@ -200,7 +200,9 @@ const ProfileScreen = ({ route, navigation }) => {
           {user.coverPhoto ? <Image source={{ uri: user.coverPhoto }} style={styles.coverImage} /> : <View style={styles.coverFallback} />}
           <View style={styles.coverShade} />
           <SafeAreaView style={styles.topBar}>
-            <TouchableOpacity style={styles.circleBtn} onPress={() => navigation.goBack()}><ArrowLeft size={23} color="#fff" /></TouchableOpacity>
+            <TouchableOpacity style={styles.circleBtn} onPress={() => {
+              if (navigation.canGoBack()) navigation.goBack();
+            }}><ArrowLeft size={23} color="#fff" /></TouchableOpacity>
             {isSelf && <TouchableOpacity style={styles.circleBtn} onPress={() => Alert.alert('Settings', 'Profile settings can be added here.')}><Settings size={21} color="#fff" /></TouchableOpacity>}
           </SafeAreaView>
           {isSelf && <TouchableOpacity style={styles.coverEdit} onPress={() => pickImage('cover')}><Camera size={18} color="#fff" /></TouchableOpacity>}
