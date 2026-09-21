@@ -46,7 +46,6 @@ export const uploadToCloudinary = async (fileUri, type = 'auto') => {
         method: 'POST',
         body: form,
         headers: {
-          'Content-Type': 'multipart/form-data',
           'X-File-Name': filename,
           'X-File-Type': mimeType,
         },
