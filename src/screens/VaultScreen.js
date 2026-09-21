@@ -518,7 +518,7 @@ const VaultScreen = ({ navigation }) => {
         onPress={currentVault ? handleUploadFile : () => setVaultModalVisible(true)}
         disabled={isUploading}
       >
-        {isUploading ? <ActivityIndicator color="#fff" /> : (currentVault ? <UploadCloud size={24} color="#fff" /> : <FolderPlus size={24} color="#fff" />)}
+        {isUploading ? <ActivityIndicator color="#111111" /> : (currentVault ? <UploadCloud size={24} color="#111111" /> : <FolderPlus size={24} color="#111111" />)}
       </TouchableOpacity>
 
       {/* --- CREATE VAULT MODAL --- */}
@@ -625,7 +625,7 @@ const styles = StyleSheet.create({
   tabBtn: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 10, borderRadius: 10 },
   activeTabBtn: { backgroundColor: '#FFFC00', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
   tabText: { fontSize: 15, fontWeight: '600', color: '#707070', marginLeft: 8 },
-  activeTabText: { color: '#fff' },
+  activeTabText: { color: '#111111' },
   
   searchContainer: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: '#fff' },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F7F7F5', borderRadius: 12, paddingHorizontal: 12, height: 45, borderWidth: 1, borderColor: '#E8E8E3' },
@@ -666,7 +666,7 @@ const styles = StyleSheet.create({
   modalHelperText: { fontSize: 14, color: '#707070', marginBottom: 20 },
   modalInput: { backgroundColor: '#F7F7F5', borderWidth: 1, borderColor: '#E8E8E3', borderRadius: 12, paddingHorizontal: 15, height: 50, fontSize: 16, color: '#111111', marginBottom: 15 },
   modalSubmitBtn: { backgroundColor: '#FFFC00', paddingVertical: 15, borderRadius: 12, alignItems: 'center', marginTop: 5 },
-  modalSubmitText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  modalSubmitText: { color: '#111111', fontSize: 16, fontWeight: '800' },
   
   bottomSheet: { position: 'absolute', bottom: 0, width: '100%', backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingBottom: 40, paddingTop: 10 },
   sheetHandle: { width: 40, height: 5, backgroundColor: '#E8E8E3', borderRadius: 3, alignSelf: 'center', marginBottom: 20 },
