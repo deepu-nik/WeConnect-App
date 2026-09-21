@@ -44,6 +44,9 @@ const ConnectScreen = ({ navigation }) => {
   const [qrMode, setQrMode] = useState('my_code');
   const [scanned, setScanned] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState('');
+  const [cameraKey, setCameraKey] = useState(0);
   const [locationPreview, setLocationPreview] = useState(null);
   const scanLineY = useMemo(() => new Animated.Value(0), []);
   const [permission, requestPermission] = useCameraPermissions();
@@ -198,6 +201,9 @@ const ConnectScreen = ({ navigation }) => {
     setQrMode(mode);
     setScanned(false);
     setScanSuccess(false);
+    setCameraReady(false);
+    setCameraError('');
+    if (mode === 'scan') setCameraKey((value) => value + 1);
     setQrVisible(true);
   };
 
@@ -220,6 +226,25 @@ const ConnectScreen = ({ navigation }) => {
       }
     }
     openQr('scan');
+  };
+
+  const handleCameraReady = () => {
+    setCameraError('');
+    setCameraReady(true);
+  };
+
+  const handleCameraMountError = ({ nativeEvent }) => {
+    const message = nativeEvent?.message || 'The camera could not be started.';
+    console.error('Camera mount failed:', message);
+    setCameraReady(false);
+    setCameraError(message);
+  };
+
+  const retryCamera = () => {
+    setCameraReady(false);
+    setCameraError('');
+    setScanned(false);
+    setCameraKey((value) => value + 1);
   };
 
   const handleScan = async ({ data }) => {
@@ -324,7 +349,12 @@ const ConnectScreen = ({ navigation }) => {
       </View>
 
       <Text style={styles.sectionLabel}>WHERE ARE YOU?</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.locationRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.locationScroll}
+        contentContainerStyle={styles.locationRow}
+      >
         {LOCATIONS.map(([name, icon]) => (
           <TouchableOpacity
             key={name}
@@ -427,7 +457,12 @@ const ConnectScreen = ({ navigation }) => {
         </View>
       </Modal>
 
-      <Modal visible={qrVisible} animationType="slide" onRequestClose={() => setQrVisible(false)}>
+      <Modal
+        visible={qrVisible}
+        animationType="slide"
+        hardwareAccelerated={Platform.OS === 'android'}
+        onRequestClose={() => setQrVisible(false)}
+      >
         <SafeAreaView style={styles.qrModal} edges={['top', 'bottom']}>
           <View style={styles.qrHeader}>
             <TouchableOpacity onPress={() => setQrVisible(false)}><X size={28} color="#000" /></TouchableOpacity>
@@ -456,9 +491,12 @@ const ConnectScreen = ({ navigation }) => {
           ) : (
             <View style={styles.scanner}>
               <CameraView
-                style={StyleSheet.absoluteFillObject}
+                key={cameraKey}
+                style={styles.camera}
                 facing="back"
-                onBarcodeScanned={scanned ? undefined : handleScan}
+                onCameraReady={handleCameraReady}
+                onMountError={handleCameraMountError}
+                onBarcodeScanned={scanned || !!cameraError ? undefined : handleScan}
                 barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
               />
               <View style={styles.cameraShade} pointerEvents="none" />
@@ -469,6 +507,20 @@ const ConnectScreen = ({ navigation }) => {
                 <View style={[styles.corner, styles.cornerBR]} />
                 {!scanSuccess && <Animated.View style={[styles.scanBeam, { transform: [{ translateY: scanLineY.interpolate({ inputRange: [0, 1], outputRange: [0, 210] }) }] }]} />}
               </View>
+              {cameraError ? (
+                <View style={styles.cameraErrorOverlay}>
+                  <Text style={styles.cameraErrorTitle}>Camera unavailable</Text>
+                  <Text style={styles.cameraErrorText}>We couldn't start the camera preview.</Text>
+                  <TouchableOpacity style={styles.cameraRetryButton} onPress={retryCamera}>
+                    <Text style={styles.cameraRetryText}>Try again</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : !cameraReady ? (
+                <View style={styles.cameraLoadingOverlay} pointerEvents="none">
+                  <ActivityIndicator size="large" color="#FFFC00" />
+                  <Text style={styles.cameraLoadingText}>Starting camera…</Text>
+                </View>
+              ) : null}
               <Text style={styles.scanInstruction}>Point your camera at a WeConnect QR code</Text>
               {scanSuccess && <View style={styles.scanSuccessOverlay}><View style={styles.successCircle}><Check size={42} color="#111111" strokeWidth={3} /></View><Text style={styles.successTitle}>You’re friends now!</Text><Text style={styles.successSub}>Connection added successfully</Text></View>}
             </View>
@@ -485,7 +537,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: '#111111' },
   qrButton: { backgroundColor: '#F0F0EC', padding: 9, borderRadius: 12 },
   sectionLabel: { fontSize: 12, fontWeight: '800', color: '#999999', paddingHorizontal: 20, marginBottom: 8 },
-  locationRow: { paddingHorizontal: 15, gap: 8, paddingBottom: 8 },
+  locationScroll: { height: 102, flexGrow: 0, flexShrink: 0 },
+  locationRow: { paddingHorizontal: 15, gap: 8, paddingBottom: 8, alignItems: 'flex-start' },
   search: { margin: 15, marginTop: 5, height: 46, borderWidth: 1, borderColor: '#E8E8E3', borderRadius: 12, backgroundColor: '#F7F7F5', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, color: '#111111', fontSize: 15 },
   tabs: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#F0F0EC', borderRadius: 12, padding: 4, marginBottom: 10 },
@@ -553,7 +606,8 @@ const styles = StyleSheet.create({
   qrAvatar: { width: 76, height: 76, borderRadius: 38 },
   qrName: { fontSize: 22, fontWeight: '800', color: '#111111' },
   qrHint: { textAlign: 'center', color: '#707070', lineHeight: 20 },
-  scanner: { margin: 20, flex: 1, borderRadius: 24, overflow: 'hidden', backgroundColor: '#000' },
+  scanner: { margin: 20, flex: 1, borderRadius: 24, overflow: 'hidden', backgroundColor: '#000', position: 'relative' },
+  camera: { ...StyleSheet.absoluteFillObject },
   cameraShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.16)' },
   scanFrame: { position: 'absolute', width: 230, height: 230, alignSelf: 'center', top: '28%' },
   corner: { position: 'absolute', width: 34, height: 34, borderColor: '#FFFC00' },
@@ -563,6 +617,13 @@ const styles = StyleSheet.create({
   cornerBR: { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: 10 },
   scanBeam: { position: 'absolute', left: 8, right: 8, top: 8, height: 3, backgroundColor: '#FFFC00', shadowColor: '#FFFC00', shadowOpacity: 0.9, shadowRadius: 8, elevation: 5 },
   scanInstruction: { position: 'absolute', left: 20, right: 20, bottom: 24, textAlign: 'center', color: '#fff', fontSize: 14, fontWeight: '600' },
+  cameraLoadingOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.48)' },
+  cameraLoadingText: { color: '#fff', fontSize: 14, fontWeight: '700', marginTop: 10 },
+  cameraErrorOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30, backgroundColor: 'rgba(0,0,0,0.82)' },
+  cameraErrorTitle: { color: '#fff', fontSize: 20, fontWeight: '900' },
+  cameraErrorText: { color: '#ddd', fontSize: 13, textAlign: 'center', marginTop: 7, lineHeight: 19 },
+  cameraRetryButton: { marginTop: 16, backgroundColor: '#FFFC00', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 18 },
+  cameraRetryText: { color: '#111111', fontSize: 13, fontWeight: '900' },
   scanSuccessOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,252,0,0.96)', alignItems: 'center', justifyContent: 'center' },
   successCircle: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   successTitle: { color: '#111111', fontSize: 25, fontWeight: '900' },
