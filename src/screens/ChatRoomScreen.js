@@ -340,6 +340,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
         ) : null}
       </View>
     );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
