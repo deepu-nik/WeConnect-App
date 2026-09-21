@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { openProfile } from '../navigation/navigationHelpers';
 import { 
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image, 
   TextInput, ActivityIndicator, StatusBar, Animated, RefreshControl, 
@@ -228,7 +229,7 @@ const ChatsScreen = ({ navigation }) => {
     }
   };
 
-  const openProfile = (user) => navigation.navigate('Profile', { uid: user.uid || user.otherUserId, name: user.name, avatar: user.avatar });
+  const openProfile = (user) => openProfile(navigation, { uid: user.uid || user.otherUserId, name: user.name, avatar: user.avatar });
 
   const startNewChat = (selectedUser) => {
     setIsSearching(false);
