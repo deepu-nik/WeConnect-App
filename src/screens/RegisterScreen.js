@@ -110,7 +110,10 @@ const RegisterScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => {
+            if (navigation.canGoBack()) navigation.goBack();
+            else navigation.navigate('Login');
+          }} style={styles.backBtn}>
           <ArrowLeft size={28} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Create Account</Text>
