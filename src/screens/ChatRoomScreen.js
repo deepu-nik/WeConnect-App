@@ -205,7 +205,9 @@ const ChatRoomScreen = ({ route, navigation }) => {
       {/* HEADER -> Clickable to view Profile */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => {
+              if (navigation.canGoBack()) navigation.goBack();
+            }}>
             <ArrowLeft size={26} color="#000" />
           </TouchableOpacity>
           
