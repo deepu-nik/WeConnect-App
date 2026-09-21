@@ -7,7 +7,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
   ArrowLeft, Send, Image as ImageIcon, Camera, 
-  Smile, X
+  Smile, X, Video
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -165,7 +165,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
         const newChatRef = await addDoc(collection(db, 'chats'), {
           participants: [currentUser.uid, otherUserId],
           updatedAt: serverTimestamp(),
-          lastMessage: mediaUrl ? '📷 Image' : messageText,
+          lastMessage: mediaUrl ? (mediaType === 'video' ? '🎥 Video' : '📷 Photo') : messageText,
           typing: { [currentUser.uid]: false, [otherUserId]: false },
           usersInfo: {
             [currentUser.uid]: { name: currentUser.displayName || 'You', avatar: currentUser.photoURL || 'https://via.placeholder.com/150' },
@@ -183,7 +183,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
       });
 
       await updateDoc(doc(db, 'chats', currentChatId), {
-        lastMessage: mediaUrl ? '📷 Image' : messageText, updatedAt: serverTimestamp(), ['unreadCount.' + otherUserId]: increment(1) 
+        lastMessage: mediaUrl ? (mediaType === 'video' ? '🎥 Video' : '📷 Photo') : messageText, updatedAt: serverTimestamp(), ['unreadCount.' + otherUserId]: increment(1) 
       });
     } catch (error) { console.error('Error sending:', error); }
   };
@@ -210,6 +210,12 @@ const ChatRoomScreen = ({ route, navigation }) => {
         <View style={[styles.messageBubble, isMe ? styles.myBubble : styles.theirBubble]}>
           {item.mediaUrl && item.mediaType === 'image' && (
             <Image source={{ uri: item.mediaUrl }} style={styles.messageImage} />
+          )}
+          {item.mediaUrl && item.mediaType === 'video' && (
+            <View style={styles.messageVideo}>
+              <Video size={32} color="#fff" />
+              <Text style={styles.messageVideoText}>Video</Text>
+            </View>
           )}
           {item.text ? <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.theirMessageText]}>{item.text}</Text> : null}
           <Text style={[styles.timeText, isMe ? styles.myTimeText : styles.theirTimeText]}>
