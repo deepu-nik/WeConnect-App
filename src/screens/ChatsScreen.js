@@ -62,12 +62,11 @@ const ChatsScreen = ({ navigation }) => {
 
         const q = query(
           collection(db, 'chats'),
-          where('collegeId', '==', profile.collegeId),
-          where('participants', 'array-contains', currentUser.uid)
+          where('collegeId', '==', profile.collegeId)
         );
 
         unsubscribe = onSnapshot(q, (snapshot) => {
-          const next = snapshot.docs.map((chatDoc) => {
+          const next = snapshot.docs.filter((chatDoc) => (chatDoc.data()?.participants || []).includes(currentUser.uid)).map((chatDoc) => {
             const data = chatDoc.data() || {};
             const participants = Array.isArray(data.participants) ? data.participants : [];
             const otherUserId = participants.find((uid) => uid !== currentUser.uid);
