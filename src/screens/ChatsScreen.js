@@ -28,7 +28,7 @@ const STORY_BACKGROUNDS = [
   '#f12711', // Fire Red
   '#8E2DE2', // Deep Purple
   '#11998e', // Emerald Green
-  '#0f172a'  // Dark Slate
+  '#111111'  // Dark Slate
 ];
 
 // --- CUSTOM DRAGGABLE TEXT COMPONENT ---
@@ -381,7 +381,7 @@ const ChatsScreen = ({ navigation }) => {
         <TouchableOpacity onPress={() => openProfile(item)}><Text style={styles.chatName}>{item.name}</Text></TouchableOpacity>
         <Text style={styles.lastMessage}>{item.email || '@student'}</Text>
       </TouchableOpacity>
-      <MessageCircle size={24} color="#007AFF" />
+      <MessageCircle size={24} color="#111111" />
     </View>
   );
 
@@ -418,7 +418,7 @@ const ChatsScreen = ({ navigation }) => {
 
       {/* MAIN FEED */}
       {loading && !isSearching ? (
-        <View style={styles.centerContainer}><ActivityIndicator size="large" color="#007AFF" /></View>
+        <View style={styles.centerContainer}><ActivityIndicator size="large" color="#111111" /></View>
       ) : (
         <FlatList
           data={isSearching ? searchResults : chats}
@@ -583,7 +583,7 @@ const ChatsScreen = ({ navigation }) => {
 
               {/* Color Picker Row */}
               <View style={styles.colorPickerRow}>
-                 {['#ffffff', '#000000', '#FF3B30', '#34C759', '#007AFF', '#FF9500', '#AF52DE'].map(c => (
+                 {['#ffffff', '#000000', '#FF3B30', '#34C759', '#111111', '#FF9500', '#AF52DE'].map(c => (
                    <TouchableOpacity key={c} onPress={() => setTextColor(c)} style={[styles.colorSwab, {backgroundColor: c}, textColor === c && styles.colorSwabActive]} />
                  ))}
               </View>
@@ -600,7 +600,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 10 },
-  weConnectText: { fontSize: 26, fontWeight: '800', color: '#007AFF', letterSpacing: -0.5 },
+  weConnectText: { fontSize: 26, fontWeight: '800', color: '#111111', letterSpacing: -0.5 },
   headerIcons: { flexDirection: 'row', alignItems: 'center' },
   iconBtn: { marginLeft: 16 },
   
@@ -608,16 +608,16 @@ const styles = StyleSheet.create({
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f4f5f7', borderRadius: 12, paddingHorizontal: 12, height: 45 },
   searchIcon: { marginRight: 8 },
   searchInput: { flex: 1, fontSize: 16, color: '#000' },
-  clearText: { color: '#007AFF', fontWeight: 'bold' },
+  clearText: { color: '#111111', fontWeight: 'bold' },
   
   storiesSection: { paddingVertical: 10, marginBottom: 5 },
   storiesList: { paddingHorizontal: 15 },
   storyContainer: { alignItems: 'center', marginHorizontal: 8, position: 'relative' },
   storyRing: { width: 66, height: 66, borderRadius: 33, borderWidth: 2, borderColor: '#eee', justifyContent: 'center', alignItems: 'center', marginBottom: 5 },
-  storyRingActive: { borderColor: '#007AFF' },
+  storyRingActive: { borderColor: '#111111' },
   storyAvatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#ccc' },
   storyName: { fontSize: 12, color: '#333', maxWidth: 70, textAlign: 'center' },
-  addStoryBadge: { position: 'absolute', bottom: 20, right: 0, backgroundColor: '#007AFF', width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff' },
+  addStoryBadge: { position: 'absolute', bottom: 20, right: 0, backgroundColor: '#FFFC00', width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff' },
   
   listContainer: { paddingBottom: 30 },
   chatItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 20 },
@@ -628,7 +628,7 @@ const styles = StyleSheet.create({
   chatTime: { fontSize: 13, color: '#888' },
   lastMessage: { fontSize: 15, color: '#666', flex: 1, paddingRight: 10 },
   lastMessageUnread: { fontWeight: 'bold', color: '#000' },
-  unreadBadge: { backgroundColor: '#007AFF', borderRadius: 12, minWidth: 24, height: 24, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6, marginLeft: 10 },
+  unreadBadge: { backgroundColor: '#FFFC00', borderRadius: 12, minWidth: 24, height: 24, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6, marginLeft: 10 },
   unreadText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
   
   emptyContainer: { alignItems: 'center', marginTop: 50, paddingHorizontal: 40 },
