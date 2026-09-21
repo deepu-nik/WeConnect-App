@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, TouchableOpacity, FlatList, 
-  TextInput, StatusBar, LayoutAnimation, Platform, 
-  UIManager, Modal, Alert, ActivityIndicator, Share, Linking, BackHandler
+  TextInput, StatusBar, LayoutAnimation, Modal, Alert, ActivityIndicator, Share, Linking, BackHandler
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -22,10 +21,6 @@ import * as Sharing from 'expo-sharing';
 import { auth, db } from '../config/firebase';
 import { collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 const VaultScreen = ({ navigation }) => {
   const currentUser = auth.currentUser;
