@@ -284,7 +284,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
       style={[styles.sectionTab, activeSection === label && styles.sectionTabActive]}
       onPress={() => setActiveSection(label)}
     >
-      <Icon size={16} color={activeSection === label ? COLORS.blue : COLORS.muted} />
+      <Icon size={16} color={activeSection === label ? COLORS.ink : COLORS.muted} />
       <Text style={[styles.sectionTabText, activeSection === label && styles.sectionTabTextActive]}>
         {label}
       </Text>
@@ -314,6 +314,8 @@ const ProfileScreenNew = ({ route, navigation }) => {
   const interests = user.interests || [];
   const skills = user.skills || [];
   const connections = user.connections || [];
+
+  const editorTitle = ({ identity: 'Identity', education: 'Education', career: 'Career', skills: 'Skills', links: 'Social & Links' }[editSection]) || 'Edit';
 
   return (
     <View style={styles.container}>
@@ -402,7 +404,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
               <View style={styles.progressTrack}><View style={[styles.progressFill, { width: completion + '%' }]} /></View>
               <TouchableOpacity style={styles.completeAction} onPress={openEditMenu}>
                 <Text style={styles.completeActionText}>{completion < 100 ? 'Complete your profile' : 'Keep your profile fresh'}</Text>
-                <ChevronRight size={16} color={COLORS.blue} />
+                <ChevronRight size={16} color={COLORS.ink} />
               </TouchableOpacity>
             </View>
           )}
@@ -437,7 +439,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
 
               <View style={styles.card}>
                 <View style={styles.cardHeader}><Text style={styles.cardTitle}>Skills</Text>{isSelf && <TouchableOpacity onPress={() => openSectionEdit('skills')}><Edit3 size={16} color={COLORS.muted} /></TouchableOpacity>}</View>
-                {skills.length ? <View style={styles.chips}>{skills.map((skill) => <View style={styles.skillChip} key={skill}><Code2 size={13} color={COLORS.blue} /><Text style={styles.skillText}>{skill}</Text></View>)}</View> : <EmptyState icon={Code2} title="No skills added" text="Add technologies and skills you are learning." />}
+                {skills.length ? <View style={styles.chips}>{skills.map((skill) => <View style={styles.skillChip} key={skill}><Code2 size={13} color={COLORS.ink} /><Text style={styles.skillText}>{skill}</Text></View>)}</View> : <EmptyState icon={Code2} title="No skills added" text="Add technologies and skills you are learning." />}
               </View>
 
               <View style={styles.card}>
@@ -464,7 +466,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
 
           {activeSection === 'Projects' && (
             <View style={styles.card}>
-              <View style={styles.cardHeader}><Text style={styles.cardTitle}>Projects</Text>{isSelf && <TouchableOpacity onPress={() => Alert.alert('Projects', 'Project editing is coming next.')}><Plus size={18} color={COLORS.blue} /></TouchableOpacity>}</View>
+              <View style={styles.cardHeader}><Text style={styles.cardTitle}>Projects</Text>{isSelf && <TouchableOpacity onPress={() => Alert.alert('Projects', 'Project editing is coming next.')}><Plus size={18} color={COLORS.ink} /></TouchableOpacity>}</View>
               {projects.length ? projects.map((project, index) => (
                 <View style={styles.projectCard} key={project.id || project.title || index}>
                   {!!project.image && <Image source={{ uri: project.image }} style={styles.projectImage} />}
@@ -474,7 +476,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
                     {!!project.techStack?.length && <View style={styles.chips}>{project.techStack.map((tech) => <View style={styles.miniChip} key={tech}><Text style={styles.miniChipText}>{tech}</Text></View>)}</View>}
                     <View style={styles.projectLinks}>
                       {!!project.github && <TouchableOpacity onPress={() => openLink(project.github)}><Github size={18} color={COLORS.ink} /></TouchableOpacity>}
-                      {!!project.liveUrl && <TouchableOpacity onPress={() => openLink(project.liveUrl)}><ExternalLink size={18} color={COLORS.blue} /></TouchableOpacity>}
+                      {!!project.liveUrl && <TouchableOpacity onPress={() => openLink(project.liveUrl)}><ExternalLink size={18} color={COLORS.ink} /></TouchableOpacity>}
                     </View>
                   </View>
                 </View>
@@ -510,17 +512,17 @@ const ProfileScreenNew = ({ route, navigation }) => {
             <>
               <View style={styles.card}>
                 <View style={styles.cardHeader}><Text style={styles.cardTitle}>Interests</Text></View>
-                {interests.length ? <View style={styles.chips}>{interests.map((item) => <View style={styles.interestChip} key={item}><Heart size={13} color={COLORS.purple} /><Text style={styles.interestText}>{item}</Text></View>)}</View> : <EmptyState icon={Heart} title="No interests added" text="Add domains, hobbies and topics you care about." />}
+                {interests.length ? <View style={styles.chips}>{interests.map((item) => <View style={styles.interestChip} key={item}><Heart size={13} color={COLORS.ink} /><Text style={styles.interestText}>{item}</Text></View>)}</View> : <EmptyState icon={Heart} title="No interests added" text="Add domains, hobbies and topics you care about." />}
               </View>
               <View style={styles.card}>
                 <View style={styles.cardHeader}><Text style={styles.cardTitle}>Clubs & Communities</Text></View>
-                {(user.clubs || []).length ? <View style={styles.chips}>{user.clubs.map((item) => <View style={styles.interestChip} key={item}><Users size={13} color={COLORS.blue} /><Text style={styles.interestText}>{item}</Text></View>)}</View> : <EmptyState icon={Users} title="No communities added" text="Show clubs, societies and communities you are part of." />}
+                {(user.clubs || []).length ? <View style={styles.chips}>{user.clubs.map((item) => <View style={styles.interestChip} key={item}><Users size={13} color={COLORS.ink} /><Text style={styles.interestText}>{item}</Text></View>)}</View> : <EmptyState icon={Users} title="No communities added" text="Show clubs, societies and communities you are part of." />}
               </View>
             </>
           )}
 
           <View style={styles.bottomCard}>
-            <View style={styles.bottomIcon}><QrCode size={22} color={COLORS.blue} /></View>
+            <View style={styles.bottomIcon}><QrCode size={22} color={COLORS.ink} /></View>
             <View style={styles.bottomCopy}><Text style={styles.bottomTitle}>Share your profile</Text><Text style={styles.bottomText}>QR sharing and public profile links are part of the next profile phase.</Text></View>
           </View>
         </View>
@@ -564,9 +566,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
             <View style={styles.editorHeader}>
               <View>
                 <Text style={styles.editorEyebrow}>EDIT PROFILE</Text>
-                <Text style={styles.editorTitle}>
-                  {{ identity: 'Identity', education: 'Education', career: 'Career', skills: 'Skills', links: 'Social & Links' }[editSection] || 'Edit'}
-                </Text>
+                <Text style={styles.editorTitle}>{editorTitle}</Text>
                 <Text style={styles.editorSubtitle}>Update only this part of your profile.</Text>
               </View>
               <TouchableOpacity style={styles.closeButton} onPress={closeSectionEditor}><X size={22} color={COLORS.ink} /></TouchableOpacity>
@@ -622,10 +622,10 @@ const Detail = ({ icon: Icon, label, value }) => (
 
 const ListCard = ({ title, icon: Icon, items, emptyTitle, emptyText }) => (
   <View style={styles.card}>
-    <View style={styles.cardHeader}><View style={styles.titleWithIcon}><Icon size={19} color={COLORS.orange} /><Text style={styles.cardTitle}>{title}</Text></View></View>
+    <View style={styles.cardHeader}><View style={styles.titleWithIcon}><Icon size={19} color={COLORS.ink} /><Text style={styles.cardTitle}>{title}</Text></View></View>
     {items.length ? items.map((item, index) => (
       <View style={styles.listItem} key={item.id || item.title || index}>
-        <View style={styles.listIcon}><Icon size={17} color={COLORS.orange} /></View>
+        <View style={styles.listIcon}><Icon size={17} color={COLORS.ink} /></View>
         <View style={styles.listCopy}><Text style={styles.listTitle}>{item.title || item.name || 'Achievement'}</Text>{!!item.organization && <Text style={styles.listMeta}>{item.organization}</Text>}{!!item.date && <Text style={styles.listMeta}>{item.date}</Text>}{!!item.description && <Text style={styles.listDescription}>{item.description}</Text>}</View>
       </View>
     )) : <EmptyState icon={Icon} title={emptyTitle} text={emptyText} />}
@@ -695,7 +695,7 @@ const styles = StyleSheet.create({
   completionTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   completionTitle: { fontSize: 14, fontWeight: '900', color: COLORS.ink },
   completionSubtitle: { marginTop: 2, color: COLORS.muted, fontSize: 11 },
-  completionPercent: { color: COLORS.blue, fontSize: 20, fontWeight: '900' },
+  completionPercent: { color: COLORS.ink, fontSize: 20, fontWeight: '900' },
   progressTrack: { height: 7, borderRadius: 4, backgroundColor: '#FFF4A3', marginTop: 11, overflow: 'hidden' },
   progressFill: { height: 7, borderRadius: 4, backgroundColor: COLORS.blue },
   completeAction: { marginTop: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -742,7 +742,7 @@ const styles = StyleSheet.create({
   timelineDot: { width: 11, height: 11, borderRadius: 6, backgroundColor: COLORS.blue, marginTop: 4 },
   timelineBody: { flex: 1 },
   timelineTitle: { color: COLORS.ink, fontWeight: '900' },
-  timelineOrg: { marginTop: 3, color: COLORS.blue, fontWeight: '700' },
+  timelineOrg: { marginTop: 3, color: COLORS.ink, fontWeight: '700' },
   timelinePeriod: { marginTop: 3, color: COLORS.muted, fontSize: 11 },
   timelineDescription: { marginTop: 5, color: '#475569', lineHeight: 18, fontSize: 12 },
   interestChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: COLORS.blueSoft },
@@ -762,7 +762,7 @@ const styles = StyleSheet.create({
   menuBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,.45)' },
   editMenuCard: { backgroundColor: COLORS.bg, borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 18, paddingBottom: 28 },
   menuHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  menuEyebrow: { color: COLORS.blue, fontSize: 10, fontWeight: '900', letterSpacing: 1.4 },
+  menuEyebrow: { color: COLORS.ink, fontSize: 10, fontWeight: '900', letterSpacing: 1.4 },
   menuTitle: { marginTop: 2, color: COLORS.ink, fontSize: 21, fontWeight: '900' },
   menuItem: { minHeight: 67, marginTop: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 16, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, flexDirection: 'row', alignItems: 'center', gap: 11 },
   menuIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: COLORS.blueSoft, alignItems: 'center', justifyContent: 'center' },
@@ -775,7 +775,7 @@ const styles = StyleSheet.create({
   editorRoot: { flex: 1, backgroundColor: COLORS.bg },
   editorKeyboard: { flex: 1 },
   editorHeader: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 14, minHeight: 95, backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: COLORS.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  editorEyebrow: { color: COLORS.blue, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
+  editorEyebrow: { color: COLORS.ink, fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
   editorTitle: { marginTop: 2, color: COLORS.ink, fontSize: 23, fontWeight: '900' },
   editorSubtitle: { marginTop: 3, color: COLORS.muted, fontSize: 11 },
   closeButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
