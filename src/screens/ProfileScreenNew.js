@@ -802,3 +802,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#FECDD3',
   },
+  editChipText: { color: '#B4233A', fontSize: 12, fontWeight: '800' },
+});
+
+export default ProfileScreenNew;
