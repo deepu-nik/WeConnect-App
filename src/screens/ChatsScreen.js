@@ -3,20 +3,16 @@ import { openProfile as navigateToProfile } from '../navigation/navigationHelper
 import { 
   View, Text, StyleSheet, FlatList, TouchableOpacity, Image, 
   TextInput, ActivityIndicator, StatusBar, Animated, RefreshControl, 
-  Dimensions, PanResponder, Modal, KeyboardAvoidingView, Platform, Keyboard, Alert
+  Dimensions, PanResponder
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, Plus, MessageCircle, Camera, MoreVertical, X, Type, Edit3, Image as ImageIcon, Send, Palette, Minus } from 'lucide-react-native'; 
-import { CameraView, useCameraPermissions } from 'expo-camera';
-import * as ImagePicker from 'expo-image-picker';
+import { Search, MessageCircle, MoreVertical } from 'lucide-react-native'; 
 
 // Firebase & Utils
 import { auth, db } from '../config/firebase';
-import { collection, query, where, onSnapshot, getDocs, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
-import { uploadToCloudinary } from '../utils/cloudinaryHelper';
-
+import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 import Dashboard from '../components/Dashboard';
-import { findUsersByName, getUserProfile } from '../services/userService';
+import { getUserProfile } from '../services/userService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DASHBOARD_MAX_HEIGHT = SCREEN_HEIGHT * 0.5;
@@ -74,137 +70,6 @@ const ChatsScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const dashboardHeight = useRef(new Animated.Value(0)).current;
   const dashboardOpacity = useRef(new Animated.Value(0)).current;
-
-  // --- STORY STUDIO STATES ---
-  const [realStories, setRealStories] = useState([]);
-  const [isStoryStudioVisible, setStoryStudioVisible] = useState(false);
-  const [permission, requestPermission] = useCameraPermissions();
-  const cameraRef = useRef(null);
-  
-  // Editor States
-  const [storyImage, setStoryImage] = useState(null); 
-  const [bgIndex, setBgIndex] = useState(0); 
-  const [textOverlays, setTextOverlays] = useState([]); 
-  const [isTypingActive, setIsTypingActive] = useState(false);
-  const [currentTextInput, setCurrentTextInput] = useState('');
-  const [textColor, setTextColor] = useState('#ffffff');
-  const [textSize, setTextSize] = useState(36); // Resizing state
-  const [isUploadingStory, setIsUploadingStory] = useState(false);
-
-  // Viewer State
-  const [viewingStory, setViewingStory] = useState(null);
-
-  // --- DASHBOARD ANIMATIONS ---
-  const handlePullDown = () => {
-    setRefreshing(true);
-    if (!isTasksOpen) {
-      setIsTasksOpen(true);
-      Animated.parallel([
-        Animated.spring(dashboardHeight, { toValue: DASHBOARD_MAX_HEIGHT, useNativeDriver: false, bounciness: 4, speed: 12 }),
-        Animated.timing(dashboardOpacity, { toValue: 1, duration: 200, useNativeDriver: false })
-      ]).start();
-    }
-    setTimeout(() => setRefreshing(false), 300);
-  };
-
-  const closeDashboard = () => {
-    setIsTasksOpen(false);
-    Animated.parallel([
-      Animated.spring(dashboardHeight, { toValue: 0, useNativeDriver: false, bounciness: 0, speed: 14 }),
-      Animated.timing(dashboardOpacity, { toValue: 0, duration: 150, useNativeDriver: false })
-    ]).start();
-  };
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponderCapture: (evt, gestureState) => gestureState.dy < -15 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
-      onPanResponderRelease: (evt, gestureState) => { if (gestureState.dy < -40 || gestureState.vy < -0.5) closeDashboard(); }
-    })
-  ).current;
-
-  // --- FIREBASE FETCHING (CHATS & STORIES) ---
-  useEffect(() => {
-    if (!currentUser) return;
-    
-    // 1. Fetch Chats
-    const chatsQ = query(collection(db, 'chats'), where('participants', 'array-contains', currentUser.uid));
-    const unsubscribeChats = onSnapshot(chatsQ, async (snapshot) => {
-      const fetchedChats = await Promise.all(snapshot.docs.map(async (chatDoc) => {
-        const data = chatDoc.data();
-        const otherUserId = data.participants?.find(id => id !== currentUser.uid) || 'unknown';
-        const cachedUser = data.usersInfo ? data.usersInfo[otherUserId] : {};
-        let liveUser = null;
-
-        try {
-          liveUser = await getUserProfile(otherUserId);
-        } catch (error) {
-          console.error('Chat profile refresh failed:', error);
-        }
-
-        return {
-          id: chatDoc.id,
-          otherUserId,
-          name: liveUser?.name || cachedUser?.name || 'Student',
-          avatar: liveUser?.avatar || cachedUser?.avatar || 'https://via.placeholder.com/150',
-          lastMessage: data.lastMessage || 'Tap to chat',
-          timestamp: data.updatedAt?.toDate() || new Date(),
-          unreadCount: data.unreadCount?.[currentUser.uid] || 0,
-          ...data,
-        };
-      }));
-
-      fetchedChats.sort((a, b) => b.timestamp - a.timestamp);
-      setChats(fetchedChats);
-      setLoading(false);
-    });
-
-    // 2. Fetch REAL Stories (Only 24 hours old)
-    const now = Date.now();
-    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-    const storiesQ = query(collection(db, 'stories'), orderBy('createdAt', 'desc'));
-    
-    const unsubscribeStories = onSnapshot(storiesQ, (snapshot) => {
-      const fetchedStories = [];
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        if (data.createdAt) {
-          const postTime = data.createdAt.toMillis ? data.createdAt.toMillis() : data.createdAt.toDate().getTime();
-          if (now - postTime < ONE_DAY_MS) {
-             fetchedStories.push({ id: doc.id, ...data });
-          }
-        }
-      });
-
-      // Format for UI: "My Story" is first
-      let myStory = fetchedStories.find(s => s.author.uid === currentUser.uid);
-      let othersStories = fetchedStories.filter(s => s.author.uid !== currentUser.uid);
-
-      const uniqueOthers = [];
-      const seenUids = new Set();
-      othersStories.forEach(s => {
-        if (!seenUids.has(s.author.uid)) {
-          seenUids.add(s.author.uid);
-          uniqueOthers.push({ ...s, uid: s.author.uid, name: s.author.name || 'Student', avatar: s.author.avatar || 'https://via.placeholder.com/150', hasNew: true, storyData: s }); 
-        }
-      });
-
-      const finalStoriesList = [
-        { 
-          id: myStory ? myStory.id : 'my_placeholder', 
-          name: 'Your Story', 
-          avatar: currentUser.photoURL || 'https://via.placeholder.com/150', 
-          isMe: true, 
-          hasNew: !!myStory,
-          storyData: myStory 
-        },
-        ...uniqueOthers
-      ];
-
-      setRealStories(finalStoriesList);
-    });
-
-    return () => { unsubscribeChats(); unsubscribeStories(); };
-  }, [currentUser]);
 
   // --- SEARCH LOGIC ---
   const handleSearch = async (text) => {
@@ -393,7 +258,6 @@ const ChatsScreen = ({ navigation }) => {
       <View style={styles.header}>
         <Text style={styles.weConnectText}>WeConnect</Text>
         <View style={styles.headerIcons}>
-          <TouchableOpacity style={styles.iconBtn} onPress={openStoryStudio}><Camera size={24} color="#000" /></TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn}><MoreVertical size={24} color="#000" /></TouchableOpacity>
         </View>
       </View>
@@ -425,11 +289,6 @@ const ChatsScreen = ({ navigation }) => {
           keyExtractor={(item) => item.id || item.uid}
           renderItem={isSearching ? renderSearchItem : renderChatItem}
           refreshControl={!isSearching ? <RefreshControl refreshing={refreshing} onRefresh={handlePullDown} tintColor="transparent" colors={['transparent']} /> : undefined}
-          ListHeaderComponent={!isSearching ? (
-            <View style={styles.storiesSection}>
-              <FlatList data={realStories} keyExtractor={(item) => item.id} renderItem={renderStory} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesList} />
-            </View>
-          ) : null}
           contentContainerStyle={[styles.listContainer, (!isSearching && chats.length === 0) && { flex: 1 }]}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
@@ -610,15 +469,6 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 16, color: '#000' },
   clearText: { color: '#111111', fontWeight: 'bold' },
   
-  storiesSection: { paddingVertical: 10, marginBottom: 5 },
-  storiesList: { paddingHorizontal: 15 },
-  storyContainer: { alignItems: 'center', marginHorizontal: 8, position: 'relative' },
-  storyRing: { width: 66, height: 66, borderRadius: 33, borderWidth: 2, borderColor: '#eee', justifyContent: 'center', alignItems: 'center', marginBottom: 5 },
-  storyRingActive: { borderColor: '#111111' },
-  storyAvatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: '#ccc' },
-  storyName: { fontSize: 12, color: '#333', maxWidth: 70, textAlign: 'center' },
-  addStoryBadge: { position: 'absolute', bottom: 20, right: 0, backgroundColor: '#FFFC00', width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff' },
-  
   listContainer: { paddingBottom: 30 },
   chatItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 20 },
   avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#eee', marginRight: 15 },
@@ -649,25 +499,6 @@ const styles = StyleSheet.create({
   viewerHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)', padding: 10, borderRadius: 30, alignSelf: 'flex-start' },
   viewerAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 10 },
   viewerName: { color: '#fff', fontSize: 16, fontWeight: 'bold', marginRight: 10 },
-
-  // --- STORY STUDIO CSS ---
-  studioContainer: { flex: 1 },
-  studioOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'space-between' },
-  
-  studioTopBar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 20 },
-  studioIconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
-  studioTools: { flexDirection: 'row', gap: 15 },
-  
-  draggableText: { fontWeight: 'bold', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: {width: 1, height: 1}, textShadowRadius: 5 },
-
-  studioBottomBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 30, paddingBottom: 40 },
-  galleryBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' },
-  captureBtnRing: { width: 80, height: 80, borderRadius: 40, borderWidth: 4, borderColor: '#fff', justifyContent: 'center', alignItems: 'center' },
-  captureBtnInner: { width: 66, height: 66, borderRadius: 33, backgroundColor: '#fff' },
-  
-  shareRow: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end' },
-  shareStoryBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 30, gap: 8 },
-  shareStoryText: { fontSize: 16, fontWeight: 'bold', color: '#000' },
 
   // Typing Mode CSS
   typingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center' },
