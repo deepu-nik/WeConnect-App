@@ -13,6 +13,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { auth, db } from '../config/firebase';
 import { markChatRead } from '../services/chatService';
+import { subscribeToMessages, sendChatMessage as sendPersistedMessage } from '../services/chatMessageService';
 import { getUserProfile } from '../services/userService';
 import { collection, query, where, addDoc, onSnapshot, orderBy, serverTimestamp, doc, updateDoc, getDocs, increment } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
@@ -76,6 +77,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [viewerTranslateY] = useState(() => new Animated.Value(0));
   const viewerPanStart = useRef({ x: 0, y: 0 }).current;
   const [fullScreenAvatar, setFullScreenAvatar] = useState(null);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [selectedMessageId, setSelectedMessageId] = useState(null);
   const typingTimeout = useRef(null);
 
   const currentUser = auth.currentUser;
@@ -193,14 +196,9 @@ const ChatRoomScreen = ({ route, navigation }) => {
   useEffect(() => {
     if (!chatId || !currentUser) return;
     markChatRead(chatId, currentUser.uid).catch((error) => console.error('Failed to mark chat read:', error));
-    const messagesRef = collection(db, 'chats', chatId, 'messages');
-    const q = query(messagesRef, orderBy('createdAt', 'desc'));
-    const unsubscribeMsgs = onSnapshot(q, (snapshot) => {
-      const fetchedMessages = snapshot.docs.map(doc => ({
-        id: doc.id, ...doc.data(), createdAt: doc.data().createdAt?.toDate() || new Date(),
-      }));
+    const unsubscribeMsgs = subscribeToMessages(chatId, (fetchedMessages) => {
       setMessages(fetchedMessages);
-    });
+    }, (error) => console.error('Message subscription failed:', error));
 
     const chatDocRef = doc(db, 'chats', chatId);
     const unsubscribeTyping = onSnapshot(chatDocRef, (docSnap) => {
@@ -239,6 +237,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
   const sendMessage = async (mediaUrl = null, mediaType = null, caption = null) => {
     const messageText = caption || inputText.trim();
+    const reply = replyingTo;
+    setReplyingTo(null);
     if (!messageText && !mediaUrl) return;
 
     let currentChatId = chatId;
@@ -264,12 +264,20 @@ const ChatRoomScreen = ({ route, navigation }) => {
         await updateDoc(doc(db, 'chats', currentChatId), { [`typing.${currentUser.uid}`]: false });
       }
 
-      await addDoc(collection(db, 'chats', currentChatId, 'messages'), {
-        text: messageText, senderId: currentUser.uid, createdAt: serverTimestamp(), mediaUrl, mediaType
-      });
-
-      await updateDoc(doc(db, 'chats', currentChatId), {
-        lastMessage: mediaUrl ? (mediaType === 'video' ? '🎥 Video' : '📷 Photo') : messageText, updatedAt: serverTimestamp(), ['unreadCount.' + otherUserId]: increment(1) 
+      const messageId = String(Date.now()) + '-' + Math.random().toString(36).slice(2, 8);
+      await sendPersistedMessage({
+        chatId: currentChatId,
+        message: {
+          id: messageId,
+          text: messageText,
+          mediaUrl,
+          mediaType,
+          replyTo: reply ? {
+            id: reply.id,
+            text: reply.text || (reply.mediaType === 'video' ? '🎥 Video' : '📷 Photo'),
+            senderId: reply.senderId,
+          } : null,
+        },
       });
     } catch (error) { console.error('Error sending:', error); }
   };
@@ -297,7 +305,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
             <Image source={{ uri: otherUserAvatar }} style={styles.tinyAvatar} />
           </TouchableOpacity>
         )}
-        <View style={[styles.messageBubble, isMe ? styles.myBubble : styles.theirBubble]}>
+        <TouchableOpacity activeOpacity={0.92} onLongPress={() => { setSelectedMessageId(item.id); setReplyingTo(item); }} style={[styles.messageBubble, isMe ? styles.myBubble : styles.theirBubble]}>
           {item.mediaUrl && item.mediaType === 'image' && (
             <TouchableOpacity activeOpacity={0.95} onPress={() => openFullScreenImage(item.mediaUrl)}>
               <Image source={{ uri: item.mediaUrl }} style={styles.messageImage} resizeMode="cover" />
@@ -313,7 +321,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
           <Text style={[styles.timeText, isMe ? styles.myTimeText : styles.theirTimeText]}>
             {item.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
-        </View>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -372,6 +380,16 @@ const ChatRoomScreen = ({ route, navigation }) => {
           }
         />
 
+        {replyingTo ? (
+          <View style={styles.replyBar}>
+            <View style={styles.replyAccent} />
+            <View style={styles.replyContent}>
+              <Text style={styles.replyLabel}>Replying to {replyingTo.senderId === currentUser?.uid ? 'yourself' : otherUserName}</Text>
+              <Text style={styles.replyText} numberOfLines={1}>{replyingTo.text || (replyingTo.mediaType === 'video' ? '🎥 Video' : '📷 Photo')}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setReplyingTo(null)}><X size={20} color="#64748b" /></TouchableOpacity>
+          </View>
+        ) : null}
         <View style={styles.inputBar}>
           <TouchableOpacity style={styles.cameraBtn} onPress={() => setMediaShareVisible(true)}>
             <Camera size={22} color="#888" />
@@ -495,6 +513,11 @@ const styles = StyleSheet.create({
   typingBubble: { backgroundColor: '#F2F3F5', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20, borderBottomLeftRadius: 4, width: 65, height: 35, justifyContent: 'center' },
   typingContainer: { flexDirection: 'row', justifyContent: 'space-between', width: 30, alignItems: 'center' },
   typingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#888' },
+  replyBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 10, marginBottom: 5, padding: 9, borderRadius: 12, backgroundColor: '#f1f5f9' },
+  replyAccent: { width: 3, alignSelf: 'stretch', backgroundColor: '#007AFF', borderRadius: 2, marginRight: 9 },
+  replyContent: { flex: 1 },
+  replyLabel: { fontSize: 11, fontWeight: '800', color: '#007AFF' },
+  replyText: { marginTop: 2, fontSize: 13, color: '#475569' },
   inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, paddingVertical: 10, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f0f0f0' },
   cameraBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f2f3f5', justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
   inputWrapper: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#f2f3f5', borderRadius: 20, marginHorizontal: 10, paddingLeft: 15, paddingRight: 5, minHeight: 40, maxHeight: 100 },
