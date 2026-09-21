@@ -14,7 +14,7 @@ import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestor
 import Dashboard from '../components/Dashboard';
 import { getUserProfile } from '../services/userService';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DASHBOARD_MAX_HEIGHT = SCREEN_HEIGHT * 0.5;
 
 // --- STORY BACKGROUND GRADIENTS (Fallback to solid colors for standard RN Views) ---
@@ -210,17 +210,6 @@ const ChatsScreen = ({ navigation }) => {
     }
   };
 
-  // --- RENDERERS ---
-  const renderStory = ({ item }) => (
-    <TouchableOpacity style={styles.storyContainer} activeOpacity={0.8} onPress={() => item.isMe ? handleStoryTap(item) : openProfile(item)}>
-      <View style={[styles.storyRing, item.hasNew && styles.storyRingActive, item.isMe && !item.hasNew && {borderColor: '#eee'}]}>
-        <Image source={{ uri: item.avatar }} style={styles.storyAvatar} />
-      </View>
-      <Text style={styles.storyName} numberOfLines={1}>{item.name}</Text>
-      {item.isMe && <View style={styles.addStoryBadge}><Plus size={14} color="#fff" /></View>}
-    </TouchableOpacity>
-  );
-
   const renderChatItem = ({ item }) => (
     <View style={styles.chatItem}>
       <TouchableOpacity onPress={() => setAvatarModalData({ name: item.name, avatar: item.avatar })}>
@@ -314,142 +303,6 @@ const ChatsScreen = ({ navigation }) => {
         </View>
       </Modal>
 
-      {/* --- LIVE STORY VIEWER MODAL --- */}
-      <Modal visible={!!viewingStory} animationType="fade" transparent={false} onRequestClose={() => setViewingStory(null)}>
-        {viewingStory && (
-          <TouchableOpacity 
-            style={[styles.viewerContainer, { backgroundColor: viewingStory.imageUrl ? '#000' : (viewingStory.bgColor || '#000') }]} 
-            activeOpacity={1} 
-            onPress={() => setViewingStory(null)}
-          >
-            <StatusBar hidden />
-            {viewingStory.imageUrl && <Image source={{ uri: viewingStory.imageUrl }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />}
-            
-            <SafeAreaView style={styles.viewerOverlay}>
-              <View style={styles.viewerHeader}>
-                <Image source={{ uri: viewingStory.author?.avatar }} style={styles.viewerAvatar} />
-                <Text style={styles.viewerName}>{viewingStory.author?.name}</Text>
-              </View>
-            </SafeAreaView>
-
-            {/* Render Text Overlays exactly where they were placed */}
-            {viewingStory.textOverlays?.map((overlay, index) => (
-              <View key={index} style={{ position: 'absolute', top: overlay.y, left: overlay.x, padding: 10 }}>
-                <Text style={[styles.draggableText, { color: overlay.color, fontSize: overlay.fontSize }]}>{overlay.text}</Text>
-              </View>
-            ))}
-          </TouchableOpacity>
-        )}
-      </Modal>
-
-      {/* --- ADVANCED STORY STUDIO MODAL --- */}
-      <Modal visible={isStoryStudioVisible} animationType="slide" transparent={false} onRequestClose={() => setStoryStudioVisible(false)}>
-        <View style={[styles.studioContainer, { backgroundColor: storyImage ? '#000' : STORY_BACKGROUNDS[bgIndex] }]}>
-          <StatusBar hidden />
-          
-          {/* BACKGROUND LAYER */}
-          {!storyImage ? (
-            permission?.granted ? (
-              <CameraView ref={cameraRef} style={StyleSheet.absoluteFillObject} facing="back" />
-            ) : (
-              <View style={styles.centerContainer}><Text style={{color:'#fff'}}>Camera Permission Denied</Text></View>
-            )
-          ) : (
-            <Image source={{ uri: storyImage }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-          )}
-
-          {/* STUDIO OVERLAY UI */}
-          {!isTypingActive && (
-            <SafeAreaView style={styles.studioOverlay}>
-              
-              {/* Top Controls */}
-              <View style={styles.studioTopBar}>
-                <TouchableOpacity onPress={() => { setStoryImage(null); setStoryStudioVisible(false); }} style={styles.studioIconBtn}>
-                  <X size={28} color="#fff" />
-                </TouchableOpacity>
-
-                <View style={styles.studioTools}>
-                  <TouchableOpacity onPress={() => setIsTypingActive(true)} style={styles.studioIconBtn}>
-                    <Type size={28} color="#fff" />
-                  </TouchableOpacity>
-                  {!storyImage && (
-                    <TouchableOpacity onPress={cycleBackground} style={styles.studioIconBtn}>
-                      <Palette size={28} color="#fff" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-
-              {/* Render Draggable Text Overlays */}
-              {textOverlays.map((overlay) => (
-                <DraggableText key={overlay.id} overlay={overlay} />
-              ))}
-
-              {/* Bottom Controls (Capture / Share) */}
-              <View style={styles.studioBottomBar}>
-                {!storyImage ? (
-                  <>
-                    <TouchableOpacity style={styles.galleryBtn} onPress={pickStoryImage}>
-                      <ImageIcon size={28} color="#fff" />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.captureBtnRing} onPress={takePhoto}>
-                      <View style={styles.captureBtnInner} />
-                    </TouchableOpacity>
-                    <View style={{width: 44}} /> 
-                  </>
-                ) : (
-                  <View style={styles.shareRow}>
-                    <TouchableOpacity style={styles.shareStoryBtn} onPress={shareStory} disabled={isUploadingStory}>
-                      {isUploadingStory ? <ActivityIndicator color="#000" /> : (
-                        <>
-                          <Text style={styles.shareStoryText}>Share to Story</Text>
-                          <Send size={18} color="#000" />
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            </SafeAreaView>
-          )}
-
-          {/* TEXT TYPING OVERLAY (Instagram Style) */}
-          {isTypingActive && (
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.typingOverlay}>
-              <View style={styles.typingTopBar}>
-                 <TouchableOpacity onPress={handleAddTextDone} style={styles.typingDoneBtn}>
-                   <Text style={styles.typingDoneText}>Done</Text>
-                 </TouchableOpacity>
-              </View>
-
-              <TextInput
-                style={[styles.typingInput, { color: textColor, fontSize: textSize }]}
-                value={currentTextInput}
-                onChangeText={setCurrentTextInput}
-                placeholder="Type something..."
-                placeholderTextColor="rgba(255,255,255,0.5)"
-                autoFocus
-                multiline
-                textAlign="center"
-              />
-
-              {/* Text Size Resizer */}
-              <View style={styles.resizerRow}>
-                <TouchableOpacity onPress={() => setTextSize(Math.max(16, textSize - 6))} style={styles.resizeBtn}><Minus size={20} color="#fff" /></TouchableOpacity>
-                <Text style={styles.resizeText}>Size</Text>
-                <TouchableOpacity onPress={() => setTextSize(Math.min(60, textSize + 6))} style={styles.resizeBtn}><Plus size={20} color="#fff" /></TouchableOpacity>
-              </View>
-
-              {/* Color Picker Row */}
-              <View style={styles.colorPickerRow}>
-                 {['#ffffff', '#000000', '#FF3B30', '#34C759', '#111111', '#FF9500', '#AF52DE'].map(c => (
-                   <TouchableOpacity key={c} onPress={() => setTextColor(c)} style={[styles.colorSwab, {backgroundColor: c}, textColor === c && styles.colorSwabActive]} />
-                 ))}
-              </View>
-            </KeyboardAvoidingView>
-          )}
-        </View>
-      </Modal>
 
     </SafeAreaView>
   );
