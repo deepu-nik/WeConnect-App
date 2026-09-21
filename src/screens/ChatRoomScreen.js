@@ -73,6 +73,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [fullScreenImage, setFullScreenImage] = useState(null);
   const [fullScreenImageIndex, setFullScreenImageIndex] = useState(0);
   const [viewerScale] = useState(() => new Animated.Value(1));
+  const [pinchScale] = useState(() => new Animated.Value(1));
   const pinchStartScale = useRef(1);
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [isGalleryUploading, setIsGalleryUploading] = useState(false);
@@ -115,7 +116,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
   };
 
   const onPinchGestureEvent = Animated.event(
-    [{ nativeEvent: { scale: viewerScale } }],
+    [{ nativeEvent: { scale: pinchScale } }],
     { useNativeDriver: true }
   );
 
@@ -123,14 +124,13 @@ const ChatRoomScreen = ({ route, navigation }) => {
     const { state, oldState, scale } = event.nativeEvent;
     if (state === State.BEGAN) {
       pinchStartScale.current = viewerScale.__getValue();
+      pinchScale.setValue(1);
       return;
     }
     if (oldState === State.ACTIVE || state === State.END || state === State.CANCELLED) {
       const nextScale = Math.max(1, Math.min(4, pinchStartScale.current * scale));
       viewerScale.setValue(nextScale);
-      if (nextScale === 1) {
-        viewerScale.setValue(1);
-      }
+      pinchScale.setValue(1);
     }
   };
 
@@ -593,7 +593,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
               <Animated.View style={styles.viewerGestureArea}>
                 <Animated.Image
                   source={{ uri: fullScreenImage }}
-                  style={[styles.viewerImage, { transform: [{ scale: viewerScale }] }]}
+                  style={[styles.viewerImage, { transform: [{ scale: viewerScale }, { scale: pinchScale }] }]}
                   resizeMode="contain"
                 />
               </Animated.View>
