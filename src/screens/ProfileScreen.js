@@ -407,27 +407,25 @@ const ProfileScreen = ({ route, navigation }) => {
         }} />
 
         {isSelf && (
-          <ProfileSection title="Profile strength" subtitle="Complete the essentials to make your identity useful." action={{ label: 'Edit', onPress: () => openEdit('identity') }}>
-            <View style={styles.strengthCard}>
-              <View style={styles.strengthTop}><View><Text style={styles.strengthPercent}>{profileStrength}%</Text><Text style={styles.strengthLabel}>profile complete</Text></View><Sparkles size={22} color="#111" /></View>
-              <View style={styles.progressTrack}><View style={[styles.progressFill, { width: profileStrength + '%' }]} /></View>
-              <Text style={styles.strengthHint}>{profileStrength < 70 ? 'Add your bio, links, skills and cover photo.' : 'Your profile is ready to represent you around campus.'}</Text>
+          <>
+            <ProfileSection title="Profile strength" subtitle="Complete the essentials to make your identity useful." action={{ label: 'Edit', onPress: () => openEdit('identity') }}>
+              <View style={styles.strengthCard}>
+                <View style={styles.strengthTop}><View><Text style={styles.strengthPercent}>{profileStrength}%</Text><Text style={styles.strengthLabel}>profile complete</Text></View><Sparkles size={22} color="#111" /></View>
+                <View style={styles.progressTrack}><View style={[styles.progressFill, { width: profileStrength + '%' }]} /></View>
+                <Text style={styles.strengthHint}>{profileStrength < 70 ? 'Add your bio, links, skills and cover photo.' : 'Your profile is ready to represent you around campus.'}</Text>
+              </View>
+            </ProfileSection>
+            <View style={styles.privacyShortcut}>
+              <View style={styles.privacyShortcutCopy}>
+                <Text style={styles.privacyShortcutTitle}>Profile Privacy</Text>
+                <Text style={styles.privacyShortcutText}>Choose who can see your location, education, skills, projects, links and activity.</Text>
+              </View>
+              <TouchableOpacity style={styles.privacyShortcutButton} onPress={openPrivacy}>
+                <LockKeyhole size={16} color="#111" />
+                <Text style={styles.privacyShortcutButtonText}>Manage</Text>
+              </TouchableOpacity>
             </View>
-          </ProfileSection>
-
-        {isSelf && (
-          <View style={styles.privacyShortcut}>
-            <View style={styles.privacyShortcutCopy}>
-              <Text style={styles.privacyShortcutTitle}>Profile Privacy</Text>
-              <Text style={styles.privacyShortcutText}>Choose who can see your location, education, skills, projects, links and activity.</Text>
-            </View>
-            <TouchableOpacity style={styles.privacyShortcutButton} onPress={openPrivacy}>
-              <LockKeyhole size={16} color="#111" />
-              <Text style={styles.privacyShortcutButtonText}>Manage</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
+          </>
         )}
 
         <ProfileSection title="About" subtitle="Your campus identity" action={isSelf ? { label: 'Edit', onPress: () => openEdit('about') } : undefined}>
