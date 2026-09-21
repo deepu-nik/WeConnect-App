@@ -28,10 +28,10 @@ const Tabs = () => (
         else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
         return <Ionicons name={iconName} size={size} color={color} />;
       },
-      tabBarActiveTintColor: '#007AFF',
-      tabBarInactiveTintColor: '#999999',
-      tabBarStyle: { height: 60, paddingBottom: 10, paddingTop: 5 },
-      tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+      tabBarActiveTintColor: '#111111',
+      tabBarInactiveTintColor: '#8A8A8A',
+      tabBarStyle: { height: 66, paddingBottom: 10, paddingTop: 6, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E8E8E3', elevation: 0 },
+      tabBarLabelStyle: { fontSize: 10, fontWeight: '800' },
     })}
   >
     <Tab.Screen name="Chats" component={ChatsScreen} options={{ title: 'Chats' }} />
