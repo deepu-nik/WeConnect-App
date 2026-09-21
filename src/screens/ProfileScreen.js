@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Modal,
+  ActivityIndicator, Alert, BackHandler, Image, KeyboardAvoidingView, Linking, Modal,
   Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { updateProfile } from 'firebase/auth';
 import { doc, getDocs, collection, query, where, updateDoc } from 'firebase/firestore';
 import {
@@ -30,6 +31,29 @@ const ProfileScreen = ({ route, navigation }) => {
   const [editVisible, setEditVisible] = useState(false);
   const [form, setForm] = useState(null);
   const [newSkill, setNewSkill] = useState('');
+
+  // Profile is a real stack screen when opened from another screen.
+  // Follow the same hardware-back pattern used by Vault/Connect: handle it
+  // only while this screen is focused, then let normal navigation pop it.
+  useFocusEffect(
+    useCallback(() => {
+      if (route?.name !== 'ProfileDetails') return undefined;
+
+      const onBackPress = () => {
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+          return true;
+        }
+
+        // Defensive fallback: never leave the authenticated app from ProfileDetails.
+        navigation.navigate('MainTabs', { screen: 'Chats' });
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [navigation, route?.name])
+  );
   useEffect(() => {
     let active = true;
     (async () => {
