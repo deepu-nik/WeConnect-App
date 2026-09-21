@@ -13,7 +13,6 @@ export const normalizeUser = (uid, data = {}) => ({
   collegeName: data.collegeName || '',
   course: data.course || '',
   year: data.year || data.gradYear || '',
-  email: data.email || '',
   location: data.location || 'Campus',
   locationIcon: data.locationIcon || '📍',
   locationPhoto: data.locationPhoto || '',
@@ -53,7 +52,7 @@ export const findUsersByName = async (searchText, currentUid) => {
   if (!text) return [];
   const users = await getAllUsers(currentUid);
   return users.filter((user) =>
-    [user.name, user.handle, user.email].some((value) =>
+    [user.name, user.handle].some((value) =>
       value.toLowerCase().includes(text)
     )
   );
