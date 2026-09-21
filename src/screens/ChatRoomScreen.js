@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, 
   KeyboardAvoidingView, Platform, Image, ActivityIndicator, StatusBar, 
-  Modal, Animated, Alert, PanResponder
+  Modal, Animated, Alert, Keyboard
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
@@ -73,9 +73,15 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [fullScreenImage, setFullScreenImage] = useState(null);
   const [fullScreenImageIndex, setFullScreenImageIndex] = useState(0);
   const [viewerScale] = useState(() => new Animated.Value(1));
-  const [viewerTranslateX] = useState(() => new Animated.Value(0));
-  const [viewerTranslateY] = useState(() => new Animated.Value(0));
-  const viewerPanStart = useRef({ x: 0, y: 0 }).current;
+  const pinchStartScale = useRef(1);
+  const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
+  const [isGalleryUploading, setIsGalleryUploading] = useState(false);
+  const emojiRows = [
+    ['😀', '😂', '🤣', '😊', '😍', '🥰', '😎', '🤩'],
+    ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍'],
+    ['👍', '👎', '👏', '🙌', '🙏', '🔥', '💯', '✨'],
+    ['😭', '😢', '😡', '🤔', '😮', '😴', '🤗', '😅'],
+  ];
   const [fullScreenAvatar, setFullScreenAvatar] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
   const [selectedMessageId, setSelectedMessageId] = useState(null);
@@ -90,15 +96,11 @@ const ChatRoomScreen = ({ route, navigation }) => {
     setFullScreenImageIndex(index);
     setFullScreenImage(url);
     viewerScale.setValue(1);
-    viewerTranslateX.setValue(0);
-    viewerTranslateY.setValue(0);
   };
 
   const closeFullScreenImage = () => {
     setFullScreenImage(null);
     viewerScale.setValue(1);
-    viewerTranslateX.setValue(0);
-    viewerTranslateY.setValue(0);
   };
 
   const showAdjacentImage = (direction) => {
@@ -118,48 +120,20 @@ const ChatRoomScreen = ({ route, navigation }) => {
   );
 
   const onPinchStateChange = (event) => {
-    if (event.nativeEvent.oldState === State.ACTIVE) {
-      const nextScale = Math.max(1, Math.min(4, event.nativeEvent.scale));
+    const { state, oldState, scale } = event.nativeEvent;
+    if (state === State.BEGAN) {
+      pinchStartScale.current = viewerScale.__getValue();
+      return;
+    }
+    if (oldState === State.ACTIVE || state === State.END || state === State.CANCELLED) {
+      const nextScale = Math.max(1, Math.min(4, pinchStartScale.current * scale));
       viewerScale.setValue(nextScale);
       if (nextScale === 1) {
-        viewerTranslateX.setValue(0);
-        viewerTranslateY.setValue(0);
+        viewerScale.setValue(1);
       }
     }
   };
 
-  const viewerPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 10 || Math.abs(gesture.dy) > 10,
-      onPanResponderGrant: () => {
-        viewerPanStart.x = viewerTranslateX.__getValue();
-        viewerPanStart.y = viewerTranslateY.__getValue();
-      },
-      onPanResponderMove: (_, gesture) => {
-        const scale = viewerScale.__getValue();
-        if (scale > 1) {
-          viewerTranslateX.setValue(viewerPanStart.x + gesture.dx);
-          viewerTranslateY.setValue(viewerPanStart.y + gesture.dy);
-        }
-      },
-      onPanResponderRelease: (_, gesture) => {
-        const scale = viewerScale.__getValue();
-        if (scale <= 1 && Math.abs(gesture.dx) > 70 && Math.abs(gesture.dx) > Math.abs(gesture.dy)) {
-          showAdjacentImage(gesture.dx < 0 ? 1 : -1);
-          return;
-        }
-        if (scale <= 1 && gesture.dy > 120) {
-          closeFullScreenImage();
-          return;
-        }
-        if (scale <= 1) {
-          viewerTranslateX.setValue(0);
-          viewerTranslateY.setValue(0);
-        }
-      },
-    })
-  ).current;
 
   useEffect(() => {
     let active = true;
@@ -282,65 +256,207 @@ const ChatRoomScreen = ({ route, navigation }) => {
     } catch (error) { console.error('Error sending:', error); }
   };
 
-  const pickImage = async (useCamera = false) => {
-    const options = { mediaTypes: ['images'], allowsEditing: true, quality: 0.8 };
-    let result = useCamera ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
-    if (!result.canceled && result.assets[0].uri) setPreviewImage(result.assets[0].uri);
-  };
+  const uploadAndSendItems = async (items) => {
+    if (!items?.length || isGalleryUploading) return;
+    setIsGalleryUploading(true);
+    setEmojiPickerVisible(false);
+    Keyboard.dismiss();
 
-  const shareMedia = async (items, caption) => {
-    for (const item of items) {
-      const secureUrl = await uploadToCloudinary(item.uri, item.type);
-      if (!secureUrl) throw new Error('Media upload failed');
-      await sendMessage(secureUrl, item.type, caption);
+    try {
+      for (const item of items.slice(0, 10)) {
+        const secureUrl = await uploadToCloudinary(item.uri, item.type);
+        if (!secureUrl) throw new Error('Media upload failed');
+        await sendMessage(secureUrl, item.type);
+      }
+    } catch (error) {
+      console.error('Media send failed:', error);
+      Alert.alert('Could not send media', 'One or more files could not be uploaded. Please try again.');
+    } finally {
+      setIsGalleryUploading(false);
     }
   };
 
+  const openGalleryAndSend = async () => {
+    if (isGalleryUploading) return;
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Gallery permission needed', 'Allow WeConnect to access your photos and videos.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images', 'videos'],
+        allowsMultipleSelection: true,
+        selectionLimit: 10,
+        quality: 0.85,
+      });
+
+      if (!result.canceled && result.assets?.length) {
+        await uploadAndSendItems(
+          result.assets.map((asset) => ({
+            uri: asset.uri,
+            type: asset.type === 'video' ? 'video' : 'image',
+          }))
+        );
+      }
+    } catch (error) {
+      console.error('Gallery picker failed:', error);
+      Alert.alert('Gallery error', 'Unable to open the gallery right now.');
+    }
+  };
+
+  const openCameraAndSend = async () => {
+    if (isGalleryUploading) return;
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Camera permission needed', 'Allow WeConnect to use your camera.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images', 'videos'],
+        videoMaxDuration: 60,
+        quality: 0.85,
+      });
+
+      if (!result.canceled && result.assets?.length) {
+        await uploadAndSendItems(
+          result.assets.map((asset) => ({
+            uri: asset.uri,
+            type: asset.type === 'video' ? 'video' : 'image',
+          }))
+        );
+      }
+    } catch (error) {
+      console.error('Camera failed:', error);
+      Alert.alert('Camera error', 'Unable to open the camera right now.');
+    }
+  };
+
+  const insertEmoji = (emoji) => {
+    setInputText((value) => value + emoji);
+  };
+
+
   const renderMessage = ({ item }) => {
     const isMe = item.senderId === currentUser?.uid;
+    const reactions = Object.entries(item.reactions || {}).filter(([, users]) => users?.length);
+    const replyPreview = item.replyTo?.text;
+
     return (
       <View style={[styles.messageRow, isMe ? styles.myRow : styles.theirRow]}>
         {!isMe && (
-          <TouchableOpacity onPress={() => setFullScreenAvatar({ name: otherUserName, uri: otherUserAvatar })}>
+          <TouchableOpacity
+            style={styles.avatarWrap}
+            onPress={() => setFullScreenAvatar({ name: otherUserName, uri: otherUserAvatar })}
+          >
             <Image source={{ uri: otherUserAvatar }} style={styles.tinyAvatar} />
           </TouchableOpacity>
         )}
-        <TouchableOpacity activeOpacity={0.92} onLongPress={() => { setSelectedMessageId(item.id); setReplyingTo(item); }} style={[styles.messageBubble, isMe ? styles.myBubble : styles.theirBubble]}>
-          {item.mediaUrl && item.mediaType === 'image' && (
-            <TouchableOpacity activeOpacity={0.95} onPress={() => openFullScreenImage(item.mediaUrl)}>
-              <Image source={{ uri: item.mediaUrl }} style={styles.messageImage} resizeMode="cover" />
-            </TouchableOpacity>
-          )}
-          {item.mediaUrl && item.mediaType === 'video' && (
-            <View style={styles.messageVideo}>
-              <Video size={32} color="#fff" />
-              <Text style={styles.messageVideoText}>Video</Text>
+
+        <View style={[styles.messageColumn, isMe ? styles.messageColumnMine : styles.messageColumnTheirs]}>
+          <TouchableOpacity
+            activeOpacity={0.92}
+            onLongPress={() => setSelectedMessageId(item.id)}
+            delayLongPress={350}
+            style={[styles.messageBubble, isMe ? styles.myBubble : styles.theirBubble]}
+          >
+            {replyPreview ? (
+              <View style={[styles.quotedReply, isMe ? styles.quotedReplyMine : styles.quotedReplyTheirs]}>
+                <Text style={[styles.quotedReplyLabel, isMe ? styles.quotedReplyLabelMine : null]}>
+                  {item.replyTo?.senderId === currentUser?.uid ? 'You' : otherUserName}
+                </Text>
+                <Text style={[styles.quotedReplyText, isMe ? styles.quotedReplyTextMine : null]} numberOfLines={1}>
+                  {replyPreview}
+                </Text>
+              </View>
+            ) : null}
+
+            {item.mediaUrl && item.mediaType === 'image' && (
+              <TouchableOpacity activeOpacity={0.95} onPress={() => openFullScreenImage(item.mediaUrl)}>
+                <Image source={{ uri: item.mediaUrl }} style={styles.messageImage} resizeMode="cover" />
+              </TouchableOpacity>
+            )}
+
+            {item.mediaUrl && item.mediaType === 'video' && (
+              <View style={styles.messageVideo}>
+                <Video size={32} color="#fff" />
+                <Text style={styles.messageVideoText}>Video</Text>
+              </View>
+            )}
+
+            {item.text ? (
+              <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.theirMessageText]}>
+                {item.text}
+              </Text>
+            ) : null}
+
+            <Text style={[styles.timeText, isMe ? styles.myTimeText : styles.theirTimeText]}>
+              {item.createdAt?.toLocaleTimeString?.([], { hour: '2-digit', minute: '2-digit' }) || ''}
+            </Text>
+          </TouchableOpacity>
+
+          {reactions.length > 0 ? (
+            <View style={[styles.reactionPillRow, isMe ? styles.reactionPillRowMine : styles.reactionPillRowTheirs]}>
+              {reactions.map(([emoji, users]) => (
+                <TouchableOpacity
+                  key={emoji}
+                  style={styles.reactionPill}
+                  onPress={() => toggleMessageReaction(chatId, item.id, currentUser.uid, emoji)}
+                >
+                  <Text style={styles.reactionPillEmoji}>{emoji}</Text>
+                  {users.length > 1 ? <Text style={styles.reactionPillCount}>{users.length}</Text> : null}
+                </TouchableOpacity>
+              ))}
             </View>
-          )}
-          {item.text ? <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.theirMessageText]}>{item.text}</Text> : null}
-          <Text style={[styles.timeText, isMe ? styles.myTimeText : styles.theirTimeText]}>
-            {item.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
-        </TouchableOpacity>
-        {selectedMessageId === item.id ? (
-          <View style={[styles.messageActions, isMe ? styles.messageActionsMine : styles.messageActionsTheirs]}>
-            {['❤️', '😂', '👍', '🔥', '😮'].map((emoji) => (
-              <TouchableOpacity key={emoji} onPress={async () => {
-                await toggleMessageReaction(chatId, item.id, currentUser.uid, emoji);
-                setSelectedMessageId(null);
-              }}><Text style={styles.reactionEmoji}>{emoji}</Text></TouchableOpacity>
-            ))}
-            <TouchableOpacity onPress={() => { setReplyingTo(item); setSelectedMessageId(null); }}>
-              <Text style={styles.replyActionText}>Reply</Text>
-            </TouchableOpacity>
-            {isMe ? <TouchableOpacity onPress={async () => { await deleteMessage(chatId, item.id); setSelectedMessageId(null); }}>
-              <Text style={styles.deleteActionText}>Delete</Text>
-            </TouchableOpacity> : null}
-          </View>
-        ) : null}
+          ) : null}
+
+          {selectedMessageId === item.id ? (
+            <View style={[styles.messageActions, isMe ? styles.messageActionsMine : styles.messageActionsTheirs]}>
+              <View style={styles.reactionActionRow}>
+                {['❤️', '😂', '👍', '🔥', '😮'].map((emoji) => (
+                  <TouchableOpacity
+                    key={emoji}
+                    style={styles.reactionAction}
+                    onPress={async () => {
+                      await toggleMessageReaction(chatId, item.id, currentUser.uid, emoji);
+                      setSelectedMessageId(null);
+                    }}
+                  >
+                    <Text style={styles.reactionEmoji}>{emoji}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View style={styles.messageActionDivider} />
+              <TouchableOpacity style={styles.textActionButton} onPress={() => { setReplyingTo(item); setSelectedMessageId(null); }}>
+                <Text style={styles.replyActionText}>Reply</Text>
+              </TouchableOpacity>
+              {isMe ? (
+                <TouchableOpacity
+                  style={styles.textActionButton}
+                  onPress={async () => {
+                    try {
+                      await deleteMessage(chatId, item.id);
+                    } finally {
+                      setSelectedMessageId(null);
+                    }
+                  }}
+                >
+                  <Text style={styles.deleteActionText}>Delete</Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity style={styles.textActionButton} onPress={() => setSelectedMessageId(null)}>
+                <Text style={styles.cancelActionText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+        </View>
       </View>
     );
   };
+
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -406,9 +522,23 @@ const ChatRoomScreen = ({ route, navigation }) => {
             <TouchableOpacity onPress={() => setReplyingTo(null)}><X size={20} color="#64748b" /></TouchableOpacity>
           </View>
         ) : null}
+        {emojiPickerVisible ? (
+          <View style={styles.emojiPanel}>
+            {emojiRows.map((row, rowIndex) => (
+              <View key={rowIndex} style={styles.emojiRow}>
+                {row.map((emoji) => (
+                  <TouchableOpacity key={emoji} style={styles.emojiButton} onPress={() => insertEmoji(emoji)}>
+                    <Text style={styles.emojiButtonText}>{emoji}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         <View style={styles.inputBar}>
-          <TouchableOpacity style={styles.cameraBtn} onPress={() => setMediaShareVisible(true)}>
-            <Camera size={22} color="#888" />
+          <TouchableOpacity style={styles.cameraBtn} onPress={openCameraAndSend} disabled={isGalleryUploading}>
+            {isGalleryUploading ? <ActivityIndicator size="small" color="#007AFF" /> : <Camera size={22} color="#64748b" />}
           </TouchableOpacity>
 
           <View style={styles.inputWrapper}>
@@ -421,8 +551,12 @@ const ChatRoomScreen = ({ route, navigation }) => {
               multiline
               maxLength={500}
             />
-            <TouchableOpacity style={styles.insideInputBtn}>
-              <Smile size={20} color="#888" />
+            <TouchableOpacity
+              style={styles.insideInputBtn}
+              onPress={() => setEmojiPickerVisible((visible) => !visible)}
+              accessibilityLabel="Open emoji picker"
+            >
+              <Smile size={20} color={emojiPickerVisible ? '#007AFF' : '#64748b'} />
             </TouchableOpacity>
           </View>
 
@@ -431,8 +565,13 @@ const ChatRoomScreen = ({ route, navigation }) => {
               <Send size={18} color="#fff" style={{ marginLeft: 2 }} />
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity style={styles.actionBtn} onPress={() => setMediaShareVisible(true)}>
-              <ImageIcon size={24} color="#888" />
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={openGalleryAndSend}
+              disabled={isGalleryUploading}
+              accessibilityLabel="Open gallery"
+            >
+              {isGalleryUploading ? <ActivityIndicator size="small" color="#007AFF" /> : <ImageIcon size={24} color="#64748b" />}
             </TouchableOpacity>
           )}
         </View>
@@ -451,19 +590,10 @@ const ChatRoomScreen = ({ route, navigation }) => {
               minPointers={2}
               maxPointers={2}
             >
-              <Animated.View style={styles.viewerGestureArea} {...viewerPanResponder.panHandlers}>
+              <Animated.View style={styles.viewerGestureArea}>
                 <Animated.Image
                   source={{ uri: fullScreenImage }}
-                  style={[
-                    styles.viewerImage,
-                    {
-                      transform: [
-                        { translateX: viewerTranslateX },
-                        { translateY: viewerTranslateY },
-                        { scale: viewerScale },
-                      ],
-                    },
-                  ]}
+                  style={[styles.viewerImage, { transform: [{ scale: viewerScale }] }]}
                   resizeMode="contain"
                 />
               </Animated.View>
@@ -476,7 +606,9 @@ const ChatRoomScreen = ({ route, navigation }) => {
             </View>
           )}
 
-          <Text style={styles.viewerHint}>Pinch to zoom • Swipe left/right • Swipe down to close</Text>
+          <View style={styles.viewerHintPill}>
+            <Text style={styles.viewerHint}>Pinch to zoom</Text>
+          </View>
         </View>
       </Modal>
 
@@ -488,14 +620,6 @@ const ChatRoomScreen = ({ route, navigation }) => {
         </View>
       </Modal>
 
-      <MediaShareSheet
-        visible={mediaShareVisible}
-        onClose={() => setMediaShareVisible(false)}
-        onShare={shareMedia}
-        title={`Share with ${otherUserName}`}
-        shareLabel="Send"
-        allowMultiple
-      />
     </SafeAreaView>
   );
 };
@@ -511,35 +635,63 @@ const styles = StyleSheet.create({
   headerName: { fontSize: 18, fontWeight: '700', color: '#000' },
   headerStatus: { fontSize: 12, fontWeight: '600', marginTop: 1 },
   listContent: { paddingHorizontal: 15, paddingVertical: 15 },
-  messageRow: { flexDirection: 'row', alignItems: 'flex-end', marginVertical: 4 },
+  messageRow: { flexDirection: 'row', alignItems: 'flex-end', marginVertical: 5, width: '100%' },
   myRow: { justifyContent: 'flex-end' },
   theirRow: { justifyContent: 'flex-start' },
-  tinyAvatar: { width: 24, height: 24, borderRadius: 12, marginRight: 8, marginBottom: 2 },
-  messageBubble: { maxWidth: '75%', paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20 },
-  myBubble: { backgroundColor: '#007AFF', borderBottomRightRadius: 4 },
-  theirBubble: { backgroundColor: '#F2F3F5', borderBottomLeftRadius: 4 },
+  avatarWrap: { width: 30, marginRight: 6, alignItems: 'center' },
+  tinyAvatar: { width: 26, height: 26, borderRadius: 13, marginBottom: 2 },
+  messageColumn: { maxWidth: '78%', flexDirection: 'column' },
+  messageColumnMine: { alignItems: 'flex-end' },
+  messageColumnTheirs: { alignItems: 'flex-start' },
+  messageBubble: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 20, minWidth: 52 },
+  myBubble: { backgroundColor: '#007AFF', borderBottomRightRadius: 5 },
+  theirBubble: { backgroundColor: '#F2F3F5', borderBottomLeftRadius: 5 },
   messageText: { fontSize: 16, lineHeight: 22 },
   myMessageText: { color: '#fff' },
   theirMessageText: { color: '#000' },
   timeText: { fontSize: 10, alignSelf: 'flex-end', marginTop: 4 },
-  myTimeText: { color: 'rgba(255,255,255,0.7)' },
-  theirTimeText: { color: '#999' },
-  messageImage: { width: 220, height: 220, borderRadius: 14, marginBottom: 5 },
+  myTimeText: { color: 'rgba(255,255,255,0.72)' },
+  theirTimeText: { color: '#8a8a8a' },
+  messageImage: { width: 230, height: 230, borderRadius: 15, marginBottom: 4 },
+  messageVideo: { width: 230, height: 170, borderRadius: 15, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  messageVideoText: { color: '#fff', fontSize: 13, fontWeight: '700', marginTop: 7 },
+  quotedReply: { borderLeftWidth: 3, borderRadius: 7, paddingLeft: 8, paddingVertical: 5, paddingRight: 4, marginBottom: 6, backgroundColor: 'rgba(0,0,0,0.05)' },
+  quotedReplyMine: { backgroundColor: 'rgba(255,255,255,0.13)' },
+  quotedReplyTheirs: { borderLeftColor: '#007AFF' },
+  quotedReplyLabel: { color: '#007AFF', fontSize: 11, fontWeight: '800' },
+  quotedReplyLabelMine: { color: '#fff' },
+  quotedReplyText: { color: '#475569', fontSize: 12, marginTop: 1 },
+  quotedReplyTextMine: { color: 'rgba(255,255,255,0.86)' },
+  reactionPillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: -2, zIndex: 2 },
+  reactionPillRowMine: { alignSelf: 'flex-end' },
+  reactionPillRowTheirs: { alignSelf: 'flex-start' },
+  reactionPill: { flexDirection: 'row', alignItems: 'center', minHeight: 27, paddingHorizontal: 7, borderRadius: 14, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', elevation: 2, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } },
+  reactionPillEmoji: { fontSize: 15 },
+  reactionPillCount: { fontSize: 11, fontWeight: '700', color: '#64748b', marginLeft: 3 },
+  messageActions: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 6, paddingHorizontal: 7, paddingVertical: 6, borderRadius: 17, backgroundColor: '#fff', elevation: 5, shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 7, shadowOffset: { width: 0, height: 2 }, zIndex: 10 },
+  messageActionsMine: { alignSelf: 'flex-end' },
+  messageActionsTheirs: { alignSelf: 'flex-start' },
+  reactionActionRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  reactionAction: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
+  reactionEmoji: { fontSize: 20 },
+  messageActionDivider: { width: 1, height: 22, backgroundColor: '#e5e7eb', marginHorizontal: 5 },
+  textActionButton: { paddingHorizontal: 8, paddingVertical: 6 },
+  replyActionText: { fontSize: 12, fontWeight: '800', color: '#007AFF' },
+  deleteActionText: { fontSize: 12, fontWeight: '800', color: '#FF3B30' },
+  cancelActionText: { fontSize: 12, fontWeight: '700', color: '#64748b' },
   typingIndicatorRow: { flexDirection: 'row', alignItems: 'flex-end', marginVertical: 5, marginLeft: 2 },
   typingBubble: { backgroundColor: '#F2F3F5', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20, borderBottomLeftRadius: 4, width: 65, height: 35, justifyContent: 'center' },
   typingContainer: { flexDirection: 'row', justifyContent: 'space-between', width: 30, alignItems: 'center' },
   typingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#888' },
-  messageActions: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 18, backgroundColor: '#fff', elevation: 3, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 6 },
-  messageActionsMine: { alignSelf: 'flex-end' },
-  messageActionsTheirs: { alignSelf: 'flex-start' },
-  reactionEmoji: { fontSize: 19 },
-  replyActionText: { fontSize: 12, fontWeight: '800', color: '#007AFF' },
-  deleteActionText: { fontSize: 12, fontWeight: '800', color: '#FF3B30' },
   replyBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 10, marginBottom: 5, padding: 9, borderRadius: 12, backgroundColor: '#f1f5f9' },
   replyAccent: { width: 3, alignSelf: 'stretch', backgroundColor: '#007AFF', borderRadius: 2, marginRight: 9 },
   replyContent: { flex: 1 },
   replyLabel: { fontSize: 11, fontWeight: '800', color: '#007AFF' },
   replyText: { marginTop: 2, fontSize: 13, color: '#475569' },
+  emojiPanel: { backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#edf0f2', paddingHorizontal: 8, paddingTop: 8, paddingBottom: 6 },
+  emojiRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 3 },
+  emojiButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19 },
+  emojiButtonText: { fontSize: 25 },
   inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, paddingVertical: 10, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#f0f0f0' },
   cameraBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f2f3f5', justifyContent: 'center', alignItems: 'center', marginBottom: 2 },
   inputWrapper: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#f2f3f5', borderRadius: 20, marginHorizontal: 10, paddingLeft: 15, paddingRight: 5, minHeight: 40, maxHeight: 100 },
@@ -562,7 +714,8 @@ const styles = StyleSheet.create({
   viewerClose: { position: 'absolute', top: 48, right: 18, zIndex: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,.6)', alignItems: 'center', justifyContent: 'center' },
   viewerCounter: { position: 'absolute', top: 58, left: 18, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(0,0,0,.6)' },
   viewerCounterText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  viewerHint: { position: 'absolute', bottom: 28, color: 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: '600' },
+  viewerHintPill: { position: 'absolute', bottom: 28, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(0,0,0,.55)' },
+  viewerHint: { color: 'rgba(255,255,255,.85)', fontSize: 12, fontWeight: '600' },
 });
 
 export default ChatRoomScreen;
