@@ -310,6 +310,12 @@ const ProfileScreen = ({ route, navigation }) => {
 
   if (loading || !user) return <View style={styles.loading}><ActivityIndicator size="large" color="#111" /></View>;
 
+  const profileRestricted = !isSelf && (user.privacy?.profileVisibility === 'private' || (user.privacy?.profileVisibility === 'connections' && !isConnected));
+  if (profileRestricted) {
+    const limitedUser = { ...user, bio: '', course: '', gradYear: '', location: '', skills: [], projects: [], experience: [], achievements: [], website: '', instagram: '', linkedin: '', github: '', whatsapp: '', resumeLink: '' };
+    return <View style={styles.container}><ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.page}><ProfileHero user={limitedUser} isSelf={false} isConnected={isConnected} connectionState={connectionState} uploading={false} onAvatarPress={() => setFullScreenAvatar(user.avatar || FALLBACK_AVATAR)} onEdit={() => {}} onMessage={() => navigation.navigate('ChatRoom', { uid: user.uid, name: user.name, avatar: user.avatar })} onConnect={connect} onShare={shareProfile} onMenu={() => setProfileMenuVisible(true)} /><View style={styles.restrictedCard}><LockKeyhole size={24} color="#111" /><Text style={styles.restrictedTitle}>Profile is limited</Text><Text style={styles.restrictedText}>{user.privacy?.profileVisibility === 'private' ? 'This profile is private. Connect with this student to interact when they allow it.' : 'Connect with this student to see the information they have shared with connections.'}</Text></View></ScrollView><Modal visible={profileMenuVisible} transparent animationType="slide" onRequestClose={() => setProfileMenuVisible(false)}><TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setProfileMenuVisible(false)}><View style={styles.menuCard}><Text style={styles.menuTitle}>{user.name}</Text><TouchableOpacity style={styles.menuItem} onPress={shareProfile}><ShareIcon /><Text>Share profile</Text></TouchableOpacity><TouchableOpacity style={styles.menuCancel} onPress={() => setProfileMenuVisible(false)}><Text style={styles.menuCancelText}>Cancel</Text></TouchableOpacity></View></TouchableOpacity></Modal></View>;
+  }
+
   const stats = [
     { key: 'connections', value: user.connections?.length || 0, label: 'Connections' },
     { key: 'projects', value: user.projects?.length || user.projectsCount || 0, label: 'Projects' },
@@ -359,7 +365,7 @@ const ProfileScreen = ({ route, navigation }) => {
         </ProfileSection>
 
         <ProfileSection title="Skills" subtitle="What you build and learn" action={isSelf ? { label: 'Manage', onPress: openEdit } : undefined}>{canSee('skills') && (
-          {groupedSkills.length ? groupedSkills.map((group) => (
+          groupedSkills.length ? groupedSkills.map((group) => (
             <View key={group.title} style={styles.skillGroup}>
               <Text style={styles.skillGroupTitle}>{group.title}</Text>
               <View style={styles.skillRow}>{group.values.map((skill) => <View key={skill} style={styles.skillPill}><Code2 size={13} color="#111" /><Text style={styles.skillText}>{skill}</Text></View>)}</View>
@@ -377,7 +383,7 @@ const ProfileScreen = ({ route, navigation }) => {
         )}</ProfileSection>
 
         <ProfileSection title="Portfolio" subtitle="Show what you have built" action={isSelf ? { label: 'Edit', onPress: openEdit } : undefined}>{canSee('projects') && (
-          {(user.projects || []).length ? (user.projects || []).slice(0, 6).map((project, index) => (
+          (user.projects || []).length ? (user.projects || []).slice(0, 6).map((project, index) => (
             <TouchableOpacity key={'project-' + index} style={styles.projectCard} onPress={() => project.url && openLink(project.url, 'Project')} activeOpacity={0.85}>
               <View style={styles.portfolioIcon}><Code2 size={21} color="#111" /></View>
               <View style={styles.portfolioCopy}><Text style={styles.portfolioTitle}>{project.name || project.title || 'Project'}</Text><Text style={styles.portfolioText} numberOfLines={2}>{project.description || project.tech || 'College project / build'}</Text></View>
