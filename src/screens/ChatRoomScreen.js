@@ -15,6 +15,7 @@ import { auth, db } from '../config/firebase';
 import { markChatRead } from '../services/chatService';
 import { collection, query, where, addDoc, onSnapshot, orderBy, serverTimestamp, doc, updateDoc, getDocs, increment } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
+import { openProfile } from '../navigation/navigationHelpers';
 
 const TypingIndicator = () => {
   const dot1 = useRef(new Animated.Value(0)).current;
@@ -184,7 +185,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
     const isMe = item.senderId === currentUser?.uid;
     return (
       <View style={[styles.messageRow, isMe ? styles.myRow : styles.theirRow]}>
-        {!isMe && <TouchableOpacity onPress={() => navigation.navigate('Profile', { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar })}><Image source={{ uri: otherUserAvatar }} style={styles.tinyAvatar} /></TouchableOpacity>}
+        {!isMe && <TouchableOpacity onPress={() => openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar })}><Image source={{ uri: otherUserAvatar }} style={styles.tinyAvatar} /></TouchableOpacity>}
         <View style={[styles.messageBubble, isMe ? styles.myBubble : styles.theirBubble]}>
           {item.mediaUrl && item.mediaType === 'image' && (
             <Image source={{ uri: item.mediaUrl }} style={styles.messageImage} />
@@ -214,7 +215,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
           <TouchableOpacity 
             style={styles.headerProfileClick} 
             activeOpacity={0.7}
-            onPress={() => navigation.navigate('Profile', { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar })}
+            onPress={() => openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar })}
           >
             <Image source={{ uri: otherUserAvatar }} style={styles.headerAvatar} />
             <View>
