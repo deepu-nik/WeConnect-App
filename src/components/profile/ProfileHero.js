@@ -2,7 +2,7 @@ import React from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Camera, MoreHorizontal, Share2, Settings } from 'lucide-react-native';
 
-const ProfileHero = ({ user, isSelf, isConnected, uploading, onAvatarPress, onAvatarEdit, onCoverEdit, onEdit, onMessage, onConnect, onShare, onMenu }) => (
+const ProfileHero = ({ user, isSelf, isConnected, connectionState, uploading, onAvatarPress, onAvatarEdit, onCoverEdit, onEdit, onMessage, onConnect, onShare, onMenu }) => (
   <View style={styles.shell}>
     <View style={styles.cover}>
       {user.coverPhoto ? <Image source={{ uri: user.coverPhoto }} style={StyleSheet.absoluteFillObject} resizeMode="cover" /> : <View style={styles.coverFallback} />}
@@ -33,7 +33,12 @@ const ProfileHero = ({ user, isSelf, isConnected, uploading, onAvatarPress, onAv
           ) : (
             <>
               {isConnected ? (
-                <TouchableOpacity style={styles.secondaryButton} onPress={onMessage}><Text style={styles.secondaryText}>Message</Text></TouchableOpacity>
+                <>
+                  <View style={styles.connectedPill}><Text style={styles.connectedText}>Connected</Text></View>
+                  <TouchableOpacity style={styles.secondaryButton} onPress={onMessage}><Text style={styles.secondaryText}>Message</Text></TouchableOpacity>
+                </>
+              ) : connectionState === 'pending' ? (
+                <View style={styles.pendingPill}><Text style={styles.pendingText}>Requested</Text></View>
               ) : (
                 <TouchableOpacity style={styles.primaryButton} onPress={onConnect}><Text style={styles.primaryText}>Connect</Text></TouchableOpacity>
               )}
@@ -68,6 +73,8 @@ const styles=StyleSheet.create({
   primaryText:{color:'#fff',fontSize:12,fontWeight:'900'},
   secondaryButton:{height:38,paddingHorizontal:14,borderRadius:19,borderWidth:1,borderColor:'#DCDCD5',backgroundColor:'#fff',alignItems:'center',justifyContent:'center'},
   secondaryText:{color:'#111',fontSize:12,fontWeight:'900'},
+  connectedPill:{height:34,paddingHorizontal:10,borderRadius:17,backgroundColor:'#E9F7EC',alignItems:'center',justifyContent:'center'},connectedText:{color:'#218838',fontSize:10,fontWeight:'900'},
+  pendingPill:{height:38,paddingHorizontal:13,borderRadius:19,backgroundColor:'#F0F0EC',alignItems:'center',justifyContent:'center'},pendingText:{color:'#777770',fontSize:11,fontWeight:'900'},
   name:{marginTop:10,fontSize:27,fontWeight:'900',letterSpacing:-.7,color:'#111'},
   handle:{marginTop:2,fontSize:13,fontWeight:'600',color:'#7A7A73'},
   role:{marginTop:9,fontSize:13,fontWeight:'800',color:'#6C6C66'},
