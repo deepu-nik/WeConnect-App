@@ -92,7 +92,6 @@ const RegisterScreen = ({ navigation }) => {
         name: cleanName,
         displayName: cleanName,
         handle: '@' + cleanHandle,
-        email: cleanEmail,
         emailVerified: false,
         collegeId: DEFAULT_COLLEGE_ID,
         collegeName: COLLEGES[0].name,
@@ -102,6 +101,11 @@ const RegisterScreen = ({ navigation }) => {
         photoURL: avatar,
         bio: 'Available to chat',
         connections: [],
+        createdAt: serverTimestamp(),
+      });
+
+      await setDoc(doc(db, 'userPrivate', user.uid), {
+        email: cleanEmail,
         createdAt: serverTimestamp(),
       });
     } catch (err) {
