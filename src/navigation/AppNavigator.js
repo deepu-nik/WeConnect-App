@@ -1,5 +1,5 @@
-import React, { useContext } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import React, { useContext, useEffect, useRef } from 'react';
+import { View, ActivityIndicator, Linking } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 
@@ -10,12 +10,16 @@ import { AuthContext } from '../context/AuthContext';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import ChatRoomScreen from '../screens/ChatRoomScreen';
-import ProfileScreen from '../screens/ProfileScreen';
-
 // EXISTING NAVIGATOR (Your Main Tabs)
 import MainTabNavigator from './MainTabNavigator';
 
 const Stack = createStackNavigator();
+
+const getProfileUidFromUrl = (url) => {
+  if (!url) return null;
+  const match = String(url).match(/^weconnect:\/\/profile\/([^/?#]+)/i);
+  return match ? match[1] : null;
+};
 
 // 1. THE AUTH STACK (Login/Register)
 const AuthStack = () => {
@@ -56,6 +60,28 @@ const AuthenticatedStack = () => {
 // 3. THE MAIN NAVIGATOR (Decider)
 const AppNavigator = () => {
   const { user, loading } = useContext(AuthContext);
+  const navigationRef = useRef(null);
+
+  useEffect(() => {
+    if (!user) return undefined;
+
+    const openProfileFromUrl = (url) => {
+      const uid = getProfileUidFromUrl(url);
+      if (!uid || !navigationRef.current) return;
+      navigationRef.current.navigate('MainTabs', {
+        screen: 'ProfileDetails',
+        params: { uid },
+      });
+    };
+
+    Linking.getInitialURL().then(openProfileFromUrl).catch(() => {});
+
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      openProfileFromUrl(url);
+    });
+
+    return () => subscription.remove();
+  }, [user]);
 
   if (loading) {
     return (
@@ -66,14 +92,8 @@ const AppNavigator = () => {
   }
 
   return (
-    <NavigationContainer>
-      {user ? (
-        // IF LOGGED IN: Show the Authenticated Stack (Tabs + Chats + Profile)
-        <AuthenticatedStack /> 
-      ) : (
-        // IF LOGGED OUT: Show Login
-        <AuthStack /> 
-      )}
+    <NavigationContainer ref={navigationRef}>
+      {user ? <AuthenticatedStack /> : <AuthStack />}
     </NavigationContainer>
   );
 };
