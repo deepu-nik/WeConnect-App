@@ -323,7 +323,7 @@ const VaultScreen = ({ navigation }) => {
   const getFileIcon = (type) => {
     switch (type) {
       case 'pdf': return <FileText size={24} color="#FF3B30" />;
-      case 'doc': return <FileText size={24} color="#007AFF" />;
+      case 'doc': return <FileText size={24} color="#111111" />;
       case 'image': return <ImageIcon size={24} color="#34C759" />;
       case 'zip': return <FileArchive size={24} color="#FF9500" />;
       default: return <FileText size={24} color="#888" />;
@@ -336,7 +336,7 @@ const VaultScreen = ({ navigation }) => {
     return (
       <TouchableOpacity style={styles.listItem} activeOpacity={0.7} onPress={() => openVault(item)}>
         <View style={[styles.iconBox, { backgroundColor: item.type === 'shared' ? '#E6F4FE' : '#F4E8FA' }]}>
-          {item.type === 'shared' ? <Users size={24} color="#007AFF" /> : <Lock size={24} color="#AF52DE" />}
+          {item.type === 'shared' ? <Users size={24} color="#111111" /> : <Lock size={24} color="#AF52DE" />}
         </View>
         <View style={styles.itemDetails}>
           <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
@@ -346,7 +346,7 @@ const VaultScreen = ({ navigation }) => {
         
         {item.type === 'shared' && (
           <TouchableOpacity style={styles.actionBtn} onPress={() => shareVaultInvite(item)}>
-            <LinkIcon size={20} color="#007AFF" />
+            <LinkIcon size={20} color="#111111" />
           </TouchableOpacity>
         )}
         
@@ -372,7 +372,7 @@ const VaultScreen = ({ navigation }) => {
 
     return (
       <View style={[styles.listItem, isPending && styles.pendingListItem]}>
-        <View style={[styles.iconBox, { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#eee' }]}>
+        <View style={[styles.iconBox, { backgroundColor: '#F7F7F5', borderWidth: 1, borderColor: '#eee' }]}>
           {getFileIcon(item.type)}
         </View>
         <View style={styles.itemDetails}>
@@ -391,7 +391,7 @@ const VaultScreen = ({ navigation }) => {
               </TouchableOpacity>
             ) : (
               <TouchableOpacity style={[styles.upvoteBtn, hasUpvoted && styles.upvoteBtnActive]} onPress={() => toggleUpvote(item)}>
-                <ThumbsUp size={18} color={hasUpvoted ? "#fff" : "#007AFF"} />
+                <ThumbsUp size={18} color={hasUpvoted ? "#fff" : "#111111"} />
                 <Text style={[styles.upvoteText, hasUpvoted && {color: '#fff'}]}>{upvoteCount}</Text>
               </TouchableOpacity>
             )}
@@ -401,7 +401,7 @@ const VaultScreen = ({ navigation }) => {
             
             <TouchableOpacity style={styles.actionBtn} onPress={() => handleDownload(item)}>
               {downloadingFileId === item.id ? (
-                <ActivityIndicator size="small" color="#007AFF" />
+                <ActivityIndicator size="small" color="#111111" />
               ) : (
                 <Download size={20} color="#888" />
               )}
@@ -441,7 +441,7 @@ const VaultScreen = ({ navigation }) => {
           <Text style={styles.headerTitle}>Vault</Text>
           {activeTab === 'shared' && (
             <TouchableOpacity style={styles.joinHeaderBtn} onPress={() => setJoinModalVisible(true)}>
-              <Key size={16} color="#007AFF" />
+              <Key size={16} color="#111111" />
               <Text style={styles.joinHeaderText}>Join Vault</Text>
             </TouchableOpacity>
           )}
@@ -452,11 +452,11 @@ const VaultScreen = ({ navigation }) => {
       {!currentVault && (
         <View style={styles.tabContainer}>
           <TouchableOpacity style={[styles.tabBtn, activeTab === 'shared' && styles.activeTabBtn]} onPress={() => handleTabSwitch('shared')}>
-            <Users size={18} color={activeTab === 'shared' ? '#fff' : '#64748b'} />
+            <Users size={18} color={activeTab === 'shared' ? '#fff' : '#707070'} />
             <Text style={[styles.tabText, activeTab === 'shared' && styles.activeTabText]}>Class Vaults</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.tabBtn, activeTab === 'private' && styles.activeTabBtn]} onPress={() => handleTabSwitch('private')}>
-            <Lock size={18} color={activeTab === 'private' ? '#fff' : '#64748b'} />
+            <Lock size={18} color={activeTab === 'private' ? '#fff' : '#707070'} />
             <Text style={[styles.tabText, activeTab === 'private' && styles.activeTabText]}>My Private Vault</Text>
           </TouchableOpacity>
         </View>
@@ -479,7 +479,7 @@ const VaultScreen = ({ navigation }) => {
       {/* CONTENT AREA */}
       <View style={styles.contentArea}>
         {loading ? (
-           <ActivityIndicator size="large" color="#007AFF" style={{marginTop: 50}} />
+           <ActivityIndicator size="large" color="#111111" style={{marginTop: 50}} />
         ) : currentVault ? (
           <FlatList
             data={displayFiles}
@@ -586,13 +586,13 @@ const VaultScreen = ({ navigation }) => {
 
             {selectedItem?.itemType === 'file' && (
               <TouchableOpacity style={styles.sheetOption} onPress={() => { setActionMenuVisible(false); handleDownload(selectedItem); }}>
-                <View style={[styles.sheetIconBox, { backgroundColor: '#e2e8f0' }]}><Download size={20} color="#0f172a" /></View>
+                <View style={[styles.sheetIconBox, { backgroundColor: '#E8E8E3' }]}><Download size={20} color="#111111" /></View>
                 <Text style={styles.sheetOptionText}>Download File</Text>
               </TouchableOpacity>
             )}
 
             <TouchableOpacity style={styles.sheetOption} onPress={openRenameModal}>
-              <View style={[styles.sheetIconBox, { backgroundColor: '#E6F4FE' }]}><Edit2 size={20} color="#007AFF" /></View>
+              <View style={[styles.sheetIconBox, { backgroundColor: '#E6F4FE' }]}><Edit2 size={20} color="#111111" /></View>
               <Text style={styles.sheetOptionText}>Rename</Text>
             </TouchableOpacity>
 
@@ -611,69 +611,69 @@ const VaultScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15, backgroundColor: '#fff' },
-  headerTitle: { fontSize: 28, fontWeight: '800', color: '#0f172a' },
-  joinHeaderBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#e6f4fe', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20 },
-  joinHeaderText: { color: '#007AFF', fontWeight: 'bold', marginLeft: 6, fontSize: 14 },
+  headerTitle: { fontSize: 28, fontWeight: '800', color: '#111111' },
+  joinHeaderBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFC00', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20 },
+  joinHeaderText: { color: '#111111', fontWeight: 'bold', marginLeft: 6, fontSize: 14 },
   
-  folderHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, paddingTop: 10, paddingBottom: 15, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  folderHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, paddingTop: 10, paddingBottom: 15, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0F0EC' },
   backBtn: { padding: 5, marginRight: 10 },
   folderHeaderInfo: { flex: 1 },
-  folderHeaderTitle: { fontSize: 20, fontWeight: 'bold', color: '#0f172a' },
-  folderHeaderSub: { fontSize: 13, color: '#64748b' },
+  folderHeaderTitle: { fontSize: 20, fontWeight: 'bold', color: '#111111' },
+  folderHeaderSub: { fontSize: 13, color: '#707070' },
   
-  tabContainer: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4, marginBottom: 5, marginTop: 10 },
+  tabContainer: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#F0F0EC', borderRadius: 12, padding: 4, marginBottom: 5, marginTop: 10 },
   tabBtn: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 10, borderRadius: 10 },
-  activeTabBtn: { backgroundColor: '#007AFF', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
-  tabText: { fontSize: 15, fontWeight: '600', color: '#64748b', marginLeft: 8 },
+  activeTabBtn: { backgroundColor: '#FFFC00', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  tabText: { fontSize: 15, fontWeight: '600', color: '#707070', marginLeft: 8 },
   activeTabText: { color: '#fff' },
   
   searchContainer: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: '#fff' },
-  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8fafc', borderRadius: 12, paddingHorizontal: 12, height: 45, borderWidth: 1, borderColor: '#e2e8f0' },
+  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F7F7F5', borderRadius: 12, paddingHorizontal: 12, height: 45, borderWidth: 1, borderColor: '#E8E8E3' },
   searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, fontSize: 15, color: '#0f172a' },
+  searchInput: { flex: 1, fontSize: 15, color: '#111111' },
   
-  contentArea: { flex: 1, backgroundColor: '#f8fafc' },
+  contentArea: { flex: 1, backgroundColor: '#F7F7F5' },
   listContent: { paddingHorizontal: 15, paddingTop: 15, paddingBottom: 100 }, 
   
-  listItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingVertical: 12, paddingHorizontal: 15, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 4, elevation: 1 },
+  listItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingVertical: 12, paddingHorizontal: 15, borderRadius: 16, marginBottom: 10, borderWidth: 1, borderColor: '#E8E8E3', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 4, elevation: 1 },
   pendingListItem: { backgroundColor: '#FFFDF5', borderColor: '#FFD60A' },
   iconBox: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
   itemDetails: { flex: 1, justifyContent: 'center' },
-  itemName: { fontSize: 16, fontWeight: '600', color: '#0f172a', marginBottom: 4 },
-  uploaderLink: { color: '#007AFF', fontWeight: '700' },
-  itemMeta: { fontSize: 13, color: '#64748b' },
-  adminBadge: { backgroundColor: '#e2e8f0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginRight: 10 },
+  itemName: { fontSize: 16, fontWeight: '600', color: '#111111', marginBottom: 4 },
+  uploaderLink: { color: '#111111', fontWeight: '700' },
+  itemMeta: { fontSize: 13, color: '#707070' },
+  adminBadge: { backgroundColor: '#E8E8E3', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginRight: 10 },
   adminBadgeText: { fontSize: 11, fontWeight: 'bold', color: '#475569' },
   actionBtn: { padding: 8, marginRight: -8 },
   
   pendingText: { fontSize: 12, color: '#FF9500', fontWeight: 'bold', marginTop: 4 },
   pendingActions: { flexDirection: 'row', alignItems: 'center' },
   approveBtn: { backgroundColor: '#34C759', padding: 10, borderRadius: 20, marginLeft: 10 },
-  upvoteBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#e6f4fe', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, marginLeft: 10 },
-  upvoteBtnActive: { backgroundColor: '#007AFF' },
-  upvoteText: { color: '#007AFF', fontWeight: 'bold', marginLeft: 6 },
+  upvoteBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFC00', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, marginLeft: 10 },
+  upvoteBtnActive: { backgroundColor: '#FFFC00' },
+  upvoteText: { color: '#111111', fontWeight: 'bold', marginLeft: 6 },
   
   emptyState: { alignItems: 'center', marginTop: 80 },
-  emptyStateText: { marginTop: 15, fontSize: 18, color: '#64748b', fontWeight: 'bold' },
-  emptyStateSub: { marginTop: 5, fontSize: 14, color: '#94a3b8', textAlign: 'center', paddingHorizontal: 20 },
+  emptyStateText: { marginTop: 15, fontSize: 18, color: '#707070', fontWeight: 'bold' },
+  emptyStateSub: { marginTop: 5, fontSize: 14, color: '#999999', textAlign: 'center', paddingHorizontal: 20 },
   
-  fab: { position: 'absolute', bottom: 30, right: 20, width: 60, height: 60, borderRadius: 30, backgroundColor: '#007AFF', justifyContent: 'center', alignItems: 'center', shadowColor: '#007AFF', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
+  fab: { position: 'absolute', bottom: 30, right: 20, width: 60, height: 60, borderRadius: 30, backgroundColor: '#FFFC00', justifyContent: 'center', alignItems: 'center', shadowColor: '#111111', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
   
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '85%', backgroundColor: '#fff', borderRadius: 24, padding: 24 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#0f172a' },
-  modalHelperText: { fontSize: 14, color: '#64748b', marginBottom: 20 },
-  modalInput: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, paddingHorizontal: 15, height: 50, fontSize: 16, color: '#0f172a', marginBottom: 15 },
-  modalSubmitBtn: { backgroundColor: '#007AFF', paddingVertical: 15, borderRadius: 12, alignItems: 'center', marginTop: 5 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#111111' },
+  modalHelperText: { fontSize: 14, color: '#707070', marginBottom: 20 },
+  modalInput: { backgroundColor: '#F7F7F5', borderWidth: 1, borderColor: '#E8E8E3', borderRadius: 12, paddingHorizontal: 15, height: 50, fontSize: 16, color: '#111111', marginBottom: 15 },
+  modalSubmitBtn: { backgroundColor: '#FFFC00', paddingVertical: 15, borderRadius: 12, alignItems: 'center', marginTop: 5 },
   modalSubmitText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   
   bottomSheet: { position: 'absolute', bottom: 0, width: '100%', backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingBottom: 40, paddingTop: 10 },
-  sheetHandle: { width: 40, height: 5, backgroundColor: '#e2e8f0', borderRadius: 3, alignSelf: 'center', marginBottom: 20 },
-  sheetTitle: { fontSize: 18, fontWeight: 'bold', color: '#0f172a', marginBottom: 20, textAlign: 'center' },
-  sheetOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  sheetHandle: { width: 40, height: 5, backgroundColor: '#E8E8E3', borderRadius: 3, alignSelf: 'center', marginBottom: 20 },
+  sheetTitle: { fontSize: 18, fontWeight: 'bold', color: '#111111', marginBottom: 20, textAlign: 'center' },
+  sheetOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#F0F0EC' },
   sheetIconBox: { width: 40, height: 40, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-  sheetOptionText: { fontSize: 16, fontWeight: '600', color: '#0f172a' },
+  sheetOptionText: { fontSize: 16, fontWeight: '600', color: '#111111' },
 });
 
 export default VaultScreen;
