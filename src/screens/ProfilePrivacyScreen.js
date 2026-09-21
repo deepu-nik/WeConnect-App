@@ -29,7 +29,29 @@ const ProfilePrivacyScreen = ({ navigation }) => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    getUserProfile(uid).then((profile) => setPrivacy(profile?.privacy || {})).catch(() => setPrivacy({}));
+    getUserProfile(uid).then((profile) => setPrivacy({
+      profileVisibility: profile?.privacy?.profileVisibility || 'everyone',
+      location: profile?.privacy?.location || 'everyone',
+      education: profile?.privacy?.education || 'everyone',
+      skills: profile?.privacy?.skills || 'everyone',
+      experience: profile?.privacy?.experience || 'everyone',
+      projects: profile?.privacy?.projects || 'everyone',
+      achievements: profile?.privacy?.achievements || 'everyone',
+      socialLinks: profile?.privacy?.socialLinks || 'everyone',
+      resume: profile?.privacy?.resume || 'connections',
+      activity: profile?.privacy?.activity || 'everyone',
+    })).catch(() => setPrivacy({
+      profileVisibility: 'everyone',
+      location: 'everyone',
+      education: 'everyone',
+      skills: 'everyone',
+      experience: 'everyone',
+      projects: 'everyone',
+      achievements: 'everyone',
+      socialLinks: 'everyone',
+      resume: 'connections',
+      activity: 'everyone',
+    }));
   }, [uid]);
 
   const save = async (next) => {
