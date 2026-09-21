@@ -12,6 +12,7 @@ export const normalizeUser = (uid, data = {}) => ({
   email: data.email || '',
   location: data.location || 'Campus',
   locationIcon: data.locationIcon || '📍',
+  locationPhoto: data.locationPhoto || '',
   course: data.course || '',
   gradYear: data.gradYear || '',
   skills: Array.isArray(data.skills) ? data.skills : [],
