@@ -173,7 +173,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
         if (!currentProfile?.collegeId) return;
         const q = query(
           collection(db, 'chats'),
-          where('collegeId', '==', currentProfile.collegeId)
+          where('collegeId', '==', currentProfile.collegeId),
+          where('participants', 'array-contains', currentUser.uid)
         );
         const snapshot = await getDocs(q);
         const existing = snapshot.docs.find((item) => item.data()?.participants?.includes(otherUserId));
