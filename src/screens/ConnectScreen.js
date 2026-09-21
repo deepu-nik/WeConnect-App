@@ -383,7 +383,7 @@ const ConnectScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Text style={styles.title}>Connect</Text>
-        <TouchableOpacity style={styles.qrButton} onPress={openScanner}>
+        <TouchableOpacity style={styles.qrButton} onPress={openQr}>
           <ScanLine size={22} color="#111111" />
         </TouchableOpacity>
       </View>
