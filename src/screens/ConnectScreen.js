@@ -159,7 +159,11 @@ const ConnectScreen = ({ navigation }) => {
     if (scanned || !data) return;
     setScanned(true);
     try {
-      const profile = await getUserProfile(data);
+      // Accept both the raw Firebase UID and a shared WeConnect deep link.
+      const raw = String(data).trim();
+      const match = raw.match(/^weconnect:\/\/profile\/([^/?#]+)/i);
+      const uid = match ? match[1] : raw;
+      const profile = await getUserProfile(uid);
       setQrVisible(false);
       if (!profile) {
         Alert.alert('User not found', 'That QR code does not belong to a WeConnect profile.');
@@ -177,7 +181,12 @@ const ConnectScreen = ({ navigation }) => {
 
   const shareQr = async () => {
     try {
-      await Share.share({ message: 'Add me on WeConnect! Scan my QR code.', url: 'weconnect://profile/' + currentUser.uid });
+      const profileUrl = 'weconnect://profile/' + currentUser.uid;
+      await Share.share({
+        title: 'My WeConnect Profile',
+        message: 'Add me on WeConnect! Open my profile in WeConnect: ' + profileUrl,
+        url: profileUrl,
+      });
     } catch (error) {
       if (error?.message) console.log(error.message);
     }
@@ -336,8 +345,8 @@ const styles = StyleSheet.create({
   qrButton: { backgroundColor: '#f1f5f9', padding: 9, borderRadius: 12 },
   sectionLabel: { fontSize: 12, fontWeight: '800', color: '#94a3b8', paddingHorizontal: 20, marginBottom: 8 },
   locationRow: { paddingHorizontal: 15, gap: 8, paddingBottom: 12 },
-  locationChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#fff' },
-  locationText: { color: '#334155', fontWeight: '600', fontSize: 13 },
+  locationChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f8fafc' },
+  locationText: { color: '#475569', fontWeight: '600', fontSize: 13 },
   search: { margin: 15, marginTop: 5, height: 46, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, backgroundColor: '#f8fafc', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, color: '#0f172a', fontSize: 15 },
   tabs: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4, marginBottom: 10 },
