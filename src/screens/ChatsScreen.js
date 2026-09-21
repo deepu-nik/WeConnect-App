@@ -3,8 +3,9 @@ import { ActivityIndicator, FlatList, Image, Modal, RefreshControl, ScrollView, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CheckCheck, ChevronRight, MessageCircle, Plus, Search, Sparkles, UserRoundPlus, X } from 'lucide-react-native';
 import { auth, db } from '../config/firebase';
-import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { markChatRead } from '../services/chatService';
+import { getUserProfile } from '../services/userService';
 import Dashboard from '../components/Dashboard';
 
 const FALLBACK_AVATAR = 'https://via.placeholder.com/150';
@@ -22,11 +23,27 @@ const dateLabel = (date) => {
 const initials = (name = 'Student') => name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
 
 const Avatar = ({ uri, name, size = 56, onPress }) => {
-  const [imageError, setImageError] = useState(false);
+  const imageUri = typeof uri === 'string' && uri.trim() ? uri.trim() : null;
+
+  // Keep this component intentionally identical to the working ChatRoom avatar:
+  // a valid profile URL is rendered directly. Initials are only used when no
+  // profile URL exists, rather than hiding a valid image after an onError event.
   const body = (
     <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
-      <Image source={{ uri: uri || FALLBACK_AVATAR }} style={{ width: size, height: size, borderRadius: size / 2 }} />
-      <View style={styles.avatarFallback}><Text style={[styles.avatarInitials, { fontSize: Math.max(11, size * 0.25) }]}>{initials(name)}</Text></View>
+      {imageUri ? (
+        <Image
+          key={imageUri}
+          source={{ uri: imageUri }}
+          style={{ width: size, height: size, borderRadius: size / 2 }}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={styles.avatarFallback}>
+          <Text style={[styles.avatarInitials, { fontSize: Math.max(11, size * 0.25) }]}>
+            {initials(name)}
+          </Text>
+        </View>
+      )}
     </View>
   );
   return onPress ? <TouchableOpacity onPress={onPress} activeOpacity={0.82}>{body}</TouchableOpacity> : body;
@@ -48,23 +65,42 @@ const ChatsScreen = ({ navigation }) => {
     if (!currentUser?.uid) { setChats([]); setLoading(false); return undefined; }
     setLoading(true);
     const q = query(collection(db, 'chats'), where('participants', 'array-contains', currentUser.uid));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const next = snapshot.docs.map((chatDoc) => {
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const next = await Promise.all(snapshot.docs.map(async (chatDoc) => {
         const data = chatDoc.data() || {};
         const participants = Array.isArray(data.participants) ? data.participants : [];
         const otherUserId = participants.find((uid) => uid !== currentUser.uid);
         const otherInfo = data.usersInfo?.[otherUserId] || {};
+
+        let avatar = otherInfo.avatar || otherInfo.photoURL || '';
+        let name = otherInfo.name || 'Student';
+
+        // Use the exact same profile source as ChatRoomScreen. Chat documents
+        // contain a snapshot of avatar data and can become stale after a user
+        // changes their profile photo.
+        if (otherUserId) {
+          try {
+            const profile = await getUserProfile(otherUserId);
+            if (profile) {
+              avatar = profile.avatar || avatar;
+              name = profile.name || name;
+            }
+          } catch (error) {
+            console.warn('Could not load current chat profile:', otherUserId, error);
+          }
+        }
+
         return {
           id: chatDoc.id,
           otherUserId,
-          name: otherInfo.name || 'Student',
-          avatar: otherInfo.avatar || FALLBACK_AVATAR,
+          name,
+          avatar,
           lastMessage: data.lastMessage || 'Start the conversation',
           timestamp: data.updatedAt?.toDate?.() || new Date(0),
           unreadCount: Number(data.unreadCount?.[currentUser.uid] || 0),
           typing: Boolean(data.typing?.[otherUserId]),
         };
-      }).sort((a, b) => b.timestamp - a.timestamp);
+      })).then((items) => items.sort((a, b) => b.timestamp - a.timestamp));
       setChats(next); setLoading(false); setRefreshing(false);
     }, (error) => { console.error('Chats subscription failed:', error); setChats([]); setLoading(false); setRefreshing(false); });
     return unsubscribe;
@@ -237,7 +273,7 @@ const styles = StyleSheet.create({
   chatCard: { minHeight: 78, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5DF', flexDirection: 'row', alignItems: 'center' },
   chatCardUnread: { borderColor: '#E2E2D8', backgroundColor: '#FFFEE6' },
   avatar: { backgroundColor: '#E7E7E1', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginRight: 11 },
-  avatarFallback: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E7E7E1' },
+  avatarFallback: { flex: 1, width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: '#E7E7E1' },
   avatarInitials: { color: '#55554F', fontWeight: '900' },
   chatContent: { flex: 1, minWidth: 0, paddingRight: 8 },
   chatTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 },
