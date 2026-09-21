@@ -59,7 +59,8 @@ const ProfileScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [editVisible, setEditVisible] = useState(false);
+  const [editSection, setEditSection] = useState(null);
+  const [editItemIndex, setEditItemIndex] = useState(null);
   const [profileMenuVisible, setProfileMenuVisible] = useState(false);
   const [fullScreenAvatar, setFullScreenAvatar] = useState(null);
   const [activeTab, setActiveTab] = useState('posts');
@@ -155,8 +156,12 @@ const ProfileScreen = ({ route, navigation }) => {
 
   const openPrivacy = () => navigation.navigate('ProfilePrivacy');
 
-  const openEdit = () => {
+  const openEdit = (section = 'identity', itemIndex = null) => {
     if (!user) return;
+    const project = itemIndex !== null ? (user.projects || [])[itemIndex] : null;
+    const experience = itemIndex !== null ? (user.experience || [])[itemIndex] : null;
+    const achievement = itemIndex !== null ? (user.achievements || [])[itemIndex] : null;
+    setEditItemIndex(itemIndex);
     setForm({
       name: user.name || '',
       handle: user.handle || '',
@@ -172,8 +177,20 @@ const ProfileScreen = ({ route, navigation }) => {
       gradYear: String(user.gradYear || ''),
       projectsCount: String(user.projectsCount || 0),
       skills: [...(user.skills || [])],
+      projectName: project?.name || project?.title || '',
+      projectDescription: project?.description || '',
+      projectTech: project?.tech || '',
+      projectUrl: project?.url || '',
+      experienceTitle: experience?.title || experience?.role || '',
+      experienceCompany: experience?.company || '',
+      experiencePeriod: experience?.period || '',
+      experienceDescription: experience?.description || '',
+      achievementTitle: achievement?.title || '',
+      achievementIssuer: achievement?.issuer || '',
+      achievementYear: String(achievement?.year || ''),
+      achievementDescription: achievement?.description || '',
     });
-    setEditVisible(true);
+    setEditSection(section);
   };
 
   const addSkill = () => {
@@ -184,34 +201,77 @@ const ProfileScreen = ({ route, navigation }) => {
   };
 
   const saveProfile = async () => {
-    if (!currentUser?.uid || !form) return;
+    if (!currentUser?.uid || !form || !editSection) return;
     setSaving(true);
     try {
-      const handle = form.handle.trim();
-      const next = {
-        displayName: form.name.trim(),
-        name: form.name.trim(),
-        handle: handle ? (handle.startsWith('@') ? handle : '@' + handle) : '@student',
-        bio: form.bio.trim(),
-        location: form.location.trim(),
-        website: form.website.trim(),
-        resumeLink: form.resumeLink.trim(),
-        instagram: form.instagram.trim(),
-        linkedin: form.linkedin.trim(),
-        github: form.github.trim(),
-        whatsapp: form.whatsapp.trim(),
-        course: form.course.trim(),
-        gradYear: form.gradYear.trim(),
-        projectsCount: Number.parseInt(form.projectsCount, 10) || 0,
-        skills: form.skills,
-      };
-      await updateDoc(doc(db, 'users', currentUser.uid), next);
-      await updateProfile(currentUser, { displayName: next.displayName });
-      setUser((prev) => ({ ...prev, ...next }));
-      setEditVisible(false);
+      const patch = {};
+      if (editSection === 'identity') {
+        const handle = form.handle.trim();
+        patch.displayName = form.name.trim();
+        patch.name = form.name.trim();
+        patch.handle = handle ? (handle.startsWith('@') ? handle : '@' + handle) : '@student';
+        patch.course = form.course.trim();
+        patch.gradYear = form.gradYear.trim();
+      } else if (editSection === 'about') {
+        patch.bio = form.bio.trim();
+        patch.location = form.location.trim();
+      } else if (editSection === 'links') {
+        patch.website = form.website.trim();
+        patch.instagram = form.instagram.trim();
+        patch.linkedin = form.linkedin.trim();
+        patch.github = form.github.trim();
+        patch.whatsapp = form.whatsapp.trim();
+        patch.resumeLink = form.resumeLink.trim();
+      } else if (editSection === 'skills') {
+        patch.skills = form.skills || [];
+      } else if (editSection === 'projects') {
+        const item = {
+          name: form.projectName.trim(),
+          description: form.projectDescription.trim(),
+          tech: form.projectTech.trim(),
+          url: form.projectUrl.trim(),
+        };
+        if (!item.name) throw new Error('Project name is required');
+        const items = [...(user.projects || [])];
+        if (editItemIndex === null) items.push(item);
+        else items[editItemIndex] = { ...items[editItemIndex], ...item };
+        patch.projects = items;
+        patch.projectsCount = items.length;
+      } else if (editSection === 'experience') {
+        const item = {
+          title: form.experienceTitle.trim(),
+          company: form.experienceCompany.trim(),
+          period: form.experiencePeriod.trim(),
+          description: form.experienceDescription.trim(),
+        };
+        if (!item.title) throw new Error('Role / title is required');
+        const items = [...(user.experience || [])];
+        if (editItemIndex === null) items.push(item);
+        else items[editItemIndex] = { ...items[editItemIndex], ...item };
+        patch.experience = items;
+      } else if (editSection === 'achievements') {
+        const item = {
+          title: form.achievementTitle.trim(),
+          issuer: form.achievementIssuer.trim(),
+          year: form.achievementYear.trim(),
+          description: form.achievementDescription.trim(),
+        };
+        if (!item.title) throw new Error('Achievement title is required');
+        const items = [...(user.achievements || [])];
+        if (editItemIndex === null) items.push(item);
+        else items[editItemIndex] = { ...items[editItemIndex], ...item };
+        patch.achievements = items;
+      }
+      await updateDoc(doc(db, 'users', currentUser.uid), patch);
+      if (editSection === 'identity') {
+        await updateProfile(currentUser, { displayName: patch.displayName });
+      }
+      setUser((prev) => ({ ...prev, ...patch }));
+      setEditSection(null);
+      setEditItemIndex(null);
     } catch (error) {
       console.error('Profile save failed:', error);
-      Alert.alert('Could not save', 'Please try again.');
+      Alert.alert('Could not save', error?.message || 'Please try again.');
     } finally {
       setSaving(false);
     }
@@ -347,7 +407,7 @@ const ProfileScreen = ({ route, navigation }) => {
         }} />
 
         {isSelf && (
-          <ProfileSection title="Profile strength" subtitle="Complete the essentials to make your identity useful." action={{ label: 'Edit', onPress: openEdit }}>
+          <ProfileSection title="Profile strength" subtitle="Complete the essentials to make your identity useful." action={{ label: 'Edit', onPress: () => openEdit('identity') }}>
             <View style={styles.strengthCard}>
               <View style={styles.strengthTop}><View><Text style={styles.strengthPercent}>{profileStrength}%</Text><Text style={styles.strengthLabel}>profile complete</Text></View><Sparkles size={22} color="#111" /></View>
               <View style={styles.progressTrack}><View style={[styles.progressFill, { width: profileStrength + '%' }]} /></View>
@@ -356,7 +416,7 @@ const ProfileScreen = ({ route, navigation }) => {
           </ProfileSection>
         )}
 
-        <ProfileSection title="About" subtitle="Your campus identity">
+        <ProfileSection title="About" subtitle="Your campus identity" action={isSelf ? { label: 'Edit', onPress: () => openEdit('about') } : undefined}>
           <View style={styles.infoCard}>
             <InfoRow icon={UserRound} label="About" value={user.bio || 'Add a short introduction about yourself.'} multiline />
             {canSee('education') && <InfoRow icon={GraduationCap} label="Education" value={(user.course || 'B.Tech Computer Science') + (user.gradYear ? ' • Class of ' + user.gradYear : '')} />}
@@ -364,7 +424,7 @@ const ProfileScreen = ({ route, navigation }) => {
           </View>
         </ProfileSection>
 
-        <ProfileSection title="Skills" subtitle="What you build and learn" action={isSelf ? { label: 'Manage', onPress: openEdit } : undefined}>
+        <ProfileSection title="Skills" subtitle="What you build and learn" action={isSelf ? { label: 'Manage', onPress: () => openEdit('skills') } : undefined}>
           {canSee('skills') ? (
             groupedSkills.length ? (
               groupedSkills.map((group) => (
@@ -400,7 +460,7 @@ const ProfileScreen = ({ route, navigation }) => {
           )}
         </ProfileSection>
 
-        <ProfileSection title="Education & Experience" subtitle="Build your professional identity">
+        <ProfileSection title="Education & Experience" subtitle="Build your professional identity" action={isSelf ? { label: 'Edit', onPress: () => openEdit('experience') } : undefined}>
           {canSee('experience') ? (
             <View style={styles.timelineCard}>
               <TimelineItem icon={GraduationCap} title={user.course || 'Computer Science Engineering'} subtitle={(user.gradYear ? 'Class of ' + user.gradYear : 'Student') + ' • ' + (user.location || 'Campus')} />
@@ -420,7 +480,7 @@ const ProfileScreen = ({ route, navigation }) => {
           )}
         </ProfileSection>
 
-        <ProfileSection title="Portfolio" subtitle="Show what you have built" action={isSelf ? { label: 'Edit', onPress: openEdit } : undefined}>
+        <ProfileSection title="Portfolio" subtitle="Show what you have built" action={isSelf ? { label: 'Edit', onPress: () => openEdit('projects') } : undefined}>
           {canSee('projects') ? (
             (user.projects || []).length ? (
               (user.projects || []).slice(0, 6).map((project, index) => (
@@ -431,7 +491,7 @@ const ProfileScreen = ({ route, navigation }) => {
                 </TouchableOpacity>
               ))
             ) : (
-              <View style={styles.emptyCard}><Code2 size={22} color="#777770" /><Text style={styles.emptyTitle}>No projects added yet</Text><Text style={styles.emptyText}>{isSelf ? 'Add projects to make your portfolio useful for collaborators and recruiters.' : 'This student has not added projects yet.'}</Text>{isSelf && <TouchableOpacity style={styles.smallButton} onPress={openEdit}><Text style={styles.smallButtonText}>Edit profile</Text></TouchableOpacity>}</View>
+              <View style={styles.emptyCard}><Code2 size={22} color="#777770" /><Text style={styles.emptyTitle}>No projects added yet</Text><Text style={styles.emptyText}>{isSelf ? 'Add projects to make your portfolio useful for collaborators and recruiters.' : 'This student has not added projects yet.'}</Text>{isSelf && <TouchableOpacity style={styles.smallButton} onPress={() => openEdit('projects')}><Text style={styles.smallButtonText}>Add project</Text></TouchableOpacity>}</View>
             )
           ) : (
             <View style={styles.privateCard}>
@@ -481,23 +541,57 @@ const ProfileScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </Modal>
 
-      <Modal visible={editVisible} animationType="slide" transparent onRequestClose={() => setEditVisible(false)}>
+      <Modal visible={!!editSection} animationType="slide" transparent onRequestClose={() => setEditSection(null)}>
         <KeyboardAvoidingView style={styles.editOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View style={styles.editModal}>
-            <View style={styles.editHeader}><View><Text style={styles.editEyebrow}>PROFILE</Text><Text style={styles.editTitle}>Edit your identity</Text></View><TouchableOpacity onPress={() => setEditVisible(false)}><X size={24} color="#111" /></TouchableOpacity></View>
+            <View style={styles.editHeader}>
+              <View>
+                <Text style={styles.editEyebrow}>EDIT PROFILE</Text>
+                <Text style={styles.editTitle}>
+                  {{identity:'Identity',about:'About',skills:'Skills',links:'Links',experience:'Experience',projects:'Project',achievements:'Achievement'}[editSection] || 'Edit'}}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setEditSection(null)}><X size={24} color="#111" /></TouchableOpacity>
+            </View>
             <ScrollView contentContainerStyle={styles.form}>
-              {[
-                ['name','Name'],['handle','Username / Handle'],['course','Course / Major'],['gradYear','Class of'],
-                ['location','Campus Location'],['website','Website'],['instagram','Instagram'],['linkedin','LinkedIn'],
-                ['github','GitHub'],['whatsapp','WhatsApp Number'],['resumeLink','Resume / Portfolio'],['projectsCount','Projects Completed'],
-              ].map(([key,label]) => (
-                <View key={key}><Text style={styles.label}>{label}</Text><TextInput style={styles.input} value={String(form?.[key] ?? '')} onChangeText={(value)=>setForm({...form,[key]:value})} keyboardType={key==='projectsCount'||key==='gradYear'||key==='whatsapp'?'numeric':key==='website'||key==='instagram'||key==='linkedin'||key==='github'||key==='resumeLink'?'url':'default'} autoCapitalize={key==='name'||key==='course'||key==='location'?'sentences':'none'} /></View>
-              ))}
-              <Text style={styles.label}>Bio</Text>
-              <TextInput style={[styles.input,styles.multiline]} value={form?.bio || ''} onChangeText={(value)=>setForm({...form,bio:value})} multiline maxLength={240} placeholder="Tell people what you build or care about" />
-              <Text style={styles.label}>Skills</Text>
-              <View style={styles.addSkillRow}><TextInput style={[styles.input,{flex:1,marginBottom:0}]} value={newSkill} onChangeText={setNewSkill} placeholder="e.g. React Native" onSubmitEditing={addSkill} /><TouchableOpacity style={styles.addSkillButton} onPress={addSkill}><Plus size={20} color="#fff" /></TouchableOpacity></View>
-              <View style={styles.editSkills}>{form?.skills?.map(skill=><View key={skill} style={styles.editSkill}><Text style={styles.editSkillText}>{skill}</Text><TouchableOpacity onPress={()=>setForm({...form,skills:form.skills.filter(item=>item!==skill)})}><Trash2 size={14} color="#C62828" /></TouchableOpacity></View>)}</View>
+              {editSection === 'identity' && <>
+                <Text style={styles.label}>Name</Text><TextInput style={styles.input} value={form?.name || ''} onChangeText={(value)=>setForm({...form,name:value})} />
+                <Text style={styles.label}>Username / Handle</Text><TextInput style={styles.input} value={form?.handle || ''} onChangeText={(value)=>setForm({...form,handle:value})} autoCapitalize="none" />
+                <Text style={styles.label}>Course / Major</Text><TextInput style={styles.input} value={form?.course || ''} onChangeText={(value)=>setForm({...form,course:value})} />
+                <Text style={styles.label}>Class of</Text><TextInput style={styles.input} value={form?.gradYear || ''} onChangeText={(value)=>setForm({...form,gradYear:value})} keyboardType="numeric" />
+              </>}
+              {editSection === 'about' && <>
+                <Text style={styles.label}>Bio</Text><TextInput style={[styles.input,styles.multiline]} value={form?.bio || ''} onChangeText={(value)=>setForm({...form,bio:value})} multiline maxLength={240} placeholder="Tell people what you build or care about" />
+                <Text style={styles.label}>Campus Location</Text><TextInput style={styles.input} value={form?.location || ''} onChangeText={(value)=>setForm({...form,location:value})} />
+              </>}
+              {editSection === 'links' && <>
+                {[
+                  ['website','Website'],['instagram','Instagram'],['linkedin','LinkedIn'],['github','GitHub'],['whatsapp','WhatsApp Number'],['resumeLink','Resume / Portfolio']
+                ].map(([key,label]) => <View key={key}><Text style={styles.label}>{label}</Text><TextInput style={styles.input} value={String(form?.[key] ?? '')} onChangeText={(value)=>setForm({...form,[key]:value})} autoCapitalize="none" /></View>)}
+              </>}
+              {editSection === 'skills' && <>
+                <Text style={styles.label}>Add a skill</Text>
+                <View style={styles.addSkillRow}><TextInput style={[styles.input,{flex:1,marginBottom:0}]} value={newSkill} onChangeText={setNewSkill} placeholder="e.g. React Native" onSubmitEditing={addSkill} /><TouchableOpacity style={styles.addSkillButton} onPress={addSkill}><Plus size={20} color="#fff" /></TouchableOpacity></View>
+                <View style={styles.editSkills}>{form?.skills?.map(skill=><View key={skill} style={styles.editSkill}><Text style={styles.editSkillText}>{skill}</Text><TouchableOpacity onPress={()=>setForm({...form,skills:form.skills.filter(item=>item!==skill)})}><Trash2 size={14} color="#C62828" /></TouchableOpacity></View>)}</View>
+              </>}
+              {editSection === 'experience' && <>
+                <Text style={styles.label}>Role / Title</Text><TextInput style={styles.input} value={form?.experienceTitle || ''} onChangeText={(value)=>setForm({...form,experienceTitle:value})} placeholder="e.g. Frontend Developer" />
+                <Text style={styles.label}>Company / Organisation</Text><TextInput style={styles.input} value={form?.experienceCompany || ''} onChangeText={(value)=>setForm({...form,experienceCompany:value})} />
+                <Text style={styles.label}>Period</Text><TextInput style={styles.input} value={form?.experiencePeriod || ''} onChangeText={(value)=>setForm({...form,experiencePeriod:value})} placeholder="e.g. May 2026 – Jul 2026" />
+                <Text style={styles.label}>Description</Text><TextInput style={[styles.input,styles.multiline]} value={form?.experienceDescription || ''} onChangeText={(value)=>setForm({...form,experienceDescription:value})} multiline />
+              </>}
+              {editSection === 'projects' && <>
+                <Text style={styles.label}>Project Name</Text><TextInput style={styles.input} value={form?.projectName || ''} onChangeText={(value)=>setForm({...form,projectName:value})} />
+                <Text style={styles.label}>Description</Text><TextInput style={[styles.input,styles.multiline]} value={form?.projectDescription || ''} onChangeText={(value)=>setForm({...form,projectDescription:value})} multiline />
+                <Text style={styles.label}>Tech Stack</Text><TextInput style={styles.input} value={form?.projectTech || ''} onChangeText={(value)=>setForm({...form,projectTech:value})} />
+                <Text style={styles.label}>GitHub / Live URL</Text><TextInput style={styles.input} value={form?.projectUrl || ''} onChangeText={(value)=>setForm({...form,projectUrl:value})} autoCapitalize="none" />
+              </>}
+              {editSection === 'achievements' && <>
+                <Text style={styles.label}>Achievement</Text><TextInput style={styles.input} value={form?.achievementTitle || ''} onChangeText={(value)=>setForm({...form,achievementTitle:value})} />
+                <Text style={styles.label}>Issuer / Organisation</Text><TextInput style={styles.input} value={form?.achievementIssuer || ''} onChangeText={(value)=>setForm({...form,achievementIssuer:value})} />
+                <Text style={styles.label}>Year</Text><TextInput style={styles.input} value={form?.achievementYear || ''} onChangeText={(value)=>setForm({...form,achievementYear:value})} />
+                <Text style={styles.label}>Description</Text><TextInput style={[styles.input,styles.multiline]} value={form?.achievementDescription || ''} onChangeText={(value)=>setForm({...form,achievementDescription:value})} multiline />
+              </>}
               <TouchableOpacity style={styles.saveButton} onPress={saveProfile} disabled={saving}>{saving?<ActivityIndicator color="#fff"/>:<Text style={styles.saveText}>Save Changes</Text>}</TouchableOpacity>
             </ScrollView>
           </View>
