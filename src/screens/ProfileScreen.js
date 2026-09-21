@@ -30,6 +30,7 @@ const ProfileScreen = ({ route, navigation }) => {
   const [editVisible, setEditVisible] = useState(false);
   const [form, setForm] = useState(null);
   const [newSkill, setNewSkill] = useState('');
+  const [fullScreenAvatar, setFullScreenAvatar] = useState(null);
   useEffect(() => {
     let active = true;
     (async () => {
@@ -214,7 +215,9 @@ const ProfileScreen = ({ route, navigation }) => {
 
         <View style={styles.body}>
           <View style={styles.avatarWrap}>
-            <Image source={{ uri: user.avatar || FALLBACK_AVATAR }} style={styles.avatar} />
+            <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenAvatar(user.avatar || FALLBACK_AVATAR)}>
+              <Image source={{ uri: user.avatar || FALLBACK_AVATAR }} style={styles.avatar} />
+            </TouchableOpacity>
             {isSelf && <TouchableOpacity style={styles.avatarEdit} onPress={() => pickImage('avatar')} disabled={uploading}><Camera size={15} color="#fff" /></TouchableOpacity>}
             {uploading && <View style={styles.uploadOverlay}><ActivityIndicator color="#fff" /></View>}
           </View>
@@ -269,6 +272,13 @@ const ProfileScreen = ({ route, navigation }) => {
           </View>
         </View>
       </ScrollView>
+
+      <Modal visible={!!fullScreenAvatar} transparent animationType="fade" onRequestClose={() => setFullScreenAvatar(null)}>
+        <View style={styles.fullScreenAvatarOverlay}>
+          <TouchableOpacity style={styles.fullScreenAvatarClose} onPress={() => setFullScreenAvatar(null)}><X size={28} color="#fff" /></TouchableOpacity>
+          {fullScreenAvatar && <Image source={{ uri: fullScreenAvatar }} style={styles.fullScreenAvatarImage} resizeMode="contain" />}
+        </View>
+      </Modal>
 
       <Modal visible={editVisible} animationType="slide" transparent onRequestClose={() => setEditVisible(false)}>
         <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -326,6 +336,9 @@ const styles = StyleSheet.create({
   avatarWrap: { width: 100, height: 100, marginTop: -68, position: 'relative' },
   avatar: { width: 100, height: 100, borderRadius: 50, borderWidth: 4, borderColor: '#fff', backgroundColor: '#e2e8f0' },
   avatarEdit: { position: 'absolute', right: 0, bottom: 0, width: 30, height: 30, borderRadius: 15, backgroundColor: '#007AFF', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  fullScreenAvatarOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.98)', alignItems: 'center', justifyContent: 'center' },
+  fullScreenAvatarImage: { width: '92%', height: '75%' },
+  fullScreenAvatarClose: { position: 'absolute', top: 48, right: 18, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
   uploadOverlay: { ...StyleSheet.absoluteFillObject, borderRadius: 50, backgroundColor: 'rgba(0,0,0,.45)', alignItems: 'center', justifyContent: 'center' },
   actionRow: { alignItems: 'flex-end', marginTop: -32, marginBottom: 18 },
   editButton: { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20, borderWidth: 1, borderColor: '#dbe1e8' },
