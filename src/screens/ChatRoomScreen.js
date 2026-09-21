@@ -602,20 +602,20 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
       {searchVisible ? (
         <View style={styles.searchBar}>
-          <Search size={18} color="#94a3b8" />
+          <Search size={18} color="#999999" />
           <TextInput
             autoFocus
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Search messages"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor="#999999"
             style={styles.searchInput}
           />
           {searchQuery ? (
             <Text style={styles.searchCount}>{searchResults.length}</Text>
           ) : null}
           <TouchableOpacity onPress={() => { setSearchVisible(false); setSearchQuery(''); }}>
-            <X size={18} color="#64748b" />
+            <X size={18} color="#707070" />
           </TouchableOpacity>
         </View>
       ) : null}
@@ -664,7 +664,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
               </Text>
             </View>
             <TouchableOpacity onPress={() => setReplyingTo(null)}>
-              <X size={19} color="#64748b" />
+              <X size={19} color="#707070" />
             </TouchableOpacity>
           </View>
         ) : null}
@@ -674,7 +674,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
             <View style={styles.emojiPanelHeader}>
               <Text style={styles.emojiPanelTitle}>Quick emojis</Text>
               <TouchableOpacity onPress={() => setEmojiPickerVisible(false)}>
-                <X size={16} color="#94a3b8" />
+                <X size={16} color="#999999" />
               </TouchableOpacity>
             </View>
             {COMPOSER_EMOJIS.map((row, rowIndex) => (
@@ -695,20 +695,12 @@ const ChatRoomScreen = ({ route, navigation }) => {
               <Camera size={21} color="#475569" />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.composerIcon} onPress={openGalleryAndSend} disabled={isUploading}>
-              {isUploading ? (
-                <ActivityIndicator size="small" color="#2563eb" />
-              ) : (
-                <ImageIcon size={21} color="#475569" />
-              )}
-            </TouchableOpacity>
-
             <View style={styles.textInputShell}>
               <TextInput
                 value={inputText}
                 onChangeText={handleTextChange}
                 placeholder="Message…"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor="#999999"
                 multiline
                 maxLength={1000}
                 style={styles.textInput}
@@ -721,7 +713,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
                   setEmojiPickerVisible((value) => !value);
                 }}
               >
-                <Smile size={20} color={emojiPickerVisible ? "#2563eb" : "#64748b"} />
+                <Smile size={20} color={emojiPickerVisible ? "#111111" : "#707070"} />
               </TouchableOpacity>
             </View>
 
@@ -731,14 +723,14 @@ const ChatRoomScreen = ({ route, navigation }) => {
               </TouchableOpacity>
             ) : (
               <TouchableOpacity style={styles.sendButtonGhost} onPress={openGalleryAndSend} disabled={isUploading}>
-                <ImageIcon size={20} color="#2563eb" />
+                <ImageIcon size={20} color="#111111" />
               </TouchableOpacity>
             )}
           </View>
 
           {isUploading ? (
             <View style={styles.uploadStatus}>
-              <ActivityIndicator size="small" color="#2563eb" />
+              <ActivityIndicator size="small" color="#111111" />
               <Text style={styles.uploadStatusText}>
                 Sending {uploadProgress.current}/{uploadProgress.total}
               </Text>
@@ -872,7 +864,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: '#F7F7F5' },
   keyboardAvoid: { flex: 1 },
   header: {
     minHeight: 68,
@@ -885,98 +877,98 @@ const styles = StyleSheet.create({
   },
   headerBack: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   headerProfile: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 3 },
-  headerAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#e2e8f0' },
+  headerAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#E8E8E3' },
   headerIdentity: { marginLeft: 10, flex: 1 },
-  headerName: { fontSize: 16, fontWeight: '800', color: '#0f172a' },
+  headerName: { fontSize: 16, fontWeight: '800', color: '#111111' },
   onlineRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   onlineDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#22c55e', marginRight: 5 },
-  headerStatus: { fontSize: 11, fontWeight: '600', color: '#64748b' },
+  headerStatus: { fontSize: 11, fontWeight: '600', color: '#707070' },
   headerActions: { flexDirection: 'row', alignItems: 'center' },
   headerAction: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19 },
-  searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 12, marginVertical: 7, paddingHorizontal: 12, minHeight: 40, borderRadius: 20, backgroundColor: '#eef2f7' },
-  searchInput: { flex: 1, paddingHorizontal: 8, fontSize: 14, color: '#0f172a' },
-  searchCount: { fontSize: 12, fontWeight: '800', color: '#2563eb', marginRight: 8 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 12, marginVertical: 7, paddingHorizontal: 12, minHeight: 40, borderRadius: 20, backgroundColor: '#EEEEEA' },
+  searchInput: { flex: 1, paddingHorizontal: 8, fontSize: 14, color: '#111111' },
+  searchCount: { fontSize: 12, fontWeight: '800', color: '#111111', marginRight: 8 },
   listContent: { paddingHorizontal: 10, paddingTop: 12, paddingBottom: 12 },
   messageRow: { width: '100%', flexDirection: 'row', alignItems: 'flex-end', minHeight: 44, paddingVertical: 3 },
   myRow: { justifyContent: 'flex-end', paddingLeft: 44 },
   theirRow: { justifyContent: 'flex-start', paddingRight: 44 },
   avatarWrap: { width: 32, alignItems: 'center', marginRight: 6 },
-  tinyAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#e2e8f0' },
+  tinyAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#E8E8E3' },
   messageColumn: { maxWidth: '82%', flexDirection: 'column' },
   messageColumnMine: { alignItems: 'flex-end' },
   messageColumnTheirs: { alignItems: 'flex-start' },
   messageBubble: { paddingHorizontal: 11, paddingVertical: 8, borderRadius: 21, minWidth: 56, overflow: 'hidden' },
-  myBubble: { backgroundColor: '#2563eb', borderBottomRightRadius: 6 },
+  myBubble: { backgroundColor: '#FFFC00', borderBottomRightRadius: 6 },
   theirBubble: { backgroundColor: '#fff', borderBottomLeftRadius: 6, borderWidth: 1, borderColor: '#e7edf4' },
   quotedReply: { borderLeftWidth: 3, borderRadius: 8, paddingLeft: 8, paddingVertical: 5, paddingRight: 5, marginBottom: 6, backgroundColor: 'rgba(15,23,42,0.06)' },
   quotedReplyMine: { backgroundColor: 'rgba(255,255,255,0.14)', borderLeftColor: '#fff' },
-  quotedReplyTheirs: { borderLeftColor: '#2563eb' },
-  quotedReplyLabel: { fontSize: 10, fontWeight: '900', color: '#2563eb' },
+  quotedReplyTheirs: { borderLeftColor: '#111111' },
+  quotedReplyLabel: { fontSize: 10, fontWeight: '900', color: '#111111' },
   quotedReplyLabelMine: { color: '#fff' },
-  quotedReplyText: { marginTop: 2, fontSize: 12, color: '#64748b' },
+  quotedReplyText: { marginTop: 2, fontSize: 12, color: '#707070' },
   quotedReplyTextMine: { color: 'rgba(255,255,255,0.85)' },
-  messageImage: { width: 240, height: 240, borderRadius: 15, marginBottom: 3, backgroundColor: '#e2e8f0' },
-  messageVideo: { width: 240, height: 175, borderRadius: 15, backgroundColor: '#0f172a', alignItems: 'center', justifyContent: 'center', marginBottom: 3 },
+  messageImage: { width: 240, height: 240, borderRadius: 15, marginBottom: 3, backgroundColor: '#E8E8E3' },
+  messageVideo: { width: 240, height: 175, borderRadius: 15, backgroundColor: '#111111', alignItems: 'center', justifyContent: 'center', marginBottom: 3 },
   videoPlayCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   videoPlayGlyph: { color: '#fff', fontSize: 20, marginLeft: 3 },
   messageVideoText: { color: '#fff', fontSize: 12, fontWeight: '800', marginTop: 7 },
   messageText: { fontSize: 16, lineHeight: 21 },
-  myMessageText: { color: '#fff' },
-  theirMessageText: { color: '#0f172a' },
-  deletedText: { fontSize: 14, fontStyle: 'italic', color: '#64748b' },
+  myMessageText: { color: '#111111' },
+  theirMessageText: { color: '#111111' },
+  deletedText: { fontSize: 14, fontStyle: 'italic', color: '#707070' },
   myDeletedText: { color: 'rgba(255,255,255,0.75)' },
   messageMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 3, gap: 2 },
   timeText: { fontSize: 9, fontWeight: '600' },
-  myTimeText: { color: 'rgba(255,255,255,0.72)' },
-  theirTimeText: { color: '#94a3b8' },
+  myTimeText: { color: 'rgba(17,17,17,0.55)' },
+  theirTimeText: { color: '#999999' },
   reactionPillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: -1, zIndex: 3 },
   reactionPillRowMine: { alignSelf: 'flex-end' },
   reactionPillRowTheirs: { alignSelf: 'flex-start' },
-  reactionPill: { flexDirection: 'row', alignItems: 'center', minHeight: 26, paddingHorizontal: 7, borderRadius: 14, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', elevation: 2 },
+  reactionPill: { flexDirection: 'row', alignItems: 'center', minHeight: 26, paddingHorizontal: 7, borderRadius: 14, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E8E8E3', elevation: 2 },
   reactionPillEmoji: { fontSize: 14 },
-  reactionPillCount: { fontSize: 10, fontWeight: '800', color: '#64748b', marginLeft: 3 },
-  messageActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', alignSelf: 'flex-start', marginTop: 5, padding: 5, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', elevation: 7, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, zIndex: 20, maxWidth: '100%' },
+  reactionPillCount: { fontSize: 10, fontWeight: '800', color: '#707070', marginLeft: 3 },
+  messageActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', alignSelf: 'flex-start', marginTop: 5, padding: 5, borderRadius: 18, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E8E8E3', elevation: 7, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, zIndex: 20, maxWidth: '100%' },
   messageActionsMine: { alignSelf: 'flex-end' },
   messageActionsTheirs: { alignSelf: 'flex-start' },
   reactionActionRow: { flexDirection: 'row', alignItems: 'center' },
   reactionAction: { width: 31, height: 31, alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
   reactionEmoji: { fontSize: 19 },
-  actionDivider: { width: 1, height: 23, backgroundColor: '#e2e8f0', marginHorizontal: 3 },
+  actionDivider: { width: 1, height: 23, backgroundColor: '#E8E8E3', marginHorizontal: 3 },
   actionChip: { paddingHorizontal: 8, paddingVertical: 7 },
-  replyActionText: { fontSize: 11, fontWeight: '900', color: '#2563eb' },
+  replyActionText: { fontSize: 11, fontWeight: '900', color: '#111111' },
   shareActionText: { fontSize: 11, fontWeight: '900', color: '#0f766e' },
   deleteActionText: { fontSize: 11, fontWeight: '900', color: '#ef4444' },
-  cancelActionText: { fontSize: 18, fontWeight: '800', color: '#64748b' },
+  cancelActionText: { fontSize: 18, fontWeight: '800', color: '#707070' },
   typingIndicatorRow: { flexDirection: 'row', alignItems: 'flex-end', marginVertical: 5, marginLeft: 3 },
   typingBubble: { width: 64, height: 38, marginLeft: 6, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e7edf4', alignItems: 'center', justifyContent: 'center' },
   typingDots: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  typingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#94a3b8' },
+  typingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#999999' },
   emptyState: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 45, paddingVertical: 150 },
   emptyAvatarRing: { width: 92, height: 92, borderRadius: 46, padding: 3, backgroundColor: '#dbeafe' },
   emptyAvatar: { width: 86, height: 86, borderRadius: 43 },
-  emptyTitle: { marginTop: 15, fontSize: 18, fontWeight: '900', color: '#0f172a' },
-  emptySubtitle: { marginTop: 6, fontSize: 13, lineHeight: 19, color: '#64748b', textAlign: 'center' },
-  replyBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 10, marginBottom: 6, padding: 9, borderRadius: 15, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0' },
-  replyAccent: { width: 3, alignSelf: 'stretch', backgroundColor: '#2563eb', borderRadius: 2, marginRight: 9 },
+  emptyTitle: { marginTop: 15, fontSize: 18, fontWeight: '900', color: '#111111' },
+  emptySubtitle: { marginTop: 6, fontSize: 13, lineHeight: 19, color: '#707070', textAlign: 'center' },
+  replyBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 10, marginBottom: 6, padding: 9, borderRadius: 15, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E8E8E3' },
+  replyAccent: { width: 3, alignSelf: 'stretch', backgroundColor: '#111111', borderRadius: 2, marginRight: 9 },
   replyContent: { flex: 1 },
-  replyLabel: { fontSize: 10, fontWeight: '900', color: '#2563eb' },
+  replyLabel: { fontSize: 10, fontWeight: '900', color: '#111111' },
   replyText: { marginTop: 2, fontSize: 13, color: '#475569' },
-  emojiPanel: { backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#e2e8f0', paddingHorizontal: 7, paddingTop: 6, paddingBottom: 5 },
+  emojiPanel: { backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#E8E8E3', paddingHorizontal: 7, paddingTop: 6, paddingBottom: 5 },
   emojiPanelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 8, paddingBottom: 4 },
-  emojiPanelTitle: { fontSize: 11, fontWeight: '900', color: '#64748b' },
+  emojiPanelTitle: { fontSize: 11, fontWeight: '900', color: '#707070' },
   emojiRow: { flexDirection: 'row', justifyContent: 'space-around' },
   emojiButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   emojiButtonText: { fontSize: 24 },
-  composerShell: { paddingHorizontal: 8, paddingTop: 6, paddingBottom: Platform.OS === 'ios' ? 7 : 5, backgroundColor: '#f8fafc' },
-  composer: { minHeight: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, paddingVertical: 5, borderRadius: 27, backgroundColor: '#fff', borderWidth: 1, borderColor: '#e2e8f0', elevation: 3, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
+  composerShell: { paddingHorizontal: 8, paddingTop: 6, paddingBottom: Platform.OS === 'ios' ? 7 : 5, backgroundColor: '#F7F7F5' },
+  composer: { minHeight: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, paddingVertical: 5, borderRadius: 27, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E8E8E3', elevation: 3, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
   composerIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19 },
-  textInputShell: { flex: 1, minHeight: 40, maxHeight: 100, flexDirection: 'row', alignItems: 'center', marginHorizontal: 2, paddingLeft: 8, borderRadius: 20, backgroundColor: '#f1f5f9' },
-  textInput: { flex: 1, color: '#0f172a', fontSize: 15, paddingVertical: 8, paddingRight: 3, textAlignVertical: 'center' },
+  textInputShell: { flex: 1, minHeight: 40, maxHeight: 100, flexDirection: 'row', alignItems: 'center', marginHorizontal: 2, paddingLeft: 8, borderRadius: 20, backgroundColor: '#F0F0EC' },
+  textInput: { flex: 1, color: '#111111', fontSize: 15, paddingVertical: 8, paddingRight: 3, textAlignVertical: 'center' },
   emojiToggle: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
-  sendButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2563eb' },
-  sendButtonGhost: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#eff6ff' },
+  sendButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#111111' },
+  sendButtonGhost: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFC00' },
   uploadStatus: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingTop: 4, gap: 7 },
-  uploadStatusText: { fontSize: 11, fontWeight: '700', color: '#2563eb' },
+  uploadStatusText: { fontSize: 11, fontWeight: '700', color: '#111111' },
   mediaViewer: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
   viewerGestureArea: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   viewerImage: { width: '100%', height: '100%' },
@@ -992,23 +984,23 @@ const styles = StyleSheet.create({
   fullScreenClose: { position: 'absolute', top: 50, right: 18, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   fullScreenAvatar: { width: '90%', height: '65%' },
   fullScreenAvatarName: { marginTop: 18, color: '#fff', fontSize: 17, fontWeight: '800' },
-  modalPage: { flex: 1, backgroundColor: '#f8fafc' },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingVertical: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-  modalTitle: { fontSize: 18, fontWeight: '900', color: '#0f172a' },
+  modalPage: { flex: 1, backgroundColor: '#F7F7F5' },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingVertical: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E8E8E3' },
+  modalTitle: { fontSize: 18, fontWeight: '900', color: '#111111' },
   mediaGrid: { padding: 3 },
   gridImageWrap: { width: '33.333%', aspectRatio: 1, padding: 3 },
-  gridImage: { flex: 1, borderRadius: 7, backgroundColor: '#e2e8f0' },
+  gridImage: { flex: 1, borderRadius: 7, backgroundColor: '#E8E8E3' },
   modalEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  modalEmptyTitle: { marginTop: 10, fontSize: 15, fontWeight: '800', color: '#64748b' },
+  modalEmptyTitle: { marginTop: 10, fontSize: 15, fontWeight: '800', color: '#707070' },
   detailsOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.35)', justifyContent: 'flex-end' },
   detailsCard: { backgroundColor: '#fff', borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 22, paddingTop: 24, paddingBottom: 30, alignItems: 'center' },
   detailsAvatar: { width: 82, height: 82, borderRadius: 41 },
-  detailsName: { marginTop: 12, fontSize: 19, fontWeight: '900', color: '#0f172a' },
-  detailsMeta: { marginTop: 3, fontSize: 12, color: '#94a3b8' },
-  detailsAction: { width: '100%', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#eef2f7', alignItems: 'center' },
-  detailsActionText: { fontSize: 14, fontWeight: '800', color: '#2563eb' },
+  detailsName: { marginTop: 12, fontSize: 19, fontWeight: '900', color: '#111111' },
+  detailsMeta: { marginTop: 3, fontSize: 12, color: '#999999' },
+  detailsAction: { width: '100%', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#EEEEEA', alignItems: 'center' },
+  detailsActionText: { fontSize: 14, fontWeight: '800', color: '#111111' },
   detailsCancel: { marginTop: 12, paddingVertical: 10 },
-  detailsCancelText: { fontSize: 14, fontWeight: '800', color: '#64748b' },
+  detailsCancelText: { fontSize: 14, fontWeight: '800', color: '#707070' },
 });
 
 export default ChatRoomScreen;
