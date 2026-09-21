@@ -316,7 +316,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
             <View />
             {isSelf && (
               <TouchableOpacity style={styles.coverButton} onPress={() => pickImage('cover')}>
-                <Camera size={18} color="#FFF" />
+                <Camera size={18} color="#FFFFFF" />
               </TouchableOpacity>
             )}
           </SafeAreaView>
@@ -330,7 +330,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
               </TouchableOpacity>
               {isSelf && (
                 <TouchableOpacity style={styles.avatarCamera} onPress={() => pickImage('avatar')} disabled={uploading}>
-                  {uploading ? <ActivityIndicator size="small" color="#FFF" /> : <Camera size={15} color="#FFF" />}
+                  {uploading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Camera size={15} color="#FFFFFF" />}
                 </TouchableOpacity>
               )}
             </View>
@@ -346,7 +346,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
                   style={styles.primaryButton}
                   onPress={() => navigation.navigate('ChatRoom', { uid: user.uid, name: user.name, avatar: user.avatar })}
                 >
-                  <MessageCircle size={16} color="#FFF" />
+                  <MessageCircle size={16} color={COLORS.ink} />
                   <Text style={styles.primaryButtonText}>Message</Text>
                 </TouchableOpacity>
               )}
@@ -558,7 +558,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
               </EditorCard>
 
               <TouchableOpacity style={styles.saveButton} onPress={saveProfile} disabled={saving}>
-                {saving ? <ActivityIndicator color="#FFF" /> : <><CheckCircle2 size={18} color="#FFF" /><Text style={styles.saveText}>Save Profile</Text></>}
+                {saving ? <ActivityIndicator color="#FFF" /> : <><CheckCircle2 size={18} color={COLORS.ink} /><Text style={styles.saveText}>Save Profile</Text></>}
               </TouchableOpacity>
             </ScrollView>
           </KeyboardAvoidingView>
