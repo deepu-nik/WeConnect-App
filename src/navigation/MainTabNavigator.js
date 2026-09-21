@@ -58,6 +58,11 @@ const MainTabNavigator = () => (
         gestureEnabled: true,
       }}
     />
+    <Stack.Screen
+      name="ProfilePrivacy"
+      component={ProfilePrivacyScreen}
+      options={{ presentation: 'card', animation: 'slide_from_right' }}
+    />
   </Stack.Navigator>
 );
 export default MainTabNavigator;
