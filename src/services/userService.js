@@ -28,6 +28,19 @@ export const normalizeUser = (uid, data = {}) => ({
   linkedin: data.linkedin || '',
   github: data.github || '',
   whatsapp: data.whatsapp || '',
+  privacy: {
+    profileVisibility: data.privacy?.profileVisibility || 'everyone',
+    location: data.privacy?.location || 'everyone',
+    education: data.privacy?.education || 'everyone',
+    skills: data.privacy?.skills || 'everyone',
+    experience: data.privacy?.experience || 'everyone',
+    projects: data.privacy?.projects || 'everyone',
+    achievements: data.privacy?.achievements || 'everyone',
+    socialLinks: data.privacy?.socialLinks || 'everyone',
+    resume: data.privacy?.resume || 'connections',
+    activity: data.privacy?.activity || 'everyone',
+    connections: data.privacy?.connections || 'everyone',
+  },
 });
 
 export const getUserProfile = async (uid) => {
