@@ -3,6 +3,7 @@ import { ActivityIndicator, FlatList, Image, Modal, RefreshControl, ScrollView, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CheckCheck, ChevronRight, MessageCircle, Plus, Search, Sparkles, UserRoundPlus, X } from 'lucide-react-native';
 import { auth, db } from '../config/firebase';
+import { getUserProfile } from '../services/userService';
 import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { markChatRead } from '../services/chatService';
 import Dashboard from '../components/Dashboard';
@@ -84,7 +85,12 @@ const ChatsScreen = ({ navigation }) => {
     if (!text.trim()) { setStudentResults([]); setSearchingStudents(false); return; }
     setSearchingStudents(true);
     try {
-      const snapshot = await getDocs(query(collection(db, 'users')));
+      const profile = await getUserProfile(currentUser?.uid);
+      if (!profile?.collegeId) {
+        setStudentResults([]);
+        return;
+      }
+      const snapshot = await getDocs(query(collection(db, 'users'), where('collegeId', '==', profile.collegeId)));
       const lower = text.trim().toLowerCase();
       setStudentResults(snapshot.docs.map((doc) => {
         const data = doc.data() || {};
