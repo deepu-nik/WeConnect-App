@@ -32,7 +32,6 @@ export default function StoryViewerScreen({ route, navigation }) {
       timer.current.start(({ finished }) => { if (finished) goNext(); });
     }
     return () => timer.current?.stop();
-    return () => timer.current?.stop();
   }, [index, story?.id, paused]);
 
   const isMine = story?.userId === auth.currentUser?.uid;
