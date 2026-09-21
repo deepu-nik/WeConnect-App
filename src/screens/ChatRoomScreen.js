@@ -582,7 +582,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
             <Text style={styles.headerName} numberOfLines={1}>{otherUserName}</Text>
             <View style={styles.onlineRow}>
               <View style={styles.onlineDot} />
-              <Text style={styles.headerStatus}>{isOtherUserTyping ? 'typing…' : 'online'}</Text>
+              <Text style={styles.headerStatus}>{isOtherUserTyping ? 'typing…' : 'Chat'}</Text>
             </View>
           </View>
         </TouchableOpacity>
@@ -977,7 +977,6 @@ const styles = StyleSheet.create({
   sendButtonGhost: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#eff6ff' },
   uploadStatus: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingTop: 4, gap: 7 },
   uploadStatusText: { fontSize: 11, fontWeight: '700', color: '#2563eb' },
-  searchCount: { fontSize: 12, fontWeight: '800', color: '#2563eb', marginRight: 8 },
   mediaViewer: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
   viewerGestureArea: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   viewerImage: { width: '100%', height: '100%' },
