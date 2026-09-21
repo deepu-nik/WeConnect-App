@@ -169,7 +169,13 @@ const ChatRoomScreen = ({ route, navigation }) => {
     const findExistingChat = async () => {
       if (chatId || !otherUserId || !currentUser) return;
       try {
-        const q = query(collection(db, 'chats'), where('participants', 'array-contains', currentUser.uid));
+        const currentProfile = await getUserProfile(currentUser.uid);
+        if (!currentProfile?.collegeId) return;
+        const q = query(
+          collection(db, 'chats'),
+          where('collegeId', '==', currentProfile.collegeId),
+          where('participants', 'array-contains', currentUser.uid)
+        );
         const snapshot = await getDocs(q);
         const existing = snapshot.docs.find((item) => item.data()?.participants?.includes(otherUserId));
         if (existing) setChatId(existing.id);
@@ -232,7 +238,9 @@ const ChatRoomScreen = ({ route, navigation }) => {
       throw new Error('Messaging is currently limited to students from your campus.');
     }
 
+    const currentProfile = await getUserProfile(currentUser.uid);
     const chatRef = await addDoc(collection(db, 'chats'), {
+      collegeId: currentProfile.collegeId,
       participants: [currentUser.uid, otherUserId],
       updatedAt: serverTimestamp(),
       lastMessage: '',
