@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, Alert, BackHandler, FlatList, Image, Modal, Platform, Pressable,
+  ActivityIndicator, Alert, Animated, BackHandler, FlatList, Image, Modal, Platform,
   SafeAreaView as NativeSafeAreaView, ScrollView, Share, StyleSheet, Text,
   TextInput, TouchableOpacity, View,
 } from 'react-native';
@@ -15,7 +15,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
-import { acceptConnectionRequest, declineConnectionRequest, sendConnectionRequest, subscribeToConnectionRequests } from '../services/connectionService';
+import { acceptConnectionRequest, connectUsersViaQr, declineConnectionRequest, sendConnectionRequest, subscribeToConnectionRequests } from '../services/connectionService';
 import { getUserProfile, normalizeUser } from '../services/userService';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import { openProfile } from '../navigation/navigationHelpers';
@@ -43,6 +43,8 @@ const ConnectScreen = ({ navigation }) => {
   const [qrVisible, setQrVisible] = useState(false);
   const [qrMode, setQrMode] = useState('my_code');
   const [scanned, setScanned] = useState(false);
+  const [scanSuccess, setScanSuccess] = useState(false);
+  const scanLineY = useMemo(() => new Animated.Value(0), []);
   const [permission, requestPermission] = useCameraPermissions();
 
   useFocusEffect(
@@ -194,8 +196,19 @@ const ConnectScreen = ({ navigation }) => {
   const openQr = (mode = 'my_code') => {
     setQrMode(mode);
     setScanned(false);
+    setScanSuccess(false);
     setQrVisible(true);
   };
+
+  useEffect(() => {
+    if (!qrVisible || qrMode !== 'scan' || scanSuccess) return undefined;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(scanLineY, { toValue: 1, duration: 1500, useNativeDriver: true }),
+      Animated.timing(scanLineY, { toValue: 0, duration: 1500, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => { loop.stop(); scanLineY.stopAnimation(); };
+  }, [qrVisible, qrMode, scanSuccess, scanLineY]);
 
   const openScanner = async () => {
     if (!permission?.granted) {
@@ -209,26 +222,25 @@ const ConnectScreen = ({ navigation }) => {
   };
 
   const handleScan = async ({ data }) => {
-    if (scanned || !data) return;
+    if (scanned || scanSuccess || !data) return;
     setScanned(true);
     try {
-      // Accept both the raw Firebase UID and a shared WeConnect deep link.
       const raw = String(data).trim();
       const match = raw.match(/^weconnect:\/\/profile\/([^/?#]+)/i);
       const uid = match ? match[1] : raw;
       const profile = await getUserProfile(uid);
+      if (!profile) throw new Error('User not found');
+      if (profile.uid === currentUser?.uid) throw new Error('You cannot connect with yourself.');
+      await connectUsersViaQr(currentUser.uid, profile.uid);
+      setScanSuccess(true);
+      await new Promise((resolve) => setTimeout(resolve, 1100));
       setQrVisible(false);
-      if (!profile) {
-        Alert.alert('User not found', 'That QR code does not belong to a WeConnect profile.');
-        return;
-      }
+      setScanSuccess(false);
       openProfile(navigation, { uid: profile.uid, name: profile.name, avatar: profile.avatar });
     } catch (error) {
       console.error('QR scan failed:', error);
-      setQrVisible(false);
-      Alert.alert('Error', 'Could not load that profile.');
-    } finally {
       setScanned(false);
+      Alert.alert('Scan failed', error?.message === 'User not found' ? 'That QR code does not belong to a WeConnect profile.' : (error?.message || 'Could not connect this profile.'));
     }
   };
 
@@ -422,10 +434,19 @@ const ConnectScreen = ({ navigation }) => {
                 onBarcodeScanned={scanned ? undefined : handleScan}
                 barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
               />
-              {scanned && <View style={styles.scanOverlay}><ActivityIndicator color="#fff" size="large" /><Text style={styles.scanText}>Opening profile…</Text></View>}
+              <View style={styles.cameraShade} pointerEvents="none" />
+              <View style={styles.scanFrame} pointerEvents="none">
+                <View style={[styles.corner, styles.cornerTL]} />
+                <View style={[styles.corner, styles.cornerTR]} />
+                <View style={[styles.corner, styles.cornerBL]} />
+                <View style={[styles.corner, styles.cornerBR]} />
+                {!scanSuccess && <Animated.View style={[styles.scanBeam, { transform: [{ translateY: scanLineY.interpolate({ inputRange: [0, 1], outputRange: [0, 210] }) }] }]} />}
+              </View>
+              <Text style={styles.scanInstruction}>Point your camera at a WeConnect QR code</Text>
+              {scanSuccess && <View style={styles.scanSuccessOverlay}><View style={styles.successCircle}><Check size={42} color="#111111" strokeWidth={3} /></View><Text style={styles.successTitle}>You’re friends now!</Text><Text style={styles.successSub}>Connection added successfully</Text></View>}
             </View>
           )}
-        </NativeSafeAreaView>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -493,8 +514,19 @@ const styles = StyleSheet.create({
   qrName: { fontSize: 22, fontWeight: '800', color: '#111111' },
   qrHint: { textAlign: 'center', color: '#707070', lineHeight: 20 },
   scanner: { margin: 20, flex: 1, borderRadius: 24, overflow: 'hidden', backgroundColor: '#000' },
-  scanOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,.65)', alignItems: 'center', justifyContent: 'center' },
-  scanText: { color: '#fff', marginTop: 10 },
+  cameraShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.16)' },
+  scanFrame: { position: 'absolute', width: 230, height: 230, alignSelf: 'center', top: '28%' },
+  corner: { position: 'absolute', width: 34, height: 34, borderColor: '#FFFC00' },
+  cornerTL: { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: 10 },
+  cornerTR: { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: 10 },
+  cornerBL: { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: 10 },
+  cornerBR: { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: 10 },
+  scanBeam: { position: 'absolute', left: 8, right: 8, top: 8, height: 3, backgroundColor: '#FFFC00', shadowColor: '#FFFC00', shadowOpacity: 0.9, shadowRadius: 8, elevation: 5 },
+  scanInstruction: { position: 'absolute', left: 20, right: 20, bottom: 24, textAlign: 'center', color: '#fff', fontSize: 14, fontWeight: '600' },
+  scanSuccessOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,252,0,0.96)', alignItems: 'center', justifyContent: 'center' },
+  successCircle: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  successTitle: { color: '#111111', fontSize: 25, fontWeight: '900' },
+  successSub: { color: '#333', fontSize: 14, marginTop: 6 },
 });
 
 export default ConnectScreen;
