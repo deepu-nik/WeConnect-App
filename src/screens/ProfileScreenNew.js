@@ -404,7 +404,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
                 <Text style={styles.completionPercent}>{completion}%</Text>
               </View>
               <View style={styles.progressTrack}><View style={[styles.progressFill, { width: completion + '%' }]} /></View>
-              <TouchableOpacity style={styles.completeAction} onPress={openEdit}>
+              <TouchableOpacity style={styles.completeAction} onPress={openEditMenu}>
                 <Text style={styles.completeActionText}>{completion < 100 ? 'Complete your profile' : 'Keep your profile fresh'}</Text>
                 <ChevronRight size={16} color={COLORS.blue} />
               </TouchableOpacity>
