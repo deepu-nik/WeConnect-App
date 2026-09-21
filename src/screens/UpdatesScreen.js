@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { openProfile as navigateToProfile } from '../navigation/navigationHelpers';
 import { 
-  View, Text, StyleSheet, FlatList, TouchableOpacity, 
+  View, Text, StyleSheet, FlatList, TouchableOpacity, Share,
   Image, TextInput, StatusBar, Modal, ActivityIndicator, Alert,
   KeyboardAvoidingView, Platform, ScrollView, Dimensions
 } from 'react-native';
@@ -358,7 +358,7 @@ const UpdatesScreen = ({ navigation }) => {
                   <Text style={styles.actionCount}>{commentCount}</Text>
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity style={styles.actionBtnPremiumShare}>
+              <TouchableOpacity style={styles.actionBtnPremiumShare} onPress={() => sharePost(item)}>
                 <Send size={20} color="#64748b" />
               </TouchableOpacity>
             </View>
@@ -534,6 +534,21 @@ const UpdatesScreen = ({ navigation }) => {
     }
 
     return null;
+  };
+
+  const sharePost = async (post) => {
+    const media = post.mediaItems?.[0]?.url || post.imageUrl;
+    const message = [post.content, media].filter(Boolean).join('\n\n');
+    if (!message) return;
+    try {
+      await Share.share({
+        title: 'Share from College Buzz',
+        message,
+        ...(media ? { url: media } : {}),
+      });
+    } catch (error) {
+      if (error?.message) console.log('Post share cancelled:', error.message);
+    }
   };
 
   const openProfile = (author) => { if (!author?.uid || author.uid === currentUser?.uid) return; navigateToProfile(navigation, { uid: author.uid, name: author.name, avatar: author.avatar }); };
