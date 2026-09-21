@@ -319,6 +319,7 @@ const ProfileScreen = ({ route, navigation }) => {
           user={user}
           isSelf={isSelf}
           isConnected={isConnected}
+          connectionState={connectionState}
           uploading={uploading}
           onAvatarPress={() => setFullScreenAvatar(user.avatar || FALLBACK_AVATAR)}
           onAvatarEdit={() => pickImage('avatar')}
