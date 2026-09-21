@@ -9,6 +9,7 @@ import ConnectScreen from '../screens/ConnectScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import UpdatesScreen from '../screens/UpdatesScreen';
 import VaultScreen from '../screens/VaultScreen';
+import ProfilePrivacyScreen from '../screens/ProfilePrivacyScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
