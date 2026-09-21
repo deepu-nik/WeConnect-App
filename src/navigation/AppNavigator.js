@@ -49,9 +49,9 @@ const AuthenticatedStack = () => {
       }}
     />
 
-    {/* The Profile Screen sits on top of tabs and chat rooms */}
+    {/* The Profile details screen is always rooted above Chats so system back returns to Chats */}
      <Stack.Screen
-      name="Profile"
+      name="ProfileDetails"
       component={ProfileScreen}
       options={{
         headerShown: false,
