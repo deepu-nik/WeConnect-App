@@ -131,7 +131,7 @@ const ChatsScreen = ({ navigation }) => {
         return { ...data, uid: data.uid || doc.id, name: data.name || data.displayName || data.username || 'Student', avatar: data.avatar || data.photoURL || FALLBACK_AVATAR };
       }).filter((user) => {
         if (user.uid === currentUser?.uid) return false;
-        const haystack = [user.name, user.username, user.email].filter(Boolean).join(' ').toLowerCase();
+        const haystack = [user.name, user.username].filter(Boolean).join(' ').toLowerCase();
         return haystack.includes(lower);
       }).slice(0, 12));
     } catch (error) {
@@ -171,7 +171,7 @@ const ChatsScreen = ({ navigation }) => {
       <Avatar uri={item.avatar} name={item.name} size={50} />
       <View style={styles.studentInfo}>
         <Text style={styles.studentName} numberOfLines={1}>{item.name}</Text>
-        <Text style={styles.studentMeta} numberOfLines={1}>{item.username ? '@' + item.username : item.email || 'WeConnect student'}</Text>
+        <Text style={styles.studentMeta} numberOfLines={1}>{item.username ? '@' + item.username : 'WeConnect student'}</Text>
       </View>
       <View style={styles.startChatButton}><MessageCircle size={17} color="#111111" /></View>
     </TouchableOpacity>
