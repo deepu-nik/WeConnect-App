@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator, Alert, BackHandler, Image, KeyboardAvoidingView, Linking, Modal,
   Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -43,6 +44,16 @@ const ProfileScreen = ({ route, navigation }) => {
       navigation.navigate('Chats');
     }
   };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      leavingToChats.current = false;
+
+      return () => {
+        leavingToChats.current = false;
+      };
+    }, [])
+  );
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (event) => {
