@@ -225,6 +225,26 @@ const ConnectScreen = ({ navigation }) => {
         return;
       }
     }
+
+    if (CameraView.isModernBarcodeScannerAvailable) {
+      setQrVisible(false);
+      setScanned(false);
+      setScanSuccess(false);
+      try {
+        await CameraView.launchScanner({
+          barcodeTypes: ['qr'],
+          isGuidanceEnabled: true,
+          isHighlightingEnabled: true,
+          isPinchToZoomEnabled: true,
+        });
+      } catch (error) {
+        console.error('Native QR scanner failed:', error);
+        Alert.alert('Scanner unavailable', 'Could not open the device QR scanner.');
+      }
+      return;
+    }
+
+    // Fallback for devices without the native scanner.
     openQr('scan');
   };
 
@@ -247,7 +267,7 @@ const ConnectScreen = ({ navigation }) => {
     setCameraKey((value) => value + 1);
   };
 
-  const handleScan = async ({ data }) => {
+  const handleScan = useCallback(async ({ data }) => {
     if (scanned || scanSuccess || !data) return;
     setScanned(true);
     try {
@@ -268,7 +288,15 @@ const ConnectScreen = ({ navigation }) => {
       setScanned(false);
       Alert.alert('Scan failed', error?.message === 'User not found' ? 'That QR code does not belong to a WeConnect profile.' : (error?.message || 'Could not connect this profile.'));
     }
-  };
+  }, [scanned, scanSuccess, currentUser, navigation]);
+
+  useEffect(() => {
+    const subscription = CameraView.onModernBarcodeScanned(async ({ data }) => {
+      if (!data || scanned || scanSuccess) return;
+      await handleScan({ data });
+    });
+    return () => subscription.remove();
+  }, [scanned, scanSuccess, handleScan]);
 
   const shareQr = async () => {
     try {
@@ -349,36 +377,32 @@ const ConnectScreen = ({ navigation }) => {
       </View>
 
       <Text style={styles.sectionLabel}>WHERE ARE YOU?</Text>
-      <ScrollView
+      <FlatList
         horizontal
+        data={[...LOCATIONS, ['Custom', '✏️', '#111111']]}
+        keyExtractor={([name]) => name}
         showsHorizontalScrollIndicator={false}
-        style={styles.locationScroll}
+        style={styles.locationList}
         contentContainerStyle={styles.locationRow}
-      >
-        {LOCATIONS.map(([name, icon]) => (
+        renderItem={({ item: [name, icon] }) => (
           <TouchableOpacity
-            key={name}
-            style={[styles.locationCard, myLocation === name && styles.locationCardActive]}
-            onPress={() => updateLocation(name, icon)}
+            style={[styles.locationCard, name !== 'Custom' && myLocation === name && styles.locationCardActive]}
+            onPress={() => name === 'Custom' ? customLocation() : updateLocation(name, icon)}
             activeOpacity={0.85}
           >
-            {myLocationPhoto && myLocation === name ? (
+            {name !== 'Custom' && myLocationPhoto && myLocation === name ? (
               <Image source={{ uri: myLocationPhoto }} style={styles.locationCardPhoto} />
             ) : (
               <View style={styles.locationCardIconWrap}>
                 <Text style={styles.locationCardIcon}>{icon}</Text>
               </View>
             )}
-            <Text style={[styles.locationCardName, myLocation === name && styles.locationCardNameActive]} numberOfLines={1}>
+            <Text style={[styles.locationCardName, name !== 'Custom' && myLocation === name && styles.locationCardNameActive]} numberOfLines={1}>
               {name}
             </Text>
           </TouchableOpacity>
-        ))}
-        <TouchableOpacity style={styles.locationCard} onPress={customLocation} activeOpacity={0.85}>
-          <View style={styles.locationCardIconWrap}><Text style={styles.locationCardIcon}>✏️</Text></View>
-          <Text style={styles.locationCardName} numberOfLines={1}>Custom</Text>
-        </TouchableOpacity>
-      </ScrollView>
+        )}
+      />
 
       {myLocation ? (
         <View style={styles.locationStatusRow}>
@@ -537,8 +561,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', color: '#111111' },
   qrButton: { backgroundColor: '#F0F0EC', padding: 9, borderRadius: 12 },
   sectionLabel: { fontSize: 12, fontWeight: '800', color: '#999999', paddingHorizontal: 20, marginBottom: 8 },
-  locationScroll: { height: 102, flexGrow: 0, flexShrink: 0 },
-  locationRow: { paddingHorizontal: 15, gap: 8, paddingBottom: 8, alignItems: 'flex-start' },
+  locationList: { height: 102, flexGrow: 0, flexShrink: 0 },
+  locationRow: { paddingHorizontal: 15, alignItems: 'flex-start', paddingBottom: 8, gap: 8 },
   search: { margin: 15, marginTop: 5, height: 46, borderWidth: 1, borderColor: '#E8E8E3', borderRadius: 12, backgroundColor: '#F7F7F5', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, color: '#111111', fontSize: 15 },
   tabs: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#F0F0EC', borderRadius: 12, padding: 4, marginBottom: 10 },
