@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 export const FALLBACK_AVATAR = 'https://via.placeholder.com/150';
@@ -38,7 +38,11 @@ export const getUserProfile = async (uid) => {
 };
 
 export const getAllUsers = async (currentUid) => {
-  const snapshot = await getDocs(collection(db, 'users'));
+  if (!currentUid) return [];
+  const currentProfile = await getDoc(doc(db, 'users', currentUid));
+  const collegeId = currentProfile.exists() ? currentProfile.data()?.collegeId : null;
+  if (!collegeId) return [];
+  const snapshot = await getDocs(query(collection(db, 'users'), where('collegeId', '==', collegeId)));
   return snapshot.docs
     .filter((item) => item.id !== currentUid)
     .map((item) => normalizeUser(item.id, item.data()));
