@@ -21,7 +21,7 @@ const dateLabel = (date) => {
 
 const initials = (name = 'Student') => name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
 
-const Avatar = ({ uri, name, size = 56, onPress }) => {
+const Avatar = ({ uri, name, size = 56, onPress }) => {\n  const [imageError, setImageError] = useState(false);
   const body = (
     <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
       <Image source={{ uri: uri || FALLBACK_AVATAR }} style={{ width: size, height: size, borderRadius: size / 2 }} />
