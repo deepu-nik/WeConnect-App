@@ -19,8 +19,7 @@ export const subscribeToStories = (onStories, onError) => {
 
       const q = query(
         collection(db, 'stories'),
-        where('collegeId', '==', profile.collegeId),
-        orderBy('createdAt', 'desc')
+        where('collegeId', '==', profile.collegeId)
       );
 
       unsubscribe = onSnapshot(q, (snapshot) => {
@@ -29,6 +28,7 @@ export const subscribeToStories = (onStories, onError) => {
           const created = story.createdAt?.toDate ? story.createdAt.toDate().getTime() : new Date(story.createdAt || 0).getTime();
           return created >= cutoff;
         });
+        stories.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
         onStories(stories);
       }, onError);
     } catch (error) {
