@@ -45,7 +45,6 @@ const ConnectScreen = ({ navigation }) => {
   const [scanned, setScanned] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
   const [locationPreview, setLocationPreview] = useState(null);
-  const scanLineY = useMemo(() => new Animated.Value(0), []);
   const [permission, requestPermission] = useCameraPermissions();
 
   useFocusEffect(
@@ -194,22 +193,13 @@ const ConnectScreen = ({ navigation }) => {
     }
   };
 
-  const openQr = (mode = 'my_code') => {
-    setQrMode(mode);
+  const openQr = () => {
+    setQrMode('my_code');
     setScanned(false);
     setScanSuccess(false);
     setQrVisible(true);
   };
 
-  useEffect(() => {
-    if (!qrVisible || qrMode !== 'scan' || scanSuccess) return undefined;
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(scanLineY, { toValue: 1, duration: 1500, useNativeDriver: true }),
-      Animated.timing(scanLineY, { toValue: 0, duration: 1500, useNativeDriver: true }),
-    ]));
-    loop.start();
-    return () => { loop.stop(); scanLineY.stopAnimation(); };
-  }, [qrVisible, qrMode, scanSuccess, scanLineY]);
 
   const openScanner = async () => {
     if (!permission?.granted) {
@@ -220,8 +210,6 @@ const ConnectScreen = ({ navigation }) => {
       }
     }
 
-    setQrVisible(false);
-    setQrMode('scan');
     setScanned(false);
     setScanSuccess(false);
 
@@ -345,7 +333,7 @@ const ConnectScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Text style={styles.title}>Connect</Text>
-        <TouchableOpacity style={styles.qrButton} onPress={() => openQr()}>
+        <TouchableOpacity style={styles.qrButton} onPress={openScanner}>
           <ScanLine size={22} color="#111111" />
         </TouchableOpacity>
       </View>
@@ -470,37 +458,16 @@ const ConnectScreen = ({ navigation }) => {
             <TouchableOpacity onPress={shareQr}><Share2 size={22} color="#111111" /></TouchableOpacity>
           </View>
 
-          <View style={styles.qrTabs}>
-            <TouchableOpacity style={[styles.qrTab, qrMode === 'my_code' && styles.qrTabActive]} onPress={() => setQrMode('my_code')}>
-              <QrIcon size={18} color={qrMode === 'my_code' ? '#fff' : '#707070'} />
-              <Text style={[styles.qrTabText, qrMode === 'my_code' && styles.qrTabTextActive]}>My Code</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.qrTab, qrMode === 'scan' && styles.qrTabActive]} onPress={openScanner}>
-              <ScanLine size={18} color={qrMode === 'scan' ? '#fff' : '#707070'} />
-              <Text style={[styles.qrTabText, qrMode === 'scan' && styles.qrTabTextActive]}>Scan</Text>
+          <View style={styles.qrCard}>
+            <Image source={{ uri: currentUser?.photoURL || 'https://via.placeholder.com/150' }} style={styles.qrAvatar} />
+            <Text style={styles.qrName}>{currentUser?.displayName || 'Student'}</Text>
+            <QRCode value={currentUser?.uid || 'weconnect'} size={190} />
+            <Text style={styles.qrHint}>Let a classmate scan this code to open your profile.</Text>
+            <TouchableOpacity style={styles.nativeScannerButton} onPress={openScanner} activeOpacity={0.85}>
+              <ScanLine size={19} color="#111111" />
+              <Text style={styles.nativeScannerButtonText}>Scan a QR Code</Text>
             </TouchableOpacity>
           </View>
-
-          {qrMode === 'my_code' ? (
-            <View style={styles.qrCard}>
-              <Image source={{ uri: currentUser?.photoURL || 'https://via.placeholder.com/150' }} style={styles.qrAvatar} />
-              <Text style={styles.qrName}>{currentUser?.displayName || 'Student'}</Text>
-              <QRCode value={currentUser?.uid || 'weconnect'} size={190} />
-              <Text style={styles.qrHint}>Let a classmate scan this code to open your profile.</Text>
-            </View>
-          ) : (
-            <View style={styles.nativeScannerInfo}>
-              <ScanLine size={42} color="#111111" />
-              <Text style={styles.nativeScannerTitle}>QR Scanner</Text>
-              <Text style={styles.nativeScannerText}>
-                Tap below to open the device’s native QR scanner.
-              </Text>
-              <TouchableOpacity style={styles.nativeScannerButton} onPress={openScanner} activeOpacity={0.85}>
-                <ScanLine size={19} color="#111111" />
-                <Text style={styles.nativeScannerButtonText}>Open Scanner</Text>
-              </TouchableOpacity>
-            </View>
-          )}
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -573,18 +540,10 @@ const styles = StyleSheet.create({
   qrModal: { flex: 1, backgroundColor: '#F7F7F5' },
   qrHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18, backgroundColor: '#fff' },
   qrTitle: { fontSize: 18, fontWeight: '800', color: '#111111' },
-  qrTabs: { flexDirection: 'row', margin: 20, backgroundColor: '#E8E8E3', padding: 4, borderRadius: 12 },
-  qrTab: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7, paddingVertical: 10, borderRadius: 9 },
-  qrTabActive: { backgroundColor: '#FFFC00' },
-  qrTabText: { color: '#707070', fontWeight: '700' },
-  qrTabTextActive: { color: '#111111' },
   qrCard: { margin: 20, padding: 30, borderRadius: 24, backgroundColor: '#fff', alignItems: 'center', gap: 14 },
   qrAvatar: { width: 76, height: 76, borderRadius: 38 },
   qrName: { fontSize: 22, fontWeight: '800', color: '#111111' },
   qrHint: { textAlign: 'center', color: '#707070', lineHeight: 20 },
-  nativeScannerInfo: { flex: 1, margin: 20, borderRadius: 24, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 },
-  nativeScannerTitle: { marginTop: 14, fontSize: 22, fontWeight: '900', color: '#111111' },
-  nativeScannerText: { marginTop: 8, textAlign: 'center', color: '#707070', lineHeight: 20 },
   nativeScannerButton: { marginTop: 22, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFFC00', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 22 },
   nativeScannerButtonText: { color: '#111111', fontWeight: '900' },
 });
