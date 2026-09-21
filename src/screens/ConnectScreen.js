@@ -29,6 +29,41 @@ const LOCATIONS = [
   ['Outside', '🚶', '#FF3B30'],
 ];
 
+const initials = (name = 'Student') => name
+  .split(' ')
+  .filter(Boolean)
+  .slice(0, 2)
+  .map((part) => part[0])
+  .join('')
+  .toUpperCase();
+
+const Avatar = ({ uri, name, size = 52 }) => {
+  const [imageError, setImageError] = useState(false);
+  const imageUri = typeof uri === 'string' && uri.trim() ? uri.trim() : null;
+
+  useEffect(() => {
+    setImageError(false);
+  }, [imageUri]);
+
+  return (
+    <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
+      {imageUri && !imageError ? (
+        <Image
+          key={imageUri}
+          source={{ uri: imageUri }}
+          style={{ width: size, height: size, borderRadius: size / 2 }}
+          resizeMode="cover"
+          onError={() => setImageError(true)}
+        />
+      ) : (
+        <View style={styles.avatarFallback}>
+          <Text style={[styles.avatarInitials, { fontSize: Math.max(12, size * 0.27) }]}>{initials(name)}</Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
 const ConnectScreen = ({ navigation }) => {
   const currentUser = auth.currentUser;
   const [activeTab, setActiveTab] = useState('discover');
@@ -46,6 +81,7 @@ const ConnectScreen = ({ navigation }) => {
   const [scanSuccess, setScanSuccess] = useState(false);
   const [locationPreview, setLocationPreview] = useState(null);
   const [permission, requestPermission] = useCameraPermissions();
+  const [scannerLaunching, setScannerLaunching] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -202,6 +238,8 @@ const ConnectScreen = ({ navigation }) => {
 
 
   const openScanner = async () => {
+    if (scannerLaunching) return;
+
     if (!permission?.granted) {
       const result = await requestPermission();
       if (!result.granted) {
@@ -210,8 +248,18 @@ const ConnectScreen = ({ navigation }) => {
       }
     }
 
+    if (!CameraView.isModernBarcodeScannerAvailable) {
+      Alert.alert(
+        'Scanner unavailable',
+        'This device does not support the modern QR scanner used by WeConnect.'
+      );
+      return;
+    }
+
+    setQrVisible(false);
     setScanned(false);
     setScanSuccess(false);
+    setScannerLaunching(true);
 
     try {
       await CameraView.launchScanner({
@@ -224,8 +272,10 @@ const ConnectScreen = ({ navigation }) => {
       console.error('Native QR scanner failed:', error);
       Alert.alert(
         'Scanner unavailable',
-        error?.message || 'The device QR scanner could not be opened. Please make sure Camera access is enabled for WeConnect.'
+        error?.message || 'The QR scanner could not be opened. Please make sure Camera access is enabled for WeConnect.'
       );
+    } finally {
+      setScannerLaunching(false);
     }
   };
 
@@ -280,7 +330,7 @@ const ConnectScreen = ({ navigation }) => {
       const request = requests.find((entry) => entry.senderId === item.uid);
       return (
         <View style={styles.card}>
-          <Image source={{ uri: item.avatar }} style={styles.avatar} />
+          <Avatar uri={item.avatar} name={item.name} />
           <View style={styles.cardInfo}>
             <Text style={styles.name}>{item.name}</Text>
             <Text style={styles.meta}>{item.handle || 'Pending request'}</Text>
@@ -298,7 +348,7 @@ const ConnectScreen = ({ navigation }) => {
     return (
       <View style={styles.card}>
         <TouchableOpacity onPress={() => item.uid && openProfile(navigation, { uid: item.uid })}>
-          <Image source={{ uri: item.avatar }} style={styles.avatar} />
+          <Avatar uri={item.avatar} name={item.name} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.cardInfo} onPress={() => item.uid && openProfile(navigation, { uid: item.uid })}>
           <Text style={styles.name}>{item.name}</Text>
@@ -459,7 +509,7 @@ const ConnectScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.qrCard}>
-            <Image source={{ uri: currentUser?.photoURL || 'https://via.placeholder.com/150' }} style={styles.qrAvatar} />
+            <Avatar uri={currentUser?.photoURL} name={currentUser?.displayName || 'Student'} size={76} />
             <Text style={styles.qrName}>{currentUser?.displayName || 'Student'}</Text>
             <QRCode value={currentUser?.uid || 'weconnect'} size={190} />
             <Text style={styles.qrHint}>Let a classmate scan this code to open your profile.</Text>
@@ -510,7 +560,9 @@ const styles = StyleSheet.create({
   content: { flex: 1, backgroundColor: '#F7F7F5' },
   list: { padding: 15, paddingBottom: 100 },
   card: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 16, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: '#E8E8E3' },
-  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#E8E8E3', marginRight: 13 },
+  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#E8E8E3', marginRight: 13, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  avatarFallback: { flex: 1, width: '100%', height: '100%', borderRadius: 999, backgroundColor: '#E8E8E3', alignItems: 'center', justifyContent: 'center' },
+  avatarInitials: { color: '#55554F', fontWeight: '900' },
   cardInfo: { flex: 1 },
   name: { fontSize: 16, fontWeight: '700', color: '#111111' },
   meta: { color: '#707070', fontSize: 13, marginTop: 3 },
@@ -544,7 +596,8 @@ const styles = StyleSheet.create({
   qrAvatar: { width: 76, height: 76, borderRadius: 38 },
   qrName: { fontSize: 22, fontWeight: '800', color: '#111111' },
   qrHint: { textAlign: 'center', color: '#707070', lineHeight: 20 },
-  nativeScannerButton: { marginTop: 22, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFFC00', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 22 },
+  nativeScannerButton: { marginTop: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#FFFC00', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 22, minWidth: 170 },
+  nativeScannerButtonDisabled: { opacity: 0.65 },
   nativeScannerButtonText: { color: '#111111', fontWeight: '900' },
 });
 
