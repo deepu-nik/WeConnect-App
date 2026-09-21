@@ -14,7 +14,6 @@ import ProfileScreen from '../screens/ProfileScreen';
 
 // EXISTING NAVIGATOR (Your Main Tabs)
 import MainTabNavigator from './MainTabNavigator';
-import { navigationRef } from './navigationHelpers';
 
 const Stack = createStackNavigator();
 
@@ -50,17 +49,6 @@ const AuthenticatedStack = () => {
       }}
     />
 
-    {/* The Profile details screen is always rooted above Chats so system back returns to Chats */}
-     <Stack.Screen
-      name="ProfileDetails"
-      component={ProfileScreen}
-      options={{
-        headerShown: false,
-        presentation: "card",
-        animation: "slide_from_right",
-        gestureEnabled: true,
-      }}
-    />
     </Stack.Navigator>
   );
 };
@@ -78,7 +66,7 @@ const AppNavigator = () => {
   }
 
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer>
       {user ? (
         // IF LOGGED IN: Show the Authenticated Stack (Tabs + Chats + Profile)
         <AuthenticatedStack /> 
