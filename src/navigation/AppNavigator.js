@@ -10,6 +10,7 @@ import { AuthContext } from '../context/AuthContext';
 import LoginScreen from '../screens/LoginScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import RegisterScreen from '../screens/RegisterScreen';
+import VerifyEmailScreen from '../screens/VerifyEmailScreen';
 import ChatRoomScreen from '../screens/ChatRoomScreen';
 import NewStoryScreen from '../screens/NewStoryScreen';
 import StoryViewerScreen from '../screens/StoryViewerScreen';
@@ -66,7 +67,7 @@ const AuthenticatedStack = () => {
 
 // 3. THE MAIN NAVIGATOR (Decider)
 const AppNavigator = () => {
-  const { user, loading } = useContext(AuthContext);
+  const { user, loading, refreshEmailVerification, resendVerificationEmail, logout } = useContext(AuthContext);
   const navigationRef = useRef(null);
 
   useEffect(() => {
