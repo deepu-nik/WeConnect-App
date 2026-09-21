@@ -397,8 +397,9 @@ const ProfileScreenNew = ({ route, navigation }) => {
           {isSelf && (
             <View style={styles.completionCard}>
               <View style={styles.completionTop}>
-                <View>                  <Text style={styles.completionTitle}>Profile strength</Text>
-                  <Text style={styles.completionSubtitle}>{completion}% complete</Text>                </View>
+                <View><Text style={styles.completionTitle}>Profile strength</Text>
+                  <Text style={styles.completionSubtitle}>{completion}% complete</Text>
+                </View>
                 <Text style={styles.completionPercent}>{completion}%</Text>
               </View>
               <View style={styles.progressTrack}><View style={[styles.progressFill, { width: completion + '%' }]} /></View>
@@ -564,8 +565,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
         <SafeAreaView style={styles.editorRoot}>
           <KeyboardAvoidingView style={styles.editorKeyboard} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
             <View style={styles.editorHeader}>
-              <View>
-                <Text style={styles.editorEyebrow}>EDIT PROFILE</Text>
+              <View><Text style={styles.editorEyebrow}>EDIT PROFILE</Text>
                 <Text style={styles.editorTitle}>{editorTitle}</Text>
                 <Text style={styles.editorSubtitle}>Update only this part of your profile.</Text>
               </View>
