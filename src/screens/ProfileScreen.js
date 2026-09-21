@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
 import {
   ActivityIndicator, Alert, BackHandler, Image, KeyboardAvoidingView, Linking, Modal,
   Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -31,40 +30,37 @@ const ProfileScreen = ({ route, navigation }) => {
   const [editVisible, setEditVisible] = useState(false);
   const [form, setForm] = useState(null);
   const [newSkill, setNewSkill] = useState('');
-  const leavingToChats = useRef(false);
+  // Profile is a detail screen: every system back action should return to
+  // the Chats tab, not to whichever screen happened to open the profile.
+  // React Navigation 7's popTo removes the Profile route from the stack,
+  // avoiding the duplicate MainTabs/history problem caused by navigate().
+  const backToChats = useRef(false);
 
   const goToChats = () => {
-    if (leavingToChats.current) return;
-    leavingToChats.current = true;
-    const state = navigation.getState();
-    const hasMainTabs = state?.routes?.some((item) => item.name === 'MainTabs');
-    if (hasMainTabs) {
+    if (backToChats.current) return;
+    backToChats.current = true;
+
+    try {
+      navigation.popTo('MainTabs', { screen: 'Chats' });
+    } catch (error) {
+      backToChats.current = false;
+      console.error('Profile back navigation failed:', error);
       navigation.navigate('MainTabs', { screen: 'Chats' });
-    } else {
-      navigation.navigate('Chats');
     }
   };
 
-  useFocusEffect(
-    React.useCallback(() => {
-      leavingToChats.current = false;
-
-      return () => {
-        leavingToChats.current = false;
-      };
-    }, [])
-  );
-
   useEffect(() => {
-    const unsubscribe = navigation.addListener('beforeRemove', (event) => {
-      if (leavingToChats.current) return;
-      event.preventDefault();
-      goToChats();
-    });
-
+    // Android system back button.
     const backSubscription = BackHandler.addEventListener('hardwareBackPress', () => {
       goToChats();
       return true;
+    });
+
+    // iOS swipe-back and any other stack action that tries to remove Profile.
+    const unsubscribe = navigation.addListener('beforeRemove', (event) => {
+      if (backToChats.current) return;
+      event.preventDefault();
+      goToChats();
     });
 
     return () => {
