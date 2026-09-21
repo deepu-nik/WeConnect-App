@@ -253,8 +253,12 @@ const ConnectScreen = ({ navigation }) => {
       <Text style={styles.sectionLabel}>WHERE ARE YOU?</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.locationRow}>
         {LOCATIONS.map(([name, icon, color]) => (
-          <TouchableOpacity key={name} style={[styles.locationChip, myLocation === name && { backgroundColor: color, borderColor: color }]} onPress={() => updateLocation(name, icon)}>
-            <Text style={[styles.locationText, myLocation === name && { color: '#fff' }]}>{icon} {name}</Text>
+          <TouchableOpacity
+            key={name}
+            style={[styles.locationChip, myLocation === name && styles.locationChipActive]}
+            onPress={() => updateLocation(name, icon)}
+          >
+            <Text style={[styles.locationText, myLocation === name && styles.locationTextActive]}>{icon} {name}</Text>
           </TouchableOpacity>
         ))}
         <TouchableOpacity style={styles.locationChip} onPress={customLocation}><Text style={styles.locationText}>✏️ Custom</Text></TouchableOpacity>
@@ -347,6 +351,8 @@ const styles = StyleSheet.create({
   locationRow: { paddingHorizontal: 15, gap: 8, paddingBottom: 12 },
   locationChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f8fafc' },
   locationText: { color: '#475569', fontWeight: '600', fontSize: 13 },
+  locationChipActive: { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' },
+  locationTextActive: { color: '#007AFF' },
   search: { margin: 15, marginTop: 5, height: 46, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, backgroundColor: '#f8fafc', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, color: '#0f172a', fontSize: 15 },
   tabs: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4, marginBottom: 10 },
