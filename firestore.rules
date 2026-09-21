@@ -10,6 +10,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function verified() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
     function myUser() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid));
     }
@@ -19,13 +23,13 @@ service cloud.firestore {
     }
 
     function isCampusStudent(collegeId) {
-      return signedIn() &&
+      return verified() &&
         collegeId == 'dypiu' &&
         myCollegeId() == 'dypiu';
     }
 
     function isSameCampusUser(uid) {
-      return signedIn() &&
+      return verified() &&
         get(/databases/$(database)/documents/users/$(uid)).data.get('collegeId', '') == myCollegeId() &&
         myCollegeId() == 'dypiu';
     }
@@ -39,14 +43,14 @@ service cloud.firestore {
     }
 
     function canEditOwnProfile() {
-      return signedIn() &&
+      return verified() &&
         request.auth.uid == resource.data.uid &&
         immutableUserFieldsUnchanged() &&
         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['connections']);
     }
 
     function canAddSelfToConnections() {
-      return signedIn() &&
+      return verified() &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['connections']) &&
         request.resource.data.get('collegeId', '') == 'dypiu' &&
         resource.data.get('collegeId', '') == 'dypiu' &&
@@ -55,7 +59,7 @@ service cloud.firestore {
     }
 
     function connectionRequestParticipant() {
-      return signedIn() &&
+      return verified() &&
         (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
     }
 
@@ -64,7 +68,7 @@ service cloud.firestore {
     }
 
     function isVaultMember(vaultId) {
-      return signedIn() &&
+      return verified() &&
         vaultRef(vaultId).data.get('collegeId', '') == myCollegeId() &&
         myCollegeId() == 'dypiu' &&
         vaultRef(vaultId).data.get('members', []).hasAny([request.auth.uid]);
@@ -76,13 +80,13 @@ service cloud.firestore {
     }
 
     function isPostCampus(postId) {
-      return signedIn() &&
+      return verified() &&
         get(/databases/$(database)/documents/buzz_posts/$(postId)).data.get('collegeId', '') == myCollegeId() &&
         myCollegeId() == 'dypiu';
     }
 
     function isStoryCampus(storyId) {
-      return signedIn() &&
+      return verified() &&
         get(/databases/$(database)/documents/stories/$(storyId)).data.get('collegeId', '') == myCollegeId() &&
         myCollegeId() == 'dypiu';
     }
@@ -165,20 +169,20 @@ service cloud.firestore {
     // CHATS
     // -----------------------------------------------------------------------
     match /chats/{chatId} {
-      allow get, list: if signedIn() &&
+      allow get, list: if verified() &&
         resource.data.get('participants', []).hasAny([request.auth.uid]) &&
         resource.data.get('participants', []).size() == 2 &&
         resource.data.get('collegeId', '') == myCollegeId() &&
         myCollegeId() == 'dypiu';
 
-      allow create: if signedIn() &&
+      allow create: if verified() &&
         request.resource.data.get('participants', []).size() == 2 &&
         request.resource.data.get('participants', []).hasAny([request.auth.uid]) &&
         request.resource.data.get('collegeId', '') == myCollegeId() &&
         myCollegeId() == 'dypiu';
 
       // Participants may update chat state, but never participants/usersInfo.
-      allow update: if signedIn() &&
+      allow update: if verified() &&
         resource.data.get('participants', []).hasAny([request.auth.uid]) &&
         request.resource.data.get('participants', []) == resource.data.get('participants', []) &&
         request.resource.data.get('collegeId', '') == resource.data.get('collegeId', '') &&
@@ -190,14 +194,14 @@ service cloud.firestore {
       allow delete: if false;
 
       match /messages/{messageId} {
-        allow get, list: if signedIn() &&
+        allow get, list: if verified() &&
           get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []).hasAny([request.auth.uid]);
 
-        allow create: if signedIn() &&
+        allow create: if verified() &&
           get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []).hasAny([request.auth.uid]) &&
           request.resource.data.senderId == request.auth.uid;
 
-        allow update: if signedIn() &&
+        allow update: if verified() &&
           get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []).hasAny([request.auth.uid]) &&
           (
             (
@@ -220,12 +224,12 @@ service cloud.firestore {
     match /stories/{storyId} {
       allow get, list: if isCampusStudent(resource.data.get('collegeId', ''));
 
-      allow create: if signedIn() &&
+      allow create: if verified() &&
         request.resource.data.userId == request.auth.uid &&
         request.resource.data.get('collegeId', '') == myCollegeId() &&
         myCollegeId() == 'dypiu';
 
-      allow update: if signedIn() &&
+      allow update: if verified() &&
         resource.data.get('collegeId', '') == myCollegeId() &&
         myCollegeId() == 'dypiu' &&
         (
@@ -233,7 +237,7 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewers', 'reactions'])
         );
 
-      allow delete: if signedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if verified() && resource.data.userId == request.auth.uid;
 
       match /replies/{replyId} {
         allow get, list: if isStoryCampus(storyId);
@@ -251,12 +255,12 @@ service cloud.firestore {
     match /buzz_posts/{postId} {
       allow get, list: if isCampusStudent(resource.data.get('collegeId', ''));
 
-      allow create: if signedIn() &&
+      allow create: if verified() &&
         request.resource.data.get('collegeId', '') == myCollegeId() &&
         myCollegeId() == 'dypiu' &&
         request.resource.data.get('authorId', '') == request.auth.uid;
 
-      allow update: if signedIn() &&
+      allow update: if verified() &&
         resource.data.get('collegeId', '') == myCollegeId() &&
         myCollegeId() == 'dypiu' &&
         (
@@ -268,7 +272,7 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'commentCount', 'votes'])
         );
 
-      allow delete: if signedIn() && resource.data.get('authorId', '') == request.auth.uid;
+      allow delete: if verified() && resource.data.get('authorId', '') == request.auth.uid;
 
       match /comments/{commentId} {
         allow get, list: if isPostCampus(postId);
@@ -284,12 +288,12 @@ service cloud.firestore {
     // VAULTS
     // -----------------------------------------------------------------------
     match /vaults/{vaultId} {
-      allow get, list: if signedIn() &&
+      allow get, list: if verified() &&
         resource.data.get('collegeId', '') == myCollegeId() &&
         myCollegeId() == 'dypiu' &&
         resource.data.get('members', []).hasAny([request.auth.uid]);
 
-      allow create: if signedIn() &&
+      allow create: if verified() &&
         request.resource.data.get('collegeId', '') == myCollegeId() &&
         myCollegeId() == 'dypiu' &&
         request.resource.data.get('createdBy', '') == request.auth.uid &&
@@ -349,7 +353,7 @@ service cloud.firestore {
         )
         ||
         (
-          signedIn() &&
+          verified() &&
           resource.data.get('uploader', {}).get('uid', '') == request.auth.uid &&
           request.resource.data.get('vaultId', '') == resource.data.get('vaultId', '') &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
@@ -358,7 +362,7 @@ service cloud.firestore {
       allow delete: if
         isVaultAdmin(resource.data.get('vaultId', '')) ||
         (
-          signedIn() &&
+          verified() &&
           resource.data.get('uploader', {}).get('uid', '') == request.auth.uid
         );
     }
