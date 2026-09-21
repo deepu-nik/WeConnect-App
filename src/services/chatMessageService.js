@@ -26,9 +26,36 @@ export const sendChatMessage = async ({ chatId, message }) => {
     const chatSnapshot = await transaction.get(chatRef); if (!chatSnapshot.exists()) throw new Error('Chat does not exist');
     const chat = chatSnapshot.data(); const participants = Array.isArray(chat.participants) ? chat.participants : []; const unreadCount = { ...(chat.unreadCount || {}) };
     participants.forEach((uid) => { unreadCount[uid] = uid === senderId ? 0 : Number(unreadCount[uid] || 0) + 1; });
-    transaction.set(messageRef, { text: message.text || '', senderId, mediaUrl: message.mediaUrl || null, mediaType: message.mediaType || null, createdAt: serverTimestamp(), status: MESSAGE_STATUS.SENT });
+    transaction.set(messageRef, { text: message.text || '', senderId, mediaUrl: message.mediaUrl || null, mediaType: message.mediaType || null, replyTo: message.replyTo || null, createdAt: serverTimestamp(), status: MESSAGE_STATUS.SENT });
     transaction.update(chatRef, { lastMessage: message.mediaUrl ? (message.mediaType === 'video' ? '🎥 Video' : '📷 Photo') : (message.text || ''), updatedAt: serverTimestamp(), unreadCount, ['typing.' + senderId]: false });
   });
 };
 export const markChatRead = async (chatId, uid) => { if (chatId && uid) await updateDoc(doc(db, 'chats', chatId), { ['unreadCount.' + uid]: 0 }); };
 export const mergeMessages = (serverMessages = [], pendingMessages = []) => { const map = new Map(); [...pendingMessages, ...serverMessages].forEach((message) => { if (message?.id) map.set(message.id, normalizeMessage(message)); }); return [...map.values()].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()); };
+
+export const setTyping = async (chatId, uid, value) => {
+  if (!chatId || !uid) return;
+  await updateDoc(doc(db, 'chats', chatId), { ['typing.' + uid]: Boolean(value) });
+};
+
+export const updateMessage = async (chatId, messageId, patch) => {
+  if (!chatId || !messageId) return;
+  await updateDoc(doc(db, 'chats', chatId, 'messages', messageId), patch);
+};
+
+export const deleteMessage = async (chatId, messageId) => {
+  if (!chatId || !messageId) return;
+  await updateDoc(doc(db, 'chats', chatId, 'messages', messageId), { deleted: true, text: '', mediaUrl: null });
+};
+
+export const toggleMessageReaction = async (chatId, messageId, uid, emoji) => {
+  if (!chatId || !messageId || !uid || !emoji) return;
+  const ref = doc(db, 'chats', chatId, 'messages', messageId);
+  const snapshot = await import('firebase/firestore').then(({ getDoc }) => getDoc(ref));
+  if (!snapshot.exists()) return;
+  const reactions = { ...(snapshot.data().reactions || {}) };
+  const users = Array.isArray(reactions[emoji]) ? reactions[emoji] : [];
+  reactions[emoji] = users.includes(uid) ? users.filter((id) => id !== uid) : [...users, uid];
+  if (!reactions[emoji].length) delete reactions[emoji];
+  await updateDoc(ref, { reactions });
+};
