@@ -15,9 +15,10 @@ import * as ImagePicker from 'expo-image-picker';
 
 // Firebase & Utils
 import { auth, db } from '../config/firebase';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, arrayRemove, orderBy, increment } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, arrayRemove, orderBy, increment, where } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import MediaShareSheet from '../components/MediaShareSheet';
+import { getUserProfile } from '../services/userService';
 import StoriesStrip from '../components/StoriesStrip';
 
 const { width } = Dimensions.get('window');
@@ -52,27 +53,55 @@ const UpdatesScreen = ({ navigation }) => {
 
   // --- ⏳ FETCH POSTS (WITH 48-HOUR AUTO-HIDE LOGIC) ---
   useEffect(() => {
-    const q = query(collection(db, 'buzz_posts'), orderBy('createdAt', 'desc'));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const now = Date.now();
-      const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000;
-      const cutoffTime = now - FORTY_EIGHT_HOURS_MS;
+    let unsubscribe = null;
+    let active = true;
 
-      const fetchedPosts = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter(post => {
-          if (!post.createdAt) return true;
-          const postTime = post.createdAt.toMillis ? post.createdAt.toMillis() : post.createdAt.toDate().getTime();
-          return postTime > cutoffTime;
+    const subscribeToCampusPosts = async () => {
+      if (!currentUser?.uid) return;
+      try {
+        const profile = await getUserProfile(currentUser.uid);
+        if (!active || !profile?.collegeId) {
+          if (active) setLoading(false);
+          return;
+        }
+
+        const q = query(
+          collection(db, 'buzz_posts'),
+          where('collegeId', '==', profile.collegeId),
+          orderBy('createdAt', 'desc')
+        );
+
+        unsubscribe = onSnapshot(q, (snapshot) => {
+          const now = Date.now();
+          const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000;
+          const cutoffTime = now - FORTY_EIGHT_HOURS_MS;
+
+          const fetchedPosts = snapshot.docs
+            .map(postDoc => ({ id: postDoc.id, ...postDoc.data() }))
+            .filter(post => {
+              if (!post.createdAt) return true;
+              const postTime = post.createdAt.toMillis ? post.createdAt.toMillis() : post.createdAt.toDate().getTime();
+              return postTime > cutoffTime;
+            });
+
+          setPosts(fetchedPosts);
+          setLoading(false);
+        }, (error) => {
+          console.error('Campus posts subscription failed:', error);
+          setLoading(false);
         });
-      
-      setPosts(fetchedPosts);
-      setLoading(false);
-    });
+      } catch (error) {
+        console.error('Could not load campus profile:', error);
+        if (active) setLoading(false);
+      }
+    };
 
-    return () => unsubscribe();
-  }, []);
+    subscribeToCampusPosts();
+    return () => {
+      active = false;
+      if (unsubscribe) unsubscribe();
+    };
+  }, [currentUser?.uid]);
 
   // --- FETCH COMMENTS REAL-TIME ---
   useEffect(() => {
@@ -122,6 +151,8 @@ const UpdatesScreen = ({ navigation }) => {
       }
 
       const newPost = {
+        collegeId: (await getUserProfile(currentUser.uid))?.collegeId || 'dypiu',
+        authorId: currentUser.uid,
         type: postType,
         createdAt: serverTimestamp(),
         likes: [],
