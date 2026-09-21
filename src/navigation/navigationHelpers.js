@@ -1,23 +1,11 @@
-import { StackActions } from '@react-navigation/native';
+import { createNavigationContainerRef, StackActions } from '@react-navigation/native';
 
-const getRootNavigation = (navigation) => {
-  let root = navigation;
-  let parent = root.getParent?.();
+export const navigationRef = createNavigationContainerRef();
 
-  while (parent) {
-    root = parent;
-    parent = root.getParent?.();
-  }
+export const openProfile = (_navigation, params = {}) => {
+  if (!navigationRef.isReady()) return;
 
-  return root;
-};
-
-export const openProfile = (navigation, params = {}) => {
-  const rootNavigation = getRootNavigation(navigation);
-
-  // ProfileDetails is a root-stack screen. Push it onto the actual root
-  // stack instead of resetting the entire navigation state.
-  rootNavigation.dispatch(
+  navigationRef.dispatch(
     StackActions.push('ProfileDetails', params)
   );
 };
