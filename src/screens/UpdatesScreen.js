@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { openProfile } from '../navigation/navigationHelpers';
+import { openProfile as navigateToProfile } from '../navigation/navigationHelpers';
 import { 
   View, Text, StyleSheet, FlatList, TouchableOpacity, 
   Image, TextInput, StatusBar, Modal, ActivityIndicator, Alert,
@@ -517,7 +517,7 @@ const UpdatesScreen = ({ navigation }) => {
     return null;
   };
 
-  const openProfile = (author) => { if (!author?.uid || author.uid === currentUser?.uid) return; openProfile(navigation, { uid: author.uid, name: author.name, avatar: author.avatar }); };
+  const openProfile = (author) => { if (!author?.uid || author.uid === currentUser?.uid) return; navigateToProfile(navigation, { uid: author.uid, name: author.name, avatar: author.avatar }); };
 
   const renderComment = ({ item }) => (
     <View style={styles.commentRow}>
