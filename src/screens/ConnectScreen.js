@@ -16,6 +16,7 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { acceptConnectionRequest, declineConnectionRequest, sendConnectionRequest, subscribeToConnectionRequests } from '../services/connectionService';
 import { getAllUsers, getUserProfile, normalizeUser } from '../services/userService';
+import { openProfile } from '../navigation/navigationHelpers';
 
 const LOCATIONS = [
   ['Library', '📚', '#007AFF'],
@@ -164,7 +165,7 @@ const ConnectScreen = ({ navigation }) => {
         Alert.alert('User not found', 'That QR code does not belong to a WeConnect profile.');
         return;
       }
-      navigation.navigate('Profile', { uid: profile.uid, name: profile.name, avatar: profile.avatar });
+      openProfile(navigation, { uid: profile.uid, name: profile.name, avatar: profile.avatar });
     } catch (error) {
       console.error('QR scan failed:', error);
       setQrVisible(false);
@@ -204,10 +205,10 @@ const ConnectScreen = ({ navigation }) => {
 
     return (
       <View style={styles.card}>
-        <TouchableOpacity onPress={() => navigation.navigate('Profile', { uid: item.uid })}>
+        <TouchableOpacity onPress={() => openProfile(navigation, { uid: item.uid })}>
           <Image source={{ uri: item.avatar }} style={styles.avatar} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.cardInfo} onPress={() => navigation.navigate('Profile', { uid: item.uid })}>
+        <TouchableOpacity style={styles.cardInfo} onPress={() => openProfile(navigation, { uid: item.uid })}>
           <Text style={styles.name}>{item.name}</Text>
           <Text style={styles.meta}>{activeTab === 'network' ? item.location : (item.bio || item.handle || 'Student')}</Text>
           {activeTab === 'network' && <Text style={styles.location}>{item.locationIcon} {item.location}</Text>}
