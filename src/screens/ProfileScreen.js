@@ -400,24 +400,46 @@ const ProfileScreen = ({ route, navigation }) => {
           )}
         </ProfileSection>
 
-        <ProfileSection title="Education & Experience" subtitle="Build your professional identity">{canSee('experience') && (
-          <View style={styles.timelineCard}>
-            <TimelineItem icon={GraduationCap} title={user.course || 'Computer Science Engineering'} subtitle={(user.gradYear ? 'Class of ' + user.gradYear : 'Student') + ' • ' + (user.location || 'Campus')} />
-            {(user.experience || []).map((item, index) => <TimelineItem key={'exp-' + index} icon={BriefcaseBusiness} title={item.title || item.role || 'Experience'} subtitle={[item.company, item.period].filter(Boolean).join(' • ') || item.description || 'Professional experience'} last={index === user.experience.length - 1 && !(user.achievements || []).length} />)}
-            {(user.achievements || []).slice(0, 3).map((item, index) => <TimelineItem key={'ach-' + index} icon={Award} title={item.title || 'Achievement'} subtitle={[item.issuer, item.year].filter(Boolean).join(' • ') || item.description || 'Achievement'} last={index === Math.min((user.achievements || []).length, 3) - 1} />)}
-            {!user.experience?.length && !user.achievements?.length && <Text style={styles.emptyTimelineText}>{isSelf ? 'Add experience and achievements to build your professional timeline.' : 'No experience or achievements added yet.'}</Text>}
-          </View>
-        ))}</ProfileSection>
+        <ProfileSection title="Education & Experience" subtitle="Build your professional identity">
+          {canSee('experience') ? (
+            <View style={styles.timelineCard}>
+              <TimelineItem icon={GraduationCap} title={user.course || 'Computer Science Engineering'} subtitle={(user.gradYear ? 'Class of ' + user.gradYear : 'Student') + ' • ' + (user.location || 'Campus')} />
+              {(user.experience || []).map((item, index) => (
+                <TimelineItem key={'exp-' + index} icon={BriefcaseBusiness} title={item.title || item.role || 'Experience'} subtitle={[item.company, item.period].filter(Boolean).join(' • ') || item.description || 'Professional experience'} last={index === user.experience.length - 1 && !(user.achievements || []).length} />
+              ))}
+              {(user.achievements || []).slice(0, 3).map((item, index) => (
+                <TimelineItem key={'ach-' + index} icon={Award} title={item.title || 'Achievement'} subtitle={[item.issuer, item.year].filter(Boolean).join(' • ') || item.description || 'Achievement'} last={index === Math.min((user.achievements || []).length, 3) - 1} />
+              ))}
+              {!user.experience?.length && !user.achievements?.length && <Text style={styles.emptyTimelineText}>{isSelf ? 'Add experience and achievements to build your professional timeline.' : 'No experience or achievements added yet.'}</Text>}
+            </View>
+          ) : (
+            <View style={styles.privateCard}>
+              <LockIcon />
+              <Text style={styles.privateText}>Experience is private.</Text>
+            </View>
+          )}
+        </ProfileSection>
 
-        <ProfileSection title="Portfolio" subtitle="Show what you have built" action={isSelf ? { label: 'Edit', onPress: openEdit } : undefined}>{canSee('projects') && (
-          ((user.projects || []).length ? (user.projects || []).slice(0, 6).map((project, index) => (
-            <TouchableOpacity key={'project-' + index} style={styles.projectCard} onPress={() => project.url && openLink(project.url, 'Project')} activeOpacity={0.85}>
-              <View style={styles.portfolioIcon}><Code2 size={21} color="#111" /></View>
-              <View style={styles.portfolioCopy}><Text style={styles.portfolioTitle}>{project.name || project.title || 'Project'}</Text><Text style={styles.portfolioText} numberOfLines={2}>{project.description || project.tech || 'College project / build'}</Text></View>
-              {project.url ? <ExternalLink size={17} color="#fff" /> : <Text style={styles.arrow}>›</Text>}
-            </TouchableOpacity>
-          )) : <View style={styles.emptyCard}><Code2 size={22} color="#777770" /><Text style={styles.emptyTitle}>No projects added yet</Text><Text style={styles.emptyText}>{isSelf ? 'Add projects to make your portfolio useful for collaborators and recruiters.' : 'This student has not added projects yet.'}</Text>{isSelf && <TouchableOpacity style={styles.smallButton} onPress={openEdit}><Text style={styles.smallButtonText}>Edit profile</Text></TouchableOpacity>}</View>}
-        )}</ProfileSection>
+        <ProfileSection title="Portfolio" subtitle="Show what you have built" action={isSelf ? { label: 'Edit', onPress: openEdit } : undefined}>
+          {canSee('projects') ? (
+            (user.projects || []).length ? (
+              (user.projects || []).slice(0, 6).map((project, index) => (
+                <TouchableOpacity key={'project-' + index} style={styles.projectCard} onPress={() => project.url && openLink(project.url, 'Project')} activeOpacity={0.85}>
+                  <View style={styles.portfolioIcon}><Code2 size={21} color="#111" /></View>
+                  <View style={styles.portfolioCopy}><Text style={styles.portfolioTitle}>{project.name || project.title || 'Project'}</Text><Text style={styles.portfolioText} numberOfLines={2}>{project.description || project.tech || 'College project / build'}</Text></View>
+                  {project.url ? <ExternalLink size={17} color="#fff" /> : <Text style={styles.arrow}>›</Text>}
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View style={styles.emptyCard}><Code2 size={22} color="#777770" /><Text style={styles.emptyTitle}>No projects added yet</Text><Text style={styles.emptyText}>{isSelf ? 'Add projects to make your portfolio useful for collaborators and recruiters.' : 'This student has not added projects yet.'}</Text>{isSelf && <TouchableOpacity style={styles.smallButton} onPress={openEdit}><Text style={styles.smallButtonText}>Edit profile</Text></TouchableOpacity>}</View>
+            )
+          ) : (
+            <View style={styles.privateCard}>
+              <LockIcon />
+              <Text style={styles.privateText}>Projects are private.</Text>
+            </View>
+          )}
+        </ProfileSection>
 
         <ProfileSection title="Links" subtitle="Connect your digital identity">{canSee('socialLinks') ? <ProfileLinks user={user} onOpen={openLink} /> : <View style={styles.privateCard}><LockIcon /><Text style={styles.privateText}>Visible to connections only.</Text></View>}</ProfileSection>
 
