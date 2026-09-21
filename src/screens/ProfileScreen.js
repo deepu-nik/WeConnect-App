@@ -280,16 +280,49 @@ const ProfileScreen = ({ route, navigation }) => {
         </View>
       </Modal>
 
-      <Modal visible={editVisible} animationType="slide" transparent onRequestClose={() => setEditVisible(false)}>
-        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <Modal
+        visible={editVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setEditVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
           <View style={styles.modal}>
-            <View style={styles.modalHeader}><Text style={styles.modalTitle}>Edit Profile</Text><TouchableOpacity onPress={() => setEditVisible(false)}><X size={24} color="#0f172a" /></TouchableOpacity></View>
-            <ScrollView contentContainerStyle={styles.form}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalEyebrow}>EDIT PROFILE</Text>
+                <Text style={styles.modalTitle}>Edit Profile</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalClose}
+                onPress={() => setEditVisible(false)}
+                accessibilityLabel="Close edit profile"
+              >
+                <X size={24} color="#111111" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.formScroll}
+              contentContainerStyle={styles.form}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              automaticallyAdjustKeyboardInsets
+            >
+              <Text style={styles.formSectionTitle}>Identity</Text>
+              <Text style={styles.formSectionHint}>How classmates identify you on WeConnect.</Text>
+
               {[
-                ['name', 'Name'], ['handle', 'Username / Handle'], ['course', 'Course / Major'],
-                ['gradYear', 'Class of'], ['location', 'Campus Location'], ['website', 'Website'], ['instagram', 'Instagram Username / URL'],
-                ['linkedin', 'LinkedIn Username / URL'], ['github', 'GitHub Username / URL'], ['whatsapp', 'WhatsApp Number'],
-                ['resumeLink', 'Resume / Portfolio Link'], ['projectsCount', 'Projects Completed'],
+                ['name', 'Full Name'],
+                ['handle', 'Username / Handle'],
+                ['course', 'Course / Major'],
+                ['gradYear', 'Class of'],
+                ['location', 'Campus Location'],
               ].map(([key, label]) => (
                 <View key={key}>
                   <Text style={styles.label}>{label}</Text>
@@ -297,23 +330,115 @@ const ProfileScreen = ({ route, navigation }) => {
                     style={styles.input}
                     value={String(form?.[key] ?? '')}
                     onChangeText={(value) => setForm({ ...form, [key]: value })}
-                    keyboardType={key === 'projectsCount' || key === 'gradYear' || key === 'whatsapp' ? 'numeric' : key.includes('Link') || ['website','instagram','linkedin','github'].includes(key) ? 'url' : 'default'}
-                    autoCapitalize={['handle','website','instagram','linkedin','github','resumeLink','whatsapp'].includes(key) ? 'none' : 'sentences'}
+                    placeholder={label}
+                    placeholderTextColor="#9A9A93"
+                    keyboardType={key === 'gradYear' ? 'numeric' : 'default'}
+                    autoCapitalize={key === 'handle' ? 'none' : 'sentences'}
+                    autoCorrect={key !== 'handle'}
                   />
                 </View>
               ))}
-              <Text style={styles.label}>Bio</Text>
-              <TextInput style={[styles.input, styles.multiline]} value={form?.bio} onChangeText={(value) => setForm({ ...form, bio: value })} multiline />
 
-              <Text style={styles.label}>Currently Learning</Text>
-              <View style={styles.addSkillRow}><TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} value={newSkill} onChangeText={setNewSkill} placeholder="e.g. Node.js" /><TouchableOpacity style={styles.addSkill} onPress={addSkill}><Plus size={20} color="#fff" /></TouchableOpacity></View>
-              <View style={styles.editSkills}>
-                {form?.skills?.map((skill) => (
-                  <View style={styles.editSkill} key={skill}><Text style={styles.editSkillText}>{skill}</Text><TouchableOpacity onPress={() => setForm({ ...form, skills: form.skills.filter((item) => item !== skill) })}><Trash2 size={14} color="#FF3B30" /></TouchableOpacity></View>
+              <View style={styles.formSection}>
+                <Text style={styles.formSectionTitle}>About</Text>
+                <Text style={styles.formSectionHint}>Tell people a little about yourself.</Text>
+                <Text style={styles.label}>Bio</Text>
+                <TextInput
+                  style={[styles.input, styles.multiline]}
+                  value={form?.bio || ''}
+                  onChangeText={(value) => setForm({ ...form, bio: value })}
+                  placeholder="A short bio..."
+                  placeholderTextColor="#9A9A93"
+                  multiline
+                  textAlignVertical="top"
+                />
+              </View>
+
+              <View style={styles.formSection}>
+                <Text style={styles.formSectionTitle}>Social & Links</Text>
+                <Text style={styles.formSectionHint}>Add links classmates can use to find your work.</Text>
+                {[
+                  ['website', 'Website'],
+                  ['instagram', 'Instagram Username / URL'],
+                  ['linkedin', 'LinkedIn Username / URL'],
+                  ['github', 'GitHub Username / URL'],
+                  ['whatsapp', 'WhatsApp Number'],
+                  ['resumeLink', 'Resume / Portfolio Link'],
+                ].map(([key, label]) => (
+                  <View key={key}>
+                    <Text style={styles.label}>{label}</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={String(form?.[key] ?? '')}
+                      onChangeText={(value) => setForm({ ...form, [key]: value })}
+                      placeholder={label}
+                      placeholderTextColor="#9A9A93"
+                      keyboardType={key === 'whatsapp' ? 'phone-pad' : key === 'website' || key === 'instagram' || key === 'linkedin' || key === 'github' || key === 'resumeLink' ? 'url' : 'default'}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
                 ))}
               </View>
 
-              <TouchableOpacity style={styles.saveButton} onPress={saveProfile} disabled={saving}>{saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveText}>Save Changes</Text>}</TouchableOpacity>
+              <View style={styles.formSection}>
+                <Text style={styles.formSectionTitle}>Projects & Skills</Text>
+                <Text style={styles.formSectionHint}>Show what you're building and learning.</Text>
+
+                <Text style={styles.label}>Projects Completed</Text>
+                <TextInput
+                  style={styles.input}
+                  value={String(form?.projectsCount ?? '')}
+                  onChangeText={(value) => setForm({ ...form, projectsCount: value.replace(/[^0-9]/g, '') })}
+                  placeholder="0"
+                  placeholderTextColor="#9A9A93"
+                  keyboardType="numeric"
+                />
+
+                <Text style={styles.label}>Currently Learning</Text>
+                <View style={styles.addSkillRow}>
+                  <TextInput
+                    style={[styles.input, styles.skillInput]}
+                    value={newSkill}
+                    onChangeText={setNewSkill}
+                    placeholder="e.g. Node.js"
+                    placeholderTextColor="#9A9A93"
+                    autoCapitalize="words"
+                  />
+                  <TouchableOpacity
+                    style={styles.addSkill}
+                    onPress={addSkill}
+                    accessibilityLabel="Add skill"
+                  >
+                    <Plus size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.editSkills}>
+                  {form?.skills?.map((skill) => (
+                    <View style={styles.editSkill} key={skill}>
+                      <Text style={styles.editSkillText}>{skill}</Text>
+                      <TouchableOpacity
+                        onPress={() => setForm({ ...form, skills: form.skills.filter((item) => item !== skill) })}
+                        accessibilityLabel={`Remove ${skill}`}
+                      >
+                        <Trash2 size={14} color="#FF3B30" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={saveProfile}
+                disabled={saving}
+                activeOpacity={0.86}
+              >
+                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveText}>Save Changes</Text>}
+              </TouchableOpacity>
+
+              <View style={styles.formBottomSpace} />
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
@@ -365,21 +490,29 @@ const styles = StyleSheet.create({
   activity: { flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 15, backgroundColor: '#f8fafc' },
   activityTitle: { fontWeight: '800', color: '#0f172a' },
   activitySub: { color: '#64748b', marginTop: 3 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,.5)', justifyContent: 'flex-end' },
-  modal: { height: '88%', backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-  modalTitle: { fontSize: 19, fontWeight: '800' },
-  form: { padding: 20, paddingBottom: 50 },
-  label: { color: '#64748b', fontWeight: '700', marginTop: 14, marginBottom: 7 },
-  input: { minHeight: 48, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f8fafc', borderRadius: 12, paddingHorizontal: 13, color: '#0f172a' },
-  multiline: { height: 85, textAlignVertical: 'top', paddingTop: 12 },
-  addSkillRow: { flexDirection: 'row', gap: 8 },
-  addSkill: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#007AFF', alignItems: 'center', justifyContent: 'center' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,.52)', justifyContent: 'flex-end' },
+  modal: { height: '92%', backgroundColor: '#F7F7F5', borderTopLeftRadius: 26, borderTopRightRadius: 26, overflow: 'hidden' },
+  modalHeader: { minHeight: 82, paddingHorizontal: 20, paddingVertical: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E5E5DF', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  modalEyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.4, color: '#8A8A84', marginBottom: 2 },
+  modalTitle: { fontSize: 22, fontWeight: '900', color: '#111111' },
+  modalClose: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F0F0EB', alignItems: 'center', justifyContent: 'center' },
+  formScroll: { flex: 1 },
+  form: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
+  formSection: { marginTop: 28 },
+  formSectionTitle: { fontSize: 17, fontWeight: '900', color: '#111111', marginBottom: 4 },
+  formSectionHint: { fontSize: 11.5, lineHeight: 17, color: '#85857E', marginBottom: 7 },
+  label: { color: '#62625C', fontSize: 11, fontWeight: '800', marginTop: 14, marginBottom: 7 },
+  input: { minHeight: 49, borderWidth: 1, borderColor: '#E0E0DA', backgroundColor: '#FFFFFF', borderRadius: 13, paddingHorizontal: 14, color: '#111111', fontSize: 14 },
+  multiline: { minHeight: 92, paddingTop: 12 },
+  addSkillRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  skillInput: { flex: 1 },
+  addSkill: { width: 49, height: 49, borderRadius: 13, backgroundColor: '#111111', alignItems: 'center', justifyContent: 'center' },
   editSkills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  editSkill: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff1f2', borderWidth: 1, borderColor: '#fecdd3', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 14 },
-  editSkillText: { color: '#be123c', fontWeight: '700' },
-  saveButton: { height: 52, backgroundColor: '#007AFF', borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginTop: 28 },
-  saveText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  editSkill: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FFF4F5', borderWidth: 1, borderColor: '#FFD5D9', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 14 },
+  editSkillText: { color: '#B4233A', fontWeight: '800', fontSize: 12 },
+  saveButton: { height: 54, backgroundColor: '#111111', borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: 30 },
+  saveText: { color: '#FFFFFF', fontWeight: '900', fontSize: 15 },
+  formBottomSpace: { height: 35 },
 });
 
 export default ProfileScreen;
