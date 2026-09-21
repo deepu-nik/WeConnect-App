@@ -18,8 +18,7 @@ export const findDirectChat = async (currentUid, otherUid) => {
   const snapshot = await getDocs(
     query(
       collection(db, 'chats'),
-      where('collegeId', '==', currentProfile.collegeId),
-      where('participants', 'array-contains', currentUid)
+      where('collegeId', '==', currentProfile.collegeId)
     )
   );
   const existing = snapshot.docs.find((item) =>
