@@ -31,26 +31,6 @@ const ProfileScreen = ({ route, navigation }) => {
   const [form, setForm] = useState(null);
   const [newSkill, setNewSkill] = useState('');
   useEffect(() => {
-    // Android system back button.
-    const backSubscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      goToChats();
-      return true;
-    });
-
-    // iOS swipe-back and any other stack action that tries to remove Profile.
-    const unsubscribe = navigation.addListener('beforeRemove', (event) => {
-      if (backToChats.current) return;
-      event.preventDefault();
-      goToChats();
-    });
-
-    return () => {
-      unsubscribe();
-      backSubscription.remove();
-    };
-  }, [navigation]);
-
-  useEffect(() => {
     let active = true;
     (async () => {
       try {
