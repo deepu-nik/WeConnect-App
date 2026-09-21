@@ -365,13 +365,13 @@ const ProfileScreen = ({ route, navigation }) => {
         </ProfileSection>
 
         <ProfileSection title="Skills" subtitle="What you build and learn" action={isSelf ? { label: 'Manage', onPress: openEdit } : undefined}>{canSee('skills') && (
-          groupedSkills.length ? groupedSkills.map((group) => (
+          (groupedSkills.length ? groupedSkills.map((group) => (
             <View key={group.title} style={styles.skillGroup}>
               <Text style={styles.skillGroupTitle}>{group.title}</Text>
               <View style={styles.skillRow}>{group.values.map((skill) => <View key={skill} style={styles.skillPill}><Code2 size={13} color="#111" /><Text style={styles.skillText}>{skill}</Text></View>)}</View>
             </View>
           )) : <View style={styles.emptyCard}><Code2 size={20} color="#777770" /><Text style={styles.emptyTitle}>No skills added yet</Text><Text style={styles.emptyText}>Add technologies and interests to help people understand what you do.</Text>{isSelf && <TouchableOpacity style={styles.smallButton} onPress={openEdit}><Text style={styles.smallButtonText}>Add skills</Text></TouchableOpacity>}</View>}
-        )}</ProfileSection>
+        ))}</ProfileSection>
 
         <ProfileSection title="Education & Experience" subtitle="Build your professional identity">{canSee('experience') && (
           <View style={styles.timelineCard}>
@@ -380,10 +380,10 @@ const ProfileScreen = ({ route, navigation }) => {
             {(user.achievements || []).slice(0, 3).map((item, index) => <TimelineItem key={'ach-' + index} icon={Award} title={item.title || 'Achievement'} subtitle={[item.issuer, item.year].filter(Boolean).join(' • ') || item.description || 'Achievement'} last={index === Math.min((user.achievements || []).length, 3) - 1} />)}
             {!user.experience?.length && !user.achievements?.length && <Text style={styles.emptyTimelineText}>{isSelf ? 'Add experience and achievements to build your professional timeline.' : 'No experience or achievements added yet.'}</Text>}
           </View>
-        )}</ProfileSection>
+        ))}</ProfileSection>
 
         <ProfileSection title="Portfolio" subtitle="Show what you have built" action={isSelf ? { label: 'Edit', onPress: openEdit } : undefined}>{canSee('projects') && (
-          (user.projects || []).length ? (user.projects || []).slice(0, 6).map((project, index) => (
+          ((user.projects || []).length ? (user.projects || []).slice(0, 6).map((project, index) => (
             <TouchableOpacity key={'project-' + index} style={styles.projectCard} onPress={() => project.url && openLink(project.url, 'Project')} activeOpacity={0.85}>
               <View style={styles.portfolioIcon}><Code2 size={21} color="#111" /></View>
               <View style={styles.portfolioCopy}><Text style={styles.portfolioTitle}>{project.name || project.title || 'Project'}</Text><Text style={styles.portfolioText} numberOfLines={2}>{project.description || project.tech || 'College project / build'}</Text></View>
