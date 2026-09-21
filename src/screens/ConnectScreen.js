@@ -19,7 +19,7 @@ import { getAllUsers, getUserProfile, normalizeUser } from '../services/userServ
 import { openProfile } from '../navigation/navigationHelpers';
 
 const LOCATIONS = [
-  ['Library', '📚', '#007AFF'],
+  ['Library', '📚', '#111111'],
   ['Canteen', '🍔', '#FF9500'],
   ['Hostel', '🛏️', '#AF52DE'],
   ['Ground', '⚽', '#34C759'],
@@ -233,7 +233,7 @@ const ConnectScreen = ({ navigation }) => {
           </>
         ) : (
           <TouchableOpacity style={styles.connect} onPress={() => sendRequest(item)}>
-            <UserPlus size={17} color="#007AFF" />
+            <UserPlus size={17} color="#111111" />
             <Text style={styles.connectText}>Connect</Text>
           </TouchableOpacity>
         )}
@@ -246,7 +246,7 @@ const ConnectScreen = ({ navigation }) => {
       <View style={styles.header}>
         <Text style={styles.title}>Connect</Text>
         <TouchableOpacity style={styles.qrButton} onPress={() => openQr()}>
-          <ScanLine size={22} color="#007AFF" />
+          <ScanLine size={22} color="#111111" />
         </TouchableOpacity>
       </View>
 
@@ -282,7 +282,7 @@ const ConnectScreen = ({ navigation }) => {
       </View>
 
       <View style={styles.content}>
-        {loading ? <ActivityIndicator size="large" color="#007AFF" /> : (
+        {loading ? <ActivityIndicator size="large" color="#111111" /> : (
           <FlatList
             data={filteredData}
             keyExtractor={(item) => item.uid}
@@ -304,16 +304,16 @@ const ConnectScreen = ({ navigation }) => {
           <View style={styles.qrHeader}>
             <TouchableOpacity onPress={() => setQrVisible(false)}><X size={28} color="#000" /></TouchableOpacity>
             <Text style={styles.qrTitle}>Connect via QR</Text>
-            <TouchableOpacity onPress={shareQr}><Share2 size={22} color="#007AFF" /></TouchableOpacity>
+            <TouchableOpacity onPress={shareQr}><Share2 size={22} color="#111111" /></TouchableOpacity>
           </View>
 
           <View style={styles.qrTabs}>
             <TouchableOpacity style={[styles.qrTab, qrMode === 'my_code' && styles.qrTabActive]} onPress={() => setQrMode('my_code')}>
-              <QrIcon size={18} color={qrMode === 'my_code' ? '#fff' : '#64748b'} />
+              <QrIcon size={18} color={qrMode === 'my_code' ? '#fff' : '#707070'} />
               <Text style={[styles.qrTabText, qrMode === 'my_code' && styles.qrTabTextActive]}>My Code</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.qrTab, qrMode === 'scan' && styles.qrTabActive]} onPress={openScanner}>
-              <ScanLine size={18} color={qrMode === 'scan' ? '#fff' : '#64748b'} />
+              <ScanLine size={18} color={qrMode === 'scan' ? '#fff' : '#707070'} />
               <Text style={[styles.qrTabText, qrMode === 'scan' && styles.qrTabTextActive]}>Scan</Text>
             </TouchableOpacity>
           </View>
@@ -345,50 +345,50 @@ const ConnectScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15 },
-  title: { fontSize: 28, fontWeight: '800', color: '#0f172a' },
-  qrButton: { backgroundColor: '#f1f5f9', padding: 9, borderRadius: 12 },
-  sectionLabel: { fontSize: 12, fontWeight: '800', color: '#94a3b8', paddingHorizontal: 20, marginBottom: 8 },
+  title: { fontSize: 28, fontWeight: '800', color: '#111111' },
+  qrButton: { backgroundColor: '#F0F0EC', padding: 9, borderRadius: 12 },
+  sectionLabel: { fontSize: 12, fontWeight: '800', color: '#999999', paddingHorizontal: 20, marginBottom: 8 },
   locationRow: { paddingHorizontal: 15, gap: 8, paddingBottom: 12 },
-  locationChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f8fafc' },
+  locationChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#E8E8E3', backgroundColor: '#F7F7F5' },
   locationText: { color: '#475569', fontWeight: '600', fontSize: 13 },
-  locationChipActive: { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' },
-  locationTextActive: { color: '#007AFF' },
-  search: { margin: 15, marginTop: 5, height: 46, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, backgroundColor: '#f8fafc', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 },
-  searchInput: { flex: 1, color: '#0f172a', fontSize: 15 },
-  tabs: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#f1f5f9', borderRadius: 12, padding: 4, marginBottom: 10 },
+  locationChipActive: { backgroundColor: '#FFFDE0', borderColor: '#bfdbfe' },
+  locationTextActive: { color: '#111111' },
+  search: { margin: 15, marginTop: 5, height: 46, borderWidth: 1, borderColor: '#E8E8E3', borderRadius: 12, backgroundColor: '#F7F7F5', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 },
+  searchInput: { flex: 1, color: '#111111', fontSize: 15 },
+  tabs: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#F0F0EC', borderRadius: 12, padding: 4, marginBottom: 10 },
   tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 9 },
   activeTab: { backgroundColor: '#fff' },
-  tabText: { color: '#64748b', fontWeight: '600', fontSize: 13 },
-  activeTabText: { color: '#0f172a', fontWeight: '800' },
-  content: { flex: 1, backgroundColor: '#f8fafc' },
+  tabText: { color: '#707070', fontWeight: '600', fontSize: 13 },
+  activeTabText: { color: '#111111', fontWeight: '800' },
+  content: { flex: 1, backgroundColor: '#F7F7F5' },
   list: { padding: 15, paddingBottom: 100 },
-  card: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 16, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' },
-  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#e2e8f0', marginRight: 13 },
+  card: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 16, padding: 13, marginBottom: 10, borderWidth: 1, borderColor: '#E8E8E3' },
+  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#E8E8E3', marginRight: 13 },
   cardInfo: { flex: 1 },
-  name: { fontSize: 16, fontWeight: '700', color: '#0f172a' },
-  meta: { color: '#64748b', fontSize: 13, marginTop: 3 },
-  location: { color: '#007AFF', fontSize: 12, marginTop: 3, fontWeight: '600' },
-  connect: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#e6f4fe', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 18, gap: 5 },
-  connectText: { color: '#007AFF', fontWeight: '700' },
+  name: { fontSize: 16, fontWeight: '700', color: '#111111' },
+  meta: { color: '#707070', fontSize: 13, marginTop: 3 },
+  location: { color: '#111111', fontSize: 12, marginTop: 3, fontWeight: '600' },
+  connect: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFC00', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 18, gap: 5 },
+  connectText: { color: '#111111', fontWeight: '700' },
   wave: { padding: 9, backgroundColor: '#fffbeb', borderRadius: 12, marginRight: 6 },
-  chat: { padding: 10, backgroundColor: '#007AFF', borderRadius: 13 },
+  chat: { padding: 10, backgroundColor: '#FFFC00', borderRadius: 13 },
   decline: { padding: 9, backgroundColor: '#ffebeb', borderRadius: 13, marginRight: 6 },
   accept: { padding: 9, backgroundColor: '#34C759', borderRadius: 13 },
   empty: { alignItems: 'center', paddingTop: 70 },
   emptyTitle: { fontSize: 18, fontWeight: '800', color: '#334155', marginTop: 12 },
-  emptyText: { color: '#94a3b8', marginTop: 5 },
-  qrModal: { flex: 1, backgroundColor: '#f8fafc' },
+  emptyText: { color: '#999999', marginTop: 5 },
+  qrModal: { flex: 1, backgroundColor: '#F7F7F5' },
   qrHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18, backgroundColor: '#fff' },
-  qrTitle: { fontSize: 18, fontWeight: '800', color: '#0f172a' },
-  qrTabs: { flexDirection: 'row', margin: 20, backgroundColor: '#e2e8f0', padding: 4, borderRadius: 12 },
+  qrTitle: { fontSize: 18, fontWeight: '800', color: '#111111' },
+  qrTabs: { flexDirection: 'row', margin: 20, backgroundColor: '#E8E8E3', padding: 4, borderRadius: 12 },
   qrTab: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7, paddingVertical: 10, borderRadius: 9 },
-  qrTabActive: { backgroundColor: '#0f172a' },
-  qrTabText: { color: '#64748b', fontWeight: '700' },
+  qrTabActive: { backgroundColor: '#FFFC00' },
+  qrTabText: { color: '#707070', fontWeight: '700' },
   qrTabTextActive: { color: '#fff' },
   qrCard: { margin: 20, padding: 30, borderRadius: 24, backgroundColor: '#fff', alignItems: 'center', gap: 14 },
   qrAvatar: { width: 76, height: 76, borderRadius: 38 },
-  qrName: { fontSize: 22, fontWeight: '800', color: '#0f172a' },
-  qrHint: { textAlign: 'center', color: '#64748b', lineHeight: 20 },
+  qrName: { fontSize: 22, fontWeight: '800', color: '#111111' },
+  qrHint: { textAlign: 'center', color: '#707070', lineHeight: 20 },
   scanner: { margin: 20, flex: 1, borderRadius: 24, overflow: 'hidden', backgroundColor: '#000' },
   scanOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,.65)', alignItems: 'center', justifyContent: 'center' },
   scanText: { color: '#fff', marginTop: 10 },
