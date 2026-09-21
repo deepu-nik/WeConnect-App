@@ -903,7 +903,7 @@ const styles = StyleSheet.create({
   actionBtnPremiumShare: { padding: 4 },
 
   // --- 2. PREMIUM DARK CONFESSION CARD ---
-  confessionPremiumCard: { backgroundColor: '#FFFC00', borderRadius: 24, marginHorizontal: 16, marginBottom: 20, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 8 },
+  confessionPremiumCard: { backgroundColor: '#111111', borderRadius: 24, marginHorizontal: 16, marginBottom: 20, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 8 },
   confessionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   confessionLabelBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(175, 82, 222, 0.15)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
   confessionLabelText: { color: '#AF52DE', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', marginLeft: 6 },
@@ -933,7 +933,7 @@ const styles = StyleSheet.create({
   planFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F7F7F5', paddingHorizontal: 20, paddingVertical: 15, borderTopWidth: 1, borderTopColor: '#F0F0EC' },
   planJoinCount: { fontSize: 14, fontWeight: '600', color: '#707070' },
   planJoinBtn: { backgroundColor: '#E8E8E3', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  planJoinBtnActive: { backgroundColor: '#FFFC00' },
+  planJoinBtnActive: { backgroundColor: '#111111' },
   planJoinBtnText: { fontSize: 14, fontWeight: '800', color: '#475569' },
 
   // --- 5. PREMIUM POLL WIDGET ---
