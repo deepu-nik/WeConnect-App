@@ -16,14 +16,28 @@ const VerifyEmailScreen = ({ user, onRefresh, onResend, onSignOut }) => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await onRefresh();
-    setRefreshing(false);
+    try {
+      const verified = await onRefresh();
+      if (!verified) {
+        Alert.alert('Not verified yet', 'Open the verification email first, then try again.');
+      }
+    } catch (error) {
+      Alert.alert('Could not check verification', 'Please try again in a moment.');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleResend = async () => {
     setResending(true);
-    await onResend();
-    setResending(false);
+    try {
+      await onResend();
+      Alert.alert('Email sent', 'A new verification email has been sent.');
+    } catch (error) {
+      Alert.alert('Could not send email', 'Please wait a moment and try again.');
+    } finally {
+      setResending(false);
+    }
   };
 
   return (
