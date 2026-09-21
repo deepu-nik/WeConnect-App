@@ -8,6 +8,7 @@ import { AuthContext } from '../context/AuthContext';
 
 // Screens
 import LoginScreen from '../screens/LoginScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import ChatRoomScreen from '../screens/ChatRoomScreen';
 import NewStoryScreen from '../screens/NewStoryScreen';
@@ -29,6 +30,7 @@ const AuthStack = () => {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
     </Stack.Navigator>
   );
 };
