@@ -22,6 +22,7 @@ import * as Sharing from 'expo-sharing';
 import { auth, db } from '../config/firebase';
 import { collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
+import { getUserProfile } from '../services/userService';
 
 const VaultScreen = ({ navigation }) => {
   const currentUser = auth.currentUser;
@@ -127,7 +128,10 @@ const VaultScreen = ({ navigation }) => {
   const createVault = async () => {
     if (!newVaultName.trim()) return;
     try {
+      const profile = await getUserProfile(currentUser.uid);
+      if (!profile?.collegeId) throw new Error('Your campus profile is incomplete.');
       await addDoc(collection(db, 'vaults'), {
+        collegeId: profile.collegeId,
         name: newVaultName.trim(),
         description: newVaultDesc.trim() || (activeTab === 'shared' ? 'Shared Study Material' : 'Private Storage'),
         type: activeTab,
