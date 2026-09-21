@@ -16,7 +16,7 @@ import { collection, query, where, onSnapshot, getDocs, addDoc, serverTimestamp,
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 
 import Dashboard from '../components/Dashboard';
-import { findUsersByName } from '../services/userService';
+import { findUsersByName, getUserProfile } from '../services/userService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DASHBOARD_MAX_HEIGHT = SCREEN_HEIGHT * 0.5;
@@ -128,22 +128,31 @@ const ChatsScreen = ({ navigation }) => {
     
     // 1. Fetch Chats
     const chatsQ = query(collection(db, 'chats'), where('participants', 'array-contains', currentUser.uid));
-    const unsubscribeChats = onSnapshot(chatsQ, (snapshot) => {
-      let fetchedChats = snapshot.docs.map(doc => {
-        const data = doc.data();
+    const unsubscribeChats = onSnapshot(chatsQ, async (snapshot) => {
+      const fetchedChats = await Promise.all(snapshot.docs.map(async (chatDoc) => {
+        const data = chatDoc.data();
         const otherUserId = data.participants?.find(id => id !== currentUser.uid) || 'unknown';
-        const otherUser = data.usersInfo ? data.usersInfo[otherUserId] : {};
+        const cachedUser = data.usersInfo ? data.usersInfo[otherUserId] : {};
+        let liveUser = null;
+
+        try {
+          liveUser = await getUserProfile(otherUserId);
+        } catch (error) {
+          console.error('Chat profile refresh failed:', error);
+        }
+
         return {
-          id: doc.id,
+          id: chatDoc.id,
           otherUserId,
-          name: otherUser?.name || 'Student',
-          avatar: otherUser?.avatar || 'https://via.placeholder.com/150',
+          name: liveUser?.name || cachedUser?.name || 'Student',
+          avatar: liveUser?.avatar || cachedUser?.avatar || 'https://via.placeholder.com/150',
           lastMessage: data.lastMessage || 'Tap to chat',
           timestamp: data.updatedAt?.toDate() || new Date(),
           unreadCount: data.unreadCount?.[currentUser.uid] || 0,
           ...data,
         };
-      });
+      }));
+
       fetchedChats.sort((a, b) => b.timestamp - a.timestamp);
       setChats(fetchedChats);
       setLoading(false);
