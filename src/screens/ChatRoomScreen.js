@@ -68,6 +68,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [imageCaption, setImageCaption] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [mediaShareVisible, setMediaShareVisible] = useState(false);
+  const [fullScreenImage, setFullScreenImage] = useState(null);
+  const [fullScreenAvatar, setFullScreenAvatar] = useState(null);
   const typingTimeout = useRef(null);
 
   const currentUser = auth.currentUser;
@@ -206,10 +208,16 @@ const ChatRoomScreen = ({ route, navigation }) => {
     const isMe = item.senderId === currentUser?.uid;
     return (
       <View style={[styles.messageRow, isMe ? styles.myRow : styles.theirRow]}>
-        {!isMe && <TouchableOpacity onPress={() => openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar })}><Image source={{ uri: otherUserAvatar }} style={styles.tinyAvatar} /></TouchableOpacity>}
+        {!isMe && (
+          <TouchableOpacity onPress={() => setFullScreenAvatar({ name: otherUserName, uri: otherUserAvatar })}>
+            <Image source={{ uri: otherUserAvatar }} style={styles.tinyAvatar} />
+          </TouchableOpacity>
+        )}
         <View style={[styles.messageBubble, isMe ? styles.myBubble : styles.theirBubble]}>
           {item.mediaUrl && item.mediaType === 'image' && (
-            <Image source={{ uri: item.mediaUrl }} style={styles.messageImage} />
+            <TouchableOpacity activeOpacity={0.95} onPress={() => setFullScreenImage(item.mediaUrl)}>
+              <Image source={{ uri: item.mediaUrl }} style={styles.messageImage} resizeMode="cover" />
+            </TouchableOpacity>
           )}
           {item.mediaUrl && item.mediaType === 'video' && (
             <View style={styles.messageVideo}>
@@ -243,7 +251,9 @@ const ChatRoomScreen = ({ route, navigation }) => {
             activeOpacity={0.7}
             onPress={() => openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar })}
           >
-            <Image source={{ uri: otherUserAvatar }} style={styles.headerAvatar} />
+            <TouchableOpacity onPress={() => setFullScreenAvatar({ name: otherUserName, uri: otherUserAvatar })}>
+              <Image source={{ uri: otherUserAvatar }} style={styles.headerAvatar} />
+            </TouchableOpacity>
             <View>
               <Text style={styles.headerName} numberOfLines={1}>{otherUserName}</Text>
               <Text style={[styles.headerStatus, isOnline && { color: '#34C759' }]}>
@@ -309,6 +319,21 @@ const ChatRoomScreen = ({ route, navigation }) => {
           )}
         </View>
       </KeyboardAvoidingView>
+
+      <Modal visible={!!fullScreenImage} transparent animationType="fade" onRequestClose={() => setFullScreenImage(null)}>
+        <View style={styles.fullScreenMediaOverlay}>
+          <TouchableOpacity style={styles.fullScreenClose} onPress={() => setFullScreenImage(null)}><X size={28} color="#fff" /></TouchableOpacity>
+          {fullScreenImage && <Image source={{ uri: fullScreenImage }} style={styles.fullScreenMedia} resizeMode="contain" />}
+        </View>
+      </Modal>
+
+      <Modal visible={!!fullScreenAvatar} transparent animationType="fade" onRequestClose={() => setFullScreenAvatar(null)}>
+        <View style={styles.fullScreenMediaOverlay}>
+          <TouchableOpacity style={styles.fullScreenClose} onPress={() => setFullScreenAvatar(null)}><X size={28} color="#fff" /></TouchableOpacity>
+          {fullScreenAvatar?.uri && <Image source={{ uri: fullScreenAvatar.uri }} style={styles.fullScreenAvatar} resizeMode="contain" />}
+          {!!fullScreenAvatar?.name && <Text style={styles.fullScreenAvatarName}>{fullScreenAvatar.name}</Text>}
+        </View>
+      </Modal>
 
       <MediaShareSheet
         visible={mediaShareVisible}
