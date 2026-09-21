@@ -284,12 +284,16 @@ const ProfileScreen = ({ route, navigation }) => {
         <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View style={styles.modal}>
             <View style={styles.modalHeader}><Text style={styles.modalTitle}>Edit Profile</Text><TouchableOpacity onPress={() => setEditVisible(false)}><X size={24} color="#0f172a" /></TouchableOpacity></View>
-            <ScrollView contentContainerStyle={styles.form}>
+            <ScrollView
+              style={styles.formScroll}
+              contentContainerStyle={styles.form}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.formSectionTitle}>Identity</Text>
               {[
-                ['name', 'Name'], ['handle', 'Username / Handle'], ['course', 'Course / Major'],
-                ['gradYear', 'Class of'], ['location', 'Campus Location'], ['website', 'Website'], ['instagram', 'Instagram Username / URL'],
-                ['linkedin', 'LinkedIn Username / URL'], ['github', 'GitHub Username / URL'], ['whatsapp', 'WhatsApp Number'],
-                ['resumeLink', 'Resume / Portfolio Link'], ['projectsCount', 'Projects Completed'],
+                ['name', 'Full Name'], ['handle', 'Username / Handle'], ['course', 'Course / Major'],
+                ['gradYear', 'Class of'], ['location', 'Campus Location'],
               ].map(([key, label]) => (
                 <View key={key}>
                   <Text style={styles.label}>{label}</Text>
@@ -302,9 +306,35 @@ const ProfileScreen = ({ route, navigation }) => {
                   />
                 </View>
               ))}
+              <Text style={styles.formSectionTitle}>About</Text>
               <Text style={styles.label}>Bio</Text>
               <TextInput style={[styles.input, styles.multiline]} value={form?.bio} onChangeText={(value) => setForm({ ...form, bio: value })} multiline />
 
+              <Text style={styles.formSectionTitle}>Social & Links</Text>
+              {[
+                ['website', 'Website'], ['instagram', 'Instagram Username / URL'], ['linkedin', 'LinkedIn Username / URL'],
+                ['github', 'GitHub Username / URL'], ['whatsapp', 'WhatsApp Number'], ['resumeLink', 'Resume / Portfolio Link'],
+              ].map(([key, label]) => (
+                <View key={key}>
+                  <Text style={styles.label}>{label}</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={String(form?.[key] ?? '')}
+                    onChangeText={(value) => setForm({ ...form, [key]: value })}
+                    keyboardType={key === 'whatsapp' ? 'numeric' : 'url'}
+                    autoCapitalize="none"
+                  />
+                </View>
+              ))}
+
+              <Text style={styles.formSectionTitle}>Projects & Skills</Text>
+              <Text style={styles.label}>Projects Completed</Text>
+              <TextInput
+                style={styles.input}
+                value={String(form?.projectsCount ?? '')}
+                onChangeText={(value) => setForm({ ...form, projectsCount: value })}
+                keyboardType="numeric"
+              />
               <Text style={styles.label}>Currently Learning</Text>
               <View style={styles.addSkillRow}><TextInput style={[styles.input, { flex: 1, marginBottom: 0 }]} value={newSkill} onChangeText={setNewSkill} placeholder="e.g. Node.js" /><TouchableOpacity style={styles.addSkill} onPress={addSkill}><Plus size={20} color="#fff" /></TouchableOpacity></View>
               <View style={styles.editSkills}>
@@ -369,7 +399,9 @@ const styles = StyleSheet.create({
   modal: { height: '88%', backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
   modalTitle: { fontSize: 19, fontWeight: '800' },
+  formScroll: { flex: 1 },
   form: { padding: 20, paddingBottom: 50 },
+  formSectionTitle: { fontSize: 16, fontWeight: '800', color: '#0f172a', marginTop: 4, marginBottom: 2 },
   label: { color: '#64748b', fontWeight: '700', marginTop: 14, marginBottom: 7 },
   input: { minHeight: 48, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f8fafc', borderRadius: 12, paddingHorizontal: 13, color: '#0f172a' },
   multiline: { height: 85, textAlignVertical: 'top', paddingTop: 12 },
