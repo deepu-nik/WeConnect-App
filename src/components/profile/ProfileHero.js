@@ -2,7 +2,7 @@ import React from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Camera, MoreHorizontal, Share2, Settings } from 'lucide-react-native';
 
-const ProfileHero = ({ user, isSelf, uploading, onAvatarPress, onAvatarEdit, onCoverEdit, onEdit, onMessage, onConnect, onShare, onMenu }) => (
+const ProfileHero = ({ user, isSelf, isConnected, uploading, onAvatarPress, onAvatarEdit, onCoverEdit, onEdit, onMessage, onConnect, onShare, onMenu }) => (
   <View style={styles.shell}>
     <View style={styles.cover}>
       {user.coverPhoto ? <Image source={{ uri: user.coverPhoto }} style={StyleSheet.absoluteFillObject} resizeMode="cover" /> : <View style={styles.coverFallback} />}
@@ -32,8 +32,11 @@ const ProfileHero = ({ user, isSelf, uploading, onAvatarPress, onAvatarEdit, onC
             <TouchableOpacity style={styles.secondaryButton} onPress={onEdit}><Text style={styles.secondaryText}>Edit Profile</Text></TouchableOpacity>
           ) : (
             <>
-              <TouchableOpacity style={styles.primaryButton} onPress={onConnect}><Text style={styles.primaryText}>Connect</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.secondaryButton} onPress={onMessage}><Text style={styles.secondaryText}>Message</Text></TouchableOpacity>
+              {isConnected ? (
+                <TouchableOpacity style={styles.secondaryButton} onPress={onMessage}><Text style={styles.secondaryText}>Message</Text></TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.primaryButton} onPress={onConnect}><Text style={styles.primaryText}>Connect</Text></TouchableOpacity>
+              )}
             </>
           )}
         </View>
