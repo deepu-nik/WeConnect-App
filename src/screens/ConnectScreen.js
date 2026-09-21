@@ -428,7 +428,7 @@ const ConnectScreen = ({ navigation }) => {
       </Modal>
 
       <Modal visible={qrVisible} animationType="slide" onRequestClose={() => setQrVisible(false)}>
-        <NativeSafeAreaView style={styles.qrModal}>
+        <SafeAreaView style={styles.qrModal} edges={['top', 'bottom']}>
           <View style={styles.qrHeader}>
             <TouchableOpacity onPress={() => setQrVisible(false)}><X size={28} color="#000" /></TouchableOpacity>
             <Text style={styles.qrTitle}>Connect via QR</Text>
