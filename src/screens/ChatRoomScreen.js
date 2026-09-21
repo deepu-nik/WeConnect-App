@@ -13,7 +13,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { auth, db } from '../config/firebase';
 import { markChatRead } from '../services/chatService';
-import { subscribeToMessages, sendChatMessage as sendPersistedMessage } from '../services/chatMessageService';
+import { subscribeToMessages, sendChatMessage as sendPersistedMessage, toggleMessageReaction, deleteMessage } from '../services/chatMessageService';
 import { getUserProfile } from '../services/userService';
 import { collection, query, where, addDoc, onSnapshot, orderBy, serverTimestamp, doc, updateDoc, getDocs, increment } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
@@ -322,9 +322,24 @@ const ChatRoomScreen = ({ route, navigation }) => {
             {item.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
         </TouchableOpacity>
+        {selectedMessageId === item.id ? (
+          <View style={[styles.messageActions, isMe ? styles.messageActionsMine : styles.messageActionsTheirs]}>
+            {['❤️', '😂', '👍', '🔥', '😮'].map((emoji) => (
+              <TouchableOpacity key={emoji} onPress={async () => {
+                await toggleMessageReaction(chatId, item.id, currentUser.uid, emoji);
+                setSelectedMessageId(null);
+              }}><Text style={styles.reactionEmoji}>{emoji}</Text></TouchableOpacity>
+            ))}
+            <TouchableOpacity onPress={() => { setReplyingTo(item); setSelectedMessageId(null); }}>
+              <Text style={styles.replyActionText}>Reply</Text>
+            </TouchableOpacity>
+            {isMe ? <TouchableOpacity onPress={async () => { await deleteMessage(chatId, item.id); setSelectedMessageId(null); }}>
+              <Text style={styles.deleteActionText}>Delete</Text>
+            </TouchableOpacity> : null}
+          </View>
+        ) : null}
       </View>
     );
-  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -513,6 +528,12 @@ const styles = StyleSheet.create({
   typingBubble: { backgroundColor: '#F2F3F5', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20, borderBottomLeftRadius: 4, width: 65, height: 35, justifyContent: 'center' },
   typingContainer: { flexDirection: 'row', justifyContent: 'space-between', width: 30, alignItems: 'center' },
   typingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#888' },
+  messageActions: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 18, backgroundColor: '#fff', elevation: 3, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 6 },
+  messageActionsMine: { alignSelf: 'flex-end' },
+  messageActionsTheirs: { alignSelf: 'flex-start' },
+  reactionEmoji: { fontSize: 19 },
+  replyActionText: { fontSize: 12, fontWeight: '800', color: '#007AFF' },
+  deleteActionText: { fontSize: 12, fontWeight: '800', color: '#FF3B30' },
   replyBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 10, marginBottom: 5, padding: 9, borderRadius: 12, backgroundColor: '#f1f5f9' },
   replyAccent: { width: 3, alignSelf: 'stretch', backgroundColor: '#007AFF', borderRadius: 2, marginRight: 9 },
   replyContent: { flex: 1 },
