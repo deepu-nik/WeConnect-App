@@ -9,6 +9,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { getUserProfile } from './userService';
 
 export const findDirectChat = async (currentUid, otherUid) => {
   if (!currentUid || !otherUid) return null;
@@ -22,6 +23,14 @@ export const findDirectChat = async (currentUid, otherUid) => {
 };
 
 export const createDirectChat = async ({ currentUser, otherUser, otherUserId }) => {
+  const [currentProfile, otherProfile] = await Promise.all([
+    getUserProfile(currentUser.uid),
+    getUserProfile(otherUserId),
+  ]);
+  if (!currentProfile?.collegeId || !otherProfile?.collegeId || currentProfile.collegeId !== otherProfile.collegeId) {
+    throw new Error('Messaging is currently limited to students from your campus.');
+  }
+
   const existing = await findDirectChat(currentUser.uid, otherUserId);
   if (existing) return existing.id;
 
