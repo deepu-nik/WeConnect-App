@@ -10,6 +10,8 @@ import { AuthContext } from '../context/AuthContext';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import ChatRoomScreen from '../screens/ChatRoomScreen';
+import NewStoryScreen from '../screens/NewStoryScreen';
+import StoryViewerScreen from '../screens/StoryViewerScreen';
 // EXISTING NAVIGATOR (Your Main Tabs)
 import MainTabNavigator from './MainTabNavigator';
 
@@ -42,7 +44,10 @@ const AuthenticatedStack = () => {
       <Stack.Screen name="MainTabs" component={MainTabNavigator} />
       
       {/* The Chat Room sits on top of the tabs */}
-     <Stack.Screen
+     <Stack.Screen name="NewStory" component={NewStoryScreen} />
+    <Stack.Screen name="StoryViewer" component={StoryViewerScreen} />
+
+    <Stack.Screen
       name="ChatRoom"
       component={ChatRoomScreen}
       options={{
