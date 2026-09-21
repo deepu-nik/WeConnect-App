@@ -1,13 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Modal,
+  ActivityIndicator, Alert, BackHandler, Image, KeyboardAvoidingView, Linking, Modal,
   Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { updateProfile } from 'firebase/auth';
 import { doc, getDocs, collection, query, where, updateDoc } from 'firebase/firestore';
 import {
-  ArrowLeft, Camera, CheckCircle, Code, Github, Globe, Instagram, Link as LinkIcon,
+  Camera, CheckCircle, Code, Github, Globe, Instagram, Link as LinkIcon,
   Linkedin, MapPin, Plus, Settings, Trash2, Twitter, UserRound, X, Youtube,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -30,6 +30,37 @@ const ProfileScreen = ({ route, navigation }) => {
   const [editVisible, setEditVisible] = useState(false);
   const [form, setForm] = useState(null);
   const [newSkill, setNewSkill] = useState('');
+  const leavingToChats = useRef(false);
+
+  const goToChats = () => {
+    if (leavingToChats.current) return;
+    leavingToChats.current = true;
+    const state = navigation.getState();
+    const hasMainTabs = state?.routes?.some((item) => item.name === 'MainTabs');
+    if (hasMainTabs) {
+      navigation.navigate('MainTabs', { screen: 'Chats' });
+    } else {
+      navigation.navigate('Chats');
+    }
+  };
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (event) => {
+      if (leavingToChats.current) return;
+      event.preventDefault();
+      goToChats();
+    });
+
+    const backSubscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      goToChats();
+      return true;
+    });
+
+    return () => {
+      unsubscribe();
+      backSubscription.remove();
+    };
+  }, [navigation]);
 
   useEffect(() => {
     let active = true;
@@ -200,9 +231,6 @@ const ProfileScreen = ({ route, navigation }) => {
           {user.coverPhoto ? <Image source={{ uri: user.coverPhoto }} style={styles.coverImage} /> : <View style={styles.coverFallback} />}
           <View style={styles.coverShade} />
           <SafeAreaView style={styles.topBar}>
-            <TouchableOpacity style={styles.circleBtn} onPress={() => {
-              if (navigation.canGoBack()) navigation.goBack();
-            }}><ArrowLeft size={23} color="#fff" /></TouchableOpacity>
             {isSelf && <TouchableOpacity style={styles.circleBtn} onPress={() => Alert.alert('Settings', 'Profile settings can be added here.')}><Settings size={21} color="#fff" /></TouchableOpacity>}
           </SafeAreaView>
           {isSelf && <TouchableOpacity style={styles.coverEdit} onPress={() => pickImage('cover')}><Camera size={18} color="#fff" /></TouchableOpacity>}
@@ -315,7 +343,7 @@ const styles = StyleSheet.create({
   coverImage: { ...StyleSheet.absoluteFillObject },
   coverFallback: { ...StyleSheet.absoluteFillObject, backgroundColor: '#0f172a' },
   coverShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,.3)' },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 8 },
+  topBar: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 18, paddingTop: 8 },
   circleBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,.45)', alignItems: 'center', justifyContent: 'center' },
   coverEdit: { position: 'absolute', right: 18, bottom: 38, padding: 10, borderRadius: 20, backgroundColor: 'rgba(0,0,0,.5)' },
   body: { marginTop: -24, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: '#fff', padding: 20, paddingBottom: 60 },
