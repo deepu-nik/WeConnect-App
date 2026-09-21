@@ -13,6 +13,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { auth, db } from '../config/firebase';
 import { markChatRead } from '../services/chatService';
+import { getUserProfile } from '../services/userService';
 import { collection, query, where, addDoc, onSnapshot, orderBy, serverTimestamp, doc, updateDoc, getDocs, increment } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import { openProfile } from '../navigation/navigationHelpers';
@@ -47,13 +48,15 @@ const TypingIndicator = () => {
 
 const ChatRoomScreen = ({ route, navigation }) => {
   const { 
-    chatId: initialChatId, 
-    uid: otherUserId, 
-    name: otherUserName = 'Student', 
-    avatar: otherUserAvatar = 'https://via.placeholder.com/150' 
+    chatId: initialChatId,
+    uid: otherUserId,
+    name: routeName = 'Student',
+    avatar: routeAvatar = 'https://via.placeholder.com/150' 
   } = route.params || {};
 
   const [messages, setMessages] = useState([]);
+  const [otherUserName, setOtherUserName] = useState(routeName);
+  const [otherUserAvatar, setOtherUserAvatar] = useState(routeAvatar);
   const [inputText, setInputText] = useState('');
   const [chatId, setChatId] = useState(initialChatId || null);
   
@@ -66,6 +69,23 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const typingTimeout = useRef(null);
 
   const currentUser = auth.currentUser;
+
+  useEffect(() => {
+    let active = true;
+    const loadOtherUser = async () => {
+      if (!otherUserId) return;
+      try {
+        const profile = await getUserProfile(otherUserId);
+        if (!active || !profile) return;
+        setOtherUserName(profile.name || routeName || 'Student');
+        setOtherUserAvatar(profile.avatar || routeAvatar || 'https://via.placeholder.com/150');
+      } catch (error) {
+        console.error('Other user profile load failed:', error);
+      }
+    };
+    loadOtherUser();
+    return () => { active = false; };
+  }, [otherUserId, routeName, routeAvatar]);
 
   useEffect(() => {
     const findOrCreateChat = async () => {
