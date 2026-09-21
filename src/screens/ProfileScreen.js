@@ -52,7 +52,6 @@ const ProfileScreen = ({ route, navigation }) => {
   const currentUser = auth.currentUser;
   const targetUid = route?.params?.uid || currentUser?.uid;
   const isSelf = targetUid === currentUser?.uid;
-
   const [user, setUser] = useState(null);
   const [vaultCount, setVaultCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -64,6 +63,8 @@ const ProfileScreen = ({ route, navigation }) => {
   const [activeTab, setActiveTab] = useState('posts');
   const [newSkill, setNewSkill] = useState('');
   const [form, setForm] = useState(null);
+
+  const isConnected = isSelf || Boolean(user?.connections?.includes(currentUser?.uid));
 
   useEffect(() => {
     let active = true;
@@ -258,6 +259,7 @@ const ProfileScreen = ({ route, navigation }) => {
         <ProfileHero
           user={user}
           isSelf={isSelf}
+          isConnected={isConnected}
           uploading={uploading}
           onAvatarPress={() => setFullScreenAvatar(user.avatar || FALLBACK_AVATAR)}
           onAvatarEdit={() => pickImage('avatar')}
