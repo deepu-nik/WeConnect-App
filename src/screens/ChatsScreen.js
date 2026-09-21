@@ -47,28 +47,62 @@ const ChatsScreen = ({ navigation }) => {
 
   useEffect(() => {
     if (!currentUser?.uid) { setChats([]); setLoading(false); return undefined; }
-    setLoading(true);
-    const q = query(collection(db, 'chats'), where('participants', 'array-contains', currentUser.uid));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const next = snapshot.docs.map((chatDoc) => {
-        const data = chatDoc.data() || {};
-        const participants = Array.isArray(data.participants) ? data.participants : [];
-        const otherUserId = participants.find((uid) => uid !== currentUser.uid);
-        const otherInfo = data.usersInfo?.[otherUserId] || {};
-        return {
-          id: chatDoc.id,
-          otherUserId,
-          name: otherInfo.name || 'Student',
-          avatar: otherInfo.avatar || FALLBACK_AVATAR,
-          lastMessage: data.lastMessage || 'Start the conversation',
-          timestamp: data.updatedAt?.toDate?.() || new Date(0),
-          unreadCount: Number(data.unreadCount?.[currentUser.uid] || 0),
-          typing: Boolean(data.typing?.[otherUserId]),
-        };
-      }).sort((a, b) => b.timestamp - a.timestamp);
-      setChats(next); setLoading(false); setRefreshing(false);
-    }, (error) => { console.error('Chats subscription failed:', error); setChats([]); setLoading(false); setRefreshing(false); });
-    return unsubscribe;
+
+    let unsubscribe = null;
+    let active = true;
+
+    const subscribeToCampusChats = async () => {
+      setLoading(true);
+      try {
+        const profile = await getUserProfile(currentUser.uid);
+        if (!profile?.collegeId) {
+          if (active) { setChats([]); setLoading(false); }
+          return;
+        }
+
+        const q = query(
+          collection(db, 'chats'),
+          where('collegeId', '==', profile.collegeId),
+          where('participants', 'array-contains', currentUser.uid)
+        );
+
+        unsubscribe = onSnapshot(q, (snapshot) => {
+          const next = snapshot.docs.map((chatDoc) => {
+            const data = chatDoc.data() || {};
+            const participants = Array.isArray(data.participants) ? data.participants : [];
+            const otherUserId = participants.find((uid) => uid !== currentUser.uid);
+            const otherInfo = data.usersInfo?.[otherUserId] || {};
+            return {
+              id: chatDoc.id,
+              otherUserId,
+              name: otherInfo.name || 'Student',
+              avatar: otherInfo.avatar || FALLBACK_AVATAR,
+              lastMessage: data.lastMessage || 'Start the conversation',
+              timestamp: data.updatedAt?.toDate?.() || new Date(0),
+              unreadCount: Number(data.unreadCount?.[currentUser.uid] || 0),
+              typing: Boolean(data.typing?.[otherUserId]),
+            };
+          }).sort((a, b) => b.timestamp - a.timestamp);
+          setChats(next);
+          setLoading(false);
+          setRefreshing(false);
+        }, (error) => {
+          console.error('Chats subscription failed:', error);
+          setChats([]);
+          setLoading(false);
+          setRefreshing(false);
+        });
+      } catch (error) {
+        console.error('Could not load campus chats:', error);
+        if (active) setLoading(false);
+      }
+    };
+
+    subscribeToCampusChats();
+    return () => {
+      active = false;
+      if (unsubscribe) unsubscribe();
+    };
   }, [currentUser?.uid]);
 
   const unreadCount = useMemo(() => chats.filter((chat) => chat.unreadCount > 0).length, [chats]);
