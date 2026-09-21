@@ -197,8 +197,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
     updateForm('skills', (form?.skills || []).filter((item) => item !== value));
   };
 
-  const saveSection = async () => {
-    if (!form || !editSection || !currentUser?.uid) return;
+  const saveSection = async () => {    if (!form || !editSection || !currentUser?.uid) return;
     setSaving(true);
     try {
       const fields = sectionFields[editSection] || [];
@@ -397,8 +396,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
           {isSelf && (
             <View style={styles.completionCard}>
               <View style={styles.completionTop}>
-                <View>
-                  <Text style={styles.completionTitle}>Profile strength</Text>
+                <View>                  <Text style={styles.completionTitle}>Profile strength</Text>
                   <Text style={styles.completionSubtitle}>{completion}% complete</Text>
                 </View>
                 <Text style={styles.completionPercent}>{completion}%</Text>
@@ -420,7 +418,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
           {activeSection === 'Overview' && (
             <>
               <View style={styles.card}>
-                <View style={styles.cardHeader}><Text style={styles.cardTitle}>About</Text>{isSelf && <TouchableOpacity onPress={openEdit}><Edit3 size={16} color={COLORS.muted} /></TouchableOpacity>}</View>
+                <View style={styles.cardHeader}><Text style={styles.cardTitle}>About</Text>{isSelf && <TouchableOpacity onPress={() => openSectionEdit('identity')}><Edit3 size={16} color={COLORS.muted} /></TouchableOpacity>}</View>
                 <Text style={styles.aboutText}>{user.bio || 'Add a short introduction so classmates know who you are.'}</Text>
                 <View style={styles.detailGrid}>
                   <Detail icon={GraduationCap} label="Education" value={[user.course, user.department].filter(Boolean).join(' • ') || 'Not added'} />
@@ -440,7 +438,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
               </View>
 
               <View style={styles.card}>
-                <View style={styles.cardHeader}><Text style={styles.cardTitle}>Skills</Text>{isSelf && <TouchableOpacity onPress={openEdit}><Edit3 size={16} color={COLORS.muted} /></TouchableOpacity>}</View>
+                <View style={styles.cardHeader}><Text style={styles.cardTitle}>Skills</Text>{isSelf && <TouchableOpacity onPress={() => openSectionEdit('identity')}><Edit3 size={16} color={COLORS.muted} /></TouchableOpacity>}</View>
                 {skills.length ? <View style={styles.chips}>{skills.map((skill) => <View style={styles.skillChip} key={skill}><Code2 size={13} color={COLORS.blue} /><Text style={styles.skillText}>{skill}</Text></View>)}</View> : <EmptyState icon={Code2} title="No skills added" text="Add technologies and skills you are learning." />}
               </View>
 
@@ -597,8 +595,7 @@ const ProfileScreenNew = ({ route, navigation }) => {
               </EditorCard>}
 
               {editSection === 'skills' && <EditorCard title="Skills" hint="Add the technologies and capabilities you actually use or learn.">
-                <ArrayEditor items={form?.skills || []} label="Skill" placeholder="e.g. React Native" onAdd={addSkill} onRemove={removeSkill} />
-              </EditorCard>}
+                <ArrayEditor items={form?.skills || []} label="Skill" placeholder="e.g. React Native" onAdd={addSkill} onRemove={removeSkill} />              </EditorCard>}
 
               {editSection === 'links' && <EditorCard title="Social & Links" hint="Keep your public work easy to discover.">
                 <Field label="GitHub" value={form?.github} onChange={(v) => updateForm('github', v)} autoCapitalize="none" keyboardType="url" />
@@ -798,9 +795,3 @@ const styles = StyleSheet.create({
   arrayInput: { flex: 1 },
   addButton: { width: 49, height: 49, borderRadius: 12, backgroundColor: COLORS.ink, alignItems: 'center', justifyContent: 'center' },
   editChip: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: '#FFF1F2', borderWidth: 1, borderColor: '#FECDD3' },
-  editChipText: { color: '#9F1239', fontSize: 12, fontWeight: '800' },
-  saveButton: { height: 56, borderRadius: 16, backgroundColor: COLORS.blue, borderWidth: 1, borderColor: COLORS.ink, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 2 },
-  saveText: { color: COLORS.ink, fontWeight: '900', fontSize: 15 },
-});
-
-export default ProfileScreenNew;
