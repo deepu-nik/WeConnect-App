@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   KeyboardAvoidingView, Platform, ActivityIndicator,
-  TouchableWithoutFeedback, Keyboard, StatusBar,
+  TouchableWithoutFeedback, Keyboard, StatusBar, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react-native';
@@ -97,6 +97,13 @@ const LoginScreen = ({ navigation }) => {
 
             <TouchableOpacity style={styles.forgotBtn} onPress={() => navigation.navigate('ForgotPassword')}>
               <Text style={styles.forgotText}>Forgot Password?</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.forgotBtn} onPress={() => Alert.alert(
+              'Forgot your username?',
+              'Your username is not required to sign in. Use your registered student email to log in. Once you are signed in, your username is visible on your Profile.'
+            )}>
+              <Text style={styles.forgotText}>Forgot Username?</Text>
             </TouchableOpacity>
           </View>
 
