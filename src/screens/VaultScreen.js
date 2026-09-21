@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { openProfile } from '../navigation/navigationHelpers';
 import { 
   View, Text, StyleSheet, TouchableOpacity, FlatList, 
   TextInput, StatusBar, LayoutAnimation, Modal, Alert, ActivityIndicator, Share, Linking, BackHandler
@@ -358,7 +359,7 @@ const VaultScreen = ({ navigation }) => {
     );
   };
 
-  const openUploaderProfile = (uploader) => { if (!uploader?.uid || uploader.uid === currentUser?.uid) return; navigation.navigate('Profile', { uid: uploader.uid, name: uploader.name, avatar: uploader.avatar }); };
+  const openUploaderProfile = (uploader) => { if (!uploader?.uid || uploader.uid === currentUser?.uid) return; openProfile(navigation, { uid: uploader.uid, name: uploader.name, avatar: uploader.avatar }); };
 
   const renderFileItem = ({ item }) => {
     const isAdmin = currentVault?.admins?.includes(currentUser.uid);
