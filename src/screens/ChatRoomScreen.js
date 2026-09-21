@@ -224,6 +224,14 @@ const ChatRoomScreen = ({ route, navigation }) => {
     if (chatId) return chatId;
     if (!currentUser || !otherUserId) throw new Error('Missing chat participants');
 
+    const [currentProfile, otherProfile] = await Promise.all([
+      getUserProfile(currentUser.uid),
+      getUserProfile(otherUserId),
+    ]);
+    if (!currentProfile?.collegeId || !otherProfile?.collegeId || currentProfile.collegeId !== otherProfile.collegeId) {
+      throw new Error('Messaging is currently limited to students from your campus.');
+    }
+
     const chatRef = await addDoc(collection(db, 'chats'), {
       participants: [currentUser.uid, otherUserId],
       updatedAt: serverTimestamp(),
@@ -278,7 +286,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
     } catch (error) {
       setInputText(messageText);
       setReplyingTo(reply);
-      Alert.alert('Message not sent', 'Please check your connection and try again.');
+      Alert.alert('Message not sent', error?.message || 'Please check your connection and try again.');
       console.error('Message send failed:', error);
     }
   };
