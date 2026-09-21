@@ -5,12 +5,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { updateProfile } from 'firebase/auth';
-import { collection, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDocs, query, updateDoc, where, orderBy } from 'firebase/firestore';
 import {
-  Award, BookOpen, BriefcaseBusiness, CheckCircle2, Code2, GraduationCap,
-  MapPin, Plus, QrCode, Sparkles, Trash2, UserRound, X,
+  Award, BookOpen, BriefcaseBusiness, CheckCircle2, Code2, ExternalLink, GraduationCap,
+  MapPin, Plus, QrCode, Share2, Sparkles, Trash2, UserRound, X,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import QRCode from 'react-native-qrcode-svg';
 import { auth, db } from '../config/firebase';
 import { getUserProfile, FALLBACK_AVATAR } from '../services/userService';
 import { sendConnectionRequest } from '../services/connectionService';
@@ -63,8 +64,12 @@ const ProfileScreen = ({ route, navigation }) => {
   const [activeTab, setActiveTab] = useState('posts');
   const [newSkill, setNewSkill] = useState('');
   const [form, setForm] = useState(null);
+  const [connectionState, setConnectionState] = useState('none');
+  const [posts, setPosts] = useState([]);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [qrVisible, setQrVisible] = useState(false);
 
-  const isConnected = isSelf || Boolean(user?.connections?.includes(currentUser?.uid));
+  const isConnected = isSelf || connectionState === 'connected' || Boolean(user?.connections?.includes(currentUser?.uid));
 
   useEffect(() => {
     let active = true;
@@ -92,6 +97,59 @@ const ProfileScreen = ({ route, navigation }) => {
     load();
     return () => { active = false; };
   }, [targetUid, route?.params?.uid, route?.params?.name, route?.params?.avatar]);
+
+  useEffect(() => {
+    let active = true;
+    const loadConnectionState = async () => {
+      if (isSelf || !currentUser?.uid || !targetUid) {
+        setConnectionState(isSelf ? 'connected' : 'none');
+        return;
+      }
+      try {
+        const [me, target, sent, received] = await Promise.all([
+          getUserProfile(currentUser.uid),
+          getUserProfile(targetUid),
+          getDocs(query(collection(db, 'connectionRequests'), where('senderId', '==', currentUser.uid), where('receiverId', '==', targetUid))),
+          getDocs(query(collection(db, 'connectionRequests'), where('senderId', '==', targetUid), where('receiverId', '==', currentUser.uid))),
+        ]);
+        if (!active) return;
+        if (me?.connections?.includes(targetUid) && target?.connections?.includes(currentUser.uid)) {
+          setConnectionState('connected');
+        } else if ([...sent.docs, ...received.docs].some((item) => item.data()?.status === 'pending')) {
+          setConnectionState('pending');
+        } else {
+          setConnectionState('none');
+        }
+      } catch (error) {
+        console.warn('Connection state unavailable:', error);
+      }
+    };
+    loadConnectionState();
+    return () => { active = false; };
+  }, [currentUser?.uid, targetUid, isSelf]);
+
+  useEffect(() => {
+    let active = true;
+    const loadPosts = async () => {
+      if (!targetUid) return;
+      setPostsLoading(true);
+      try {
+        const snapshot = await getDocs(query(collection(db, 'buzz_posts'), where('author.uid', '==', targetUid)));
+        const now = Date.now();
+        const next = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
+          .filter((post) => !post.createdAt || !post.createdAt.toMillis || post.createdAt.toMillis() > now - 48 * 60 * 60 * 1000)
+          .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+        if (active) setPosts(next);
+      } catch (error) {
+        console.warn('Profile posts unavailable:', error);
+        if (active) setPosts([]);
+      } finally {
+        if (active) setPostsLoading(false);
+      }
+    };
+    loadPosts();
+    return () => { active = false; };
+  }, [targetUid]);
 
   const openEdit = () => {
     if (!user) return;
@@ -215,6 +273,7 @@ const ProfileScreen = ({ route, navigation }) => {
     if (!currentUser || !user || isSelf) return;
     try {
       await sendConnectionRequest({ sender: { uid: currentUser.uid, name: currentUser.displayName || 'Student', avatar: currentUser.photoURL || '' }, receiver: user });
+      setConnectionState('pending');
       Alert.alert('Request sent', 'Your connection request has been sent.');
     } catch (error) {
       console.error('Connection request failed:', error);
@@ -249,7 +308,7 @@ const ProfileScreen = ({ route, navigation }) => {
 
   const stats = [
     { key: 'connections', value: user.connections?.length || 0, label: 'Connections' },
-    { key: 'projects', value: user.projectsCount || 0, label: 'Projects' },
+    { key: 'projects', value: user.projects?.length || user.projectsCount || 0, label: 'Projects' },
     { key: 'vault', value: vaultCount, label: 'Vault Files' },
   ];
 
@@ -306,17 +365,20 @@ const ProfileScreen = ({ route, navigation }) => {
         <ProfileSection title="Education & Experience" subtitle="Build your professional identity">
           <View style={styles.timelineCard}>
             <TimelineItem icon={GraduationCap} title={user.course || 'Computer Science Engineering'} subtitle={(user.gradYear ? 'Class of ' + user.gradYear : 'Student') + ' • ' + (user.location || 'Campus')} />
-            <TimelineItem icon={BriefcaseBusiness} title={user.projectsCount ? user.projectsCount + ' projects completed' : 'Start your project portfolio'} subtitle="Projects, internships and experience will live here." />
-            <TimelineItem icon={Award} title="Achievements & certifications" subtitle="Add hackathons, certificates and campus milestones." last />
+            {(user.experience || []).map((item, index) => <TimelineItem key={'exp-' + index} icon={BriefcaseBusiness} title={item.title || item.role || 'Experience'} subtitle={[item.company, item.period].filter(Boolean).join(' • ') || item.description || 'Professional experience'} last={index === user.experience.length - 1 && !(user.achievements || []).length} />)}
+            {(user.achievements || []).slice(0, 3).map((item, index) => <TimelineItem key={'ach-' + index} icon={Award} title={item.title || 'Achievement'} subtitle={[item.issuer, item.year].filter(Boolean).join(' • ') || item.description || 'Achievement'} last={index === Math.min((user.achievements || []).length, 3) - 1} />)}
+            {!user.experience?.length && !user.achievements?.length && <Text style={styles.emptyTimelineText}>{isSelf ? 'Add experience and achievements to build your professional timeline.' : 'No experience or achievements added yet.'}</Text>}
           </View>
         </ProfileSection>
 
-        <ProfileSection title="Portfolio" subtitle="Show what you have built" action={isSelf ? { label: 'Add', onPress: () => Alert.alert('Projects', 'Project management is the next profile module. Your project count is already supported.') } : { label: 'View all', onPress: () => {} }}>
-          <View style={styles.portfolioCard}>
-            <View style={styles.portfolioIcon}><Code2 size={22} color="#111" /></View>
-            <View style={styles.portfolioCopy}><Text style={styles.portfolioTitle}>{user.projectsCount ? user.projectsCount + ' projects' : 'Your project portfolio'}</Text><Text style={styles.portfolioText}>GitHub projects, college builds, hackathons and live work.</Text></View>
-            <Text style={styles.arrow}>›</Text>
-          </View>
+        <ProfileSection title="Portfolio" subtitle="Show what you have built" action={isSelf ? { label: 'Edit', onPress: openEdit } : undefined}>
+          {(user.projects || []).length ? (user.projects || []).slice(0, 6).map((project, index) => (
+            <TouchableOpacity key={'project-' + index} style={styles.projectCard} onPress={() => project.url && openLink(project.url, 'Project')} activeOpacity={0.85}>
+              <View style={styles.portfolioIcon}><Code2 size={21} color="#111" /></View>
+              <View style={styles.portfolioCopy}><Text style={styles.portfolioTitle}>{project.name || project.title || 'Project'}</Text><Text style={styles.portfolioText} numberOfLines={2}>{project.description || project.tech || 'College project / build'}</Text></View>
+              {project.url ? <ExternalLink size={17} color="#fff" /> : <Text style={styles.arrow}>›</Text>}
+            </TouchableOpacity>
+          )) : <View style={styles.emptyCard}><Code2 size={22} color="#777770" /><Text style={styles.emptyTitle}>No projects added yet</Text><Text style={styles.emptyText}>{isSelf ? 'Add projects to make your portfolio useful for collaborators and recruiters.' : 'This student has not added projects yet.'}</Text>{isSelf && <TouchableOpacity style={styles.smallButton} onPress={openEdit}><Text style={styles.smallButtonText}>Edit profile</Text></TouchableOpacity>}</View>}
         </ProfileSection>
 
         <ProfileSection title="Links" subtitle="Connect your digital identity">
@@ -327,19 +389,23 @@ const ProfileScreen = ({ route, navigation }) => {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlightRow}>
             <Highlight icon={Code2} title="Projects" value={String(user.projectsCount || 0)} />
             <Highlight icon={Award} title="Achievements" value="Add" />
-            <Highlight icon={QrCode} title="QR Profile" value="Share" onPress={shareProfile} />
+            <Highlight icon={QrCode} title="QR Profile" value="Show QR" onPress={() => setQrVisible(true)} />
             <Highlight icon={BookOpen} title="Vault" value={String(vaultCount)} onPress={() => navigation.navigate('Vault')} />
           </ScrollView>
         </ProfileSection>
 
         <ProfileTabs active={activeTab} onChange={setActiveTab} />
         <View style={styles.tabContent}>
-          {activeTab === 'posts' && <EmptyTab icon={Sparkles} title="Your story starts here" text="Updates and posts you publish can appear on your profile." />}
-          {activeTab === 'projects' && <EmptyTab icon={Code2} title={user.projectsCount ? 'Projects ready to showcase' : 'No projects yet'} text="Your portfolio will become a dedicated space for projects, collaborators, links and demos." />}
-          {activeTab === 'activity' && <EmptyTab icon={CheckCircle2} title="Activity" text="Connections, achievements, project updates and campus activity will appear here." />}
+          {activeTab === 'posts' && (postsLoading ? <View style={styles.tabLoading}><ActivityIndicator size="small" color="#111" /></View> : posts.length ? posts.slice(0, 8).map((post) => <PostCard key={post.id} post={post} />) : <EmptyTab icon={Sparkles} title="No recent posts" text={isSelf ? 'Your recent Updates posts will appear here.' : 'This student has no recent posts.'} />)}
+          {activeTab === 'projects' && ((user.projects || []).length ? user.projects.slice(0, 8).map((project, index) => <ProjectRow key={index} project={project} onOpen={openLink} />) : <EmptyTab icon={Code2} title="No projects yet" text={isSelf ? 'Add projects to showcase your work.' : 'No projects have been added yet.'} />)}
+          {activeTab === 'activity' && <View><ActivityRow icon={CheckCircle2} title={(user.connections?.length || 0) + ' connections'} text="Your current WeConnect network" /><ActivityRow icon={Award} title={(user.achievements?.length || 0) + ' achievements'} text="Achievements and certifications" /><ActivityRow icon={Code2} title={(user.projects?.length || user.projectsCount || 0) + ' projects'} text="Projects and builds" /></View>}
         </View>
         <View style={styles.footerSpace} />
       </ScrollView>
+
+      <Modal visible={qrVisible} transparent animationType="fade" onRequestClose={() => setQrVisible(false)}>
+        <View style={styles.qrOverlay}><View style={styles.qrModalCard}><View style={styles.qrModalHeader}><View><Text style={styles.qrEyebrow}>WE CONNECT</Text><Text style={styles.qrModalTitle}>Profile QR</Text></View><TouchableOpacity onPress={() => setQrVisible(false)}><X size={24} color="#111" /></TouchableOpacity></View><Image source={{ uri: user.avatar }} style={styles.qrModalAvatar} /><Text style={styles.qrModalName}>{user.name}</Text><Text style={styles.qrModalHandle}>{user.handle || '@student'}</Text><View style={styles.qrCodeBox}><QRCode value={'weconnect://profile/' + user.uid} size={190} /></View><Text style={styles.qrModalHint}>Let a classmate scan this code to open your profile.</Text><TouchableOpacity style={styles.qrShareButton} onPress={shareProfile}><Share2 size={17} color="#111" /><Text style={styles.qrShareText}>Share profile</Text></TouchableOpacity></View></View>
+      </Modal>
 
       <Modal visible={!!fullScreenAvatar} transparent animationType="fade" onRequestClose={() => setFullScreenAvatar(null)}>
         <View style={styles.avatarModal}><TouchableOpacity style={styles.closeButton} onPress={() => setFullScreenAvatar(null)}><X size={28} color="#fff" /></TouchableOpacity><Image source={{ uri: fullScreenAvatar }} style={styles.fullAvatar} resizeMode="contain" /></View>
@@ -386,6 +452,9 @@ const InfoRow=({icon:Icon,label,value,multiline})=><View style={styles.infoRow}>
 const TimelineItem=({icon:Icon,title,subtitle,last})=><View style={styles.timelineItem}><View style={styles.timelineIcon}><Icon size={17} color="#111"/></View><View style={[styles.timelineCopy,!last&&styles.timelineBorder]}><Text style={styles.timelineTitle}>{title}</Text><Text style={styles.timelineSubtitle}>{subtitle}</Text></View></View>;
 const Highlight=({icon:Icon,title,value,onPress})=><TouchableOpacity style={styles.highlight} onPress={onPress}><View style={styles.highlightIcon}><Icon size={20} color="#111"/></View><Text style={styles.highlightTitle}>{title}</Text><Text style={styles.highlightValue}>{value}</Text></TouchableOpacity>;
 const EmptyTab=({icon:Icon,title,text})=><View style={styles.emptyTab}><View style={styles.emptyTabIcon}><Icon size={24} color="#111"/></View><Text style={styles.emptyTabTitle}>{title}</Text><Text style={styles.emptyTabText}>{text}</Text></View>;
+const PostCard=({post})=><View style={styles.postCard}>{post.imageUrl?<Image source={{uri:post.imageUrl}} style={styles.postImage} resizeMode="cover"/>:null}<Text style={styles.postType}>{String(post.type||'UPDATE').replace('_',' ').toUpperCase()}</Text><Text style={styles.postText}>{post.content || post.question || post.eventName || 'Campus update'}</Text><View style={styles.postMeta}><Text style={styles.postMetaText}>{post.likes?.length || 0} likes</Text><Text style={styles.postMetaText}>{post.commentCount || 0} comments</Text></View></View>;
+const ProjectRow=({project,onOpen})=><TouchableOpacity style={styles.projectRow} onPress={()=>project.url&&onOpen(project.url,'Project')}><View style={styles.projectRowIcon}><Code2 size={18} color="#111"/></View><View style={styles.projectRowCopy}><Text style={styles.projectRowTitle}>{project.name||project.title||'Project'}</Text><Text style={styles.projectRowText} numberOfLines={2}>{project.description||project.tech||'Project build'}</Text></View>{project.url?<ExternalLink size={16} color="#777"/>:null}</TouchableOpacity>;
+const ActivityRow=({icon:Icon,title,text})=><View style={styles.activityRow}><View style={styles.activityIcon}><Icon size={17} color="#111"/></View><View style={styles.activityCopy}><Text style={styles.activityTitle}>{title}</Text><Text style={styles.activityText}>{text}</Text></View></View>;
 const ShareIcon=()=> <Text style={{fontSize:18}}>↗</Text>;
 
 const styles=StyleSheet.create({
