@@ -138,7 +138,7 @@ const ChatsScreen = ({ navigation }) => {
 
   const clearSearch = () => { setSearchQuery(''); setStudentResults([]); };
   const openChat = (chat) => navigation.navigate('ChatRoom', { chatId: chat.id, name: chat.name, avatar: chat.avatar, uid: chat.otherUserId });
-  const startNewChat = (user) => { clearSearch(); navigation.navigate('ChatRoom', { uid: user.uid, name: user.name, avatar: user.avatar }); };
+  const openStudentProfile = (user) => { clearSearch(); navigation.navigate('Profile', { uid: user.uid, name: user.name, avatar: user.avatar }); };
 
   const markRead = async (chat) => {
     if (!chat.unreadCount || !currentUser?.uid) return;
@@ -163,13 +163,13 @@ const ChatsScreen = ({ navigation }) => {
   );
 
   const renderStudent = ({ item }) => (
-    <TouchableOpacity style={styles.studentResult} activeOpacity={0.82} onPress={() => startNewChat(item)}>
+    <TouchableOpacity style={styles.studentResult} activeOpacity={0.82} onPress={() => openStudentProfile(item)}>
       <Avatar uri={item.avatar} name={item.name} size={50} />
       <View style={styles.studentInfo}>
         <Text style={styles.studentName} numberOfLines={1}>{item.name}</Text>
         <Text style={styles.studentMeta} numberOfLines={1}>{item.username ? '@' + item.username : item.email || 'WeConnect student'}</Text>
       </View>
-      <View style={styles.startChatButton}><MessageCircle size={17} color="#111111" /></View>
+      <View style={styles.viewProfileButton}><Text style={styles.viewProfileButtonText}>View</Text></View>
     </TouchableOpacity>
   );
 
@@ -295,7 +295,8 @@ const styles = StyleSheet.create({
   studentInfo: { flex: 1, minWidth: 0 },
   studentName: { fontSize: 14, fontWeight: '800', color: '#22221F' },
   studentMeta: { fontSize: 11, color: '#85857E', marginTop: 3 },
-  startChatButton: { width: 38, height: 38, borderRadius: 13, backgroundColor: '#FFFC00', alignItems: 'center', justifyContent: 'center' },
+  viewProfileButton: { minWidth: 48, height: 34, paddingHorizontal: 10, borderRadius: 13, backgroundColor: '#F0F0EC', alignItems: 'center', justifyContent: 'center' },
+  viewProfileButtonText: { fontSize: 11, fontWeight: '900', color: '#111111' },
   loadingBox: { minHeight: 180, alignItems: 'center', justifyContent: 'center', gap: 9 },
   loadingBoxSmall: { minHeight: 80, alignItems: 'center', justifyContent: 'center' },
   loadingText: { fontSize: 12, color: '#7A7A73' },
