@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import { auth } from '../config/firebase';
+import { auth, db } from '../config/firebase';
 import { getUserProfile } from '../services/userService';
 import { COLLEGES, DEFAULT_COLLEGE_ID } from '../config/collegeConfig';
 
