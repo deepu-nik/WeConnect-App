@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Modal, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CheckCheck, ChevronRight, MessageCircle, Plus, Search, Sparkles, UserRoundPlus, Users, X } from 'lucide-react-native';
+import { CheckCheck, ChevronRight, MessageCircle, Plus, Search, Sparkles, UserRoundPlus, X } from 'lucide-react-native';
 import { auth, db } from '../config/firebase';
 import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { markChatRead } from '../services/chatService';
@@ -142,15 +142,11 @@ const ChatsScreen = ({ navigation }) => {
       <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); setTimeout(() => setRefreshing(false), 450); }} tintColor="#111111" />} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <View style={styles.headerCopy}>
-            <Text style={styles.eyebrow}>WECONNECT • MESSAGES</Text>
-            <Text style={styles.title}>Your conversations.</Text>
-            <Text style={styles.subtitle}>{chats.length ? chats.length + ' conversation' + (chats.length === 1 ? '' : 's') + ' in your circle' : 'Connect with someone from your campus.'}</Text>
-          </View>
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.headerButton} onPress={() => setDashboardVisible(true)} accessibilityLabel="Open student utilities"><Sparkles size={21} color="#111111" /></TouchableOpacity>
-            <TouchableOpacity style={styles.headerButtonDark} onPress={() => navigation.navigate('Connect')} accessibilityLabel="Find people to connect with"><UserRoundPlus size={20} color="#FFFFFF" /></TouchableOpacity>
-          </View>
+          <Text style={styles.brand}>WeConnect</Text>
+          <TouchableOpacity style={styles.studentHubButton} onPress={() => setDashboardVisible(true)} accessibilityLabel="Open Student Hub">
+            <Sparkles size={17} color="#111111" />
+            <Text style={styles.studentHubButtonText}>Student Hub</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.searchShell}>
@@ -161,18 +157,6 @@ const ChatsScreen = ({ navigation }) => {
 
         {!searchMode ? (
           <>
-            <View style={styles.quickRow}>
-              <TouchableOpacity style={styles.quickCard} onPress={() => setDashboardVisible(true)}>
-                <View style={[styles.quickIcon, styles.quickIconYellow]}><Sparkles size={18} color="#111111" /></View>
-                <View style={styles.quickCopy}><Text style={styles.quickTitle}>Student Hub</Text><Text style={styles.quickSubtitle}>Tasks, notes & tools</Text></View>
-                <ChevronRight size={17} color="#777770" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickCard} onPress={() => navigation.navigate('Connect')}>
-                <View style={[styles.quickIcon, styles.quickIconDark]}><Users size={18} color="#FFFFFF" /></View>
-                <View style={styles.quickCopy}><Text style={styles.quickTitle}>Meet people</Text><Text style={styles.quickSubtitle}>Discover your campus</Text></View>
-                <ChevronRight size={17} color="#777770" />
-              </TouchableOpacity>
-            </View>
             <View style={styles.sectionHeader}>
               <View><Text style={styles.sectionTitle}>Messages</Text><Text style={styles.sectionHint}>{unreadCount ? unreadCount + ' unread' : 'Everything is caught up'}</Text></View>
               <View style={styles.filterPillRow}>
@@ -234,25 +218,13 @@ const ChatsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F6F6F2' },
   page: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 30 },
-  header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingTop: 6, paddingBottom: 18 },
-  headerCopy: { flex: 1, paddingRight: 12 },
-  eyebrow: { fontSize: 10, fontWeight: '900', letterSpacing: 1.25, color: '#8B8B84', marginBottom: 7 },
-  title: { fontSize: 28, lineHeight: 32, fontWeight: '900', letterSpacing: -0.8, color: '#111111' },
-  subtitle: { marginTop: 6, fontSize: 13, lineHeight: 18, color: '#73736D', maxWidth: 260 },
-  headerActions: { flexDirection: 'row', gap: 8, paddingTop: 2 },
-  headerButton: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E6E6E0', alignItems: 'center', justifyContent: 'center' },
-  headerButtonDark: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#111111', alignItems: 'center', justifyContent: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 5, paddingBottom: 18 },
+  brand: { fontSize: 25, fontWeight: '900', letterSpacing: -0.8, color: '#111111' },
+  studentHubButton: { minHeight: 42, paddingHorizontal: 13, borderRadius: 14, backgroundColor: '#FFFC00', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: '#E8E500' },
+  studentHubButtonText: { fontSize: 12, fontWeight: '900', color: '#111111' },
   searchShell: { minHeight: 52, borderRadius: 17, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E4E4DE', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, gap: 9, shadowColor: '#000', shadowOpacity: 0.035, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 1 },
   searchInput: { flex: 1, minHeight: 48, color: '#111111', fontSize: 15, paddingVertical: 0 },
   clearButton: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#EEEEEA', alignItems: 'center', justifyContent: 'center' },
-  quickRow: { flexDirection: 'row', gap: 9, marginTop: 12 },
-  quickCard: { flex: 1, minHeight: 74, borderRadius: 18, padding: 11, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5DF', flexDirection: 'row', alignItems: 'center' },
-  quickIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginRight: 9 },
-  quickIconYellow: { backgroundColor: '#FFFC00' },
-  quickIconDark: { backgroundColor: '#111111' },
-  quickCopy: { flex: 1 },
-  quickTitle: { fontSize: 13, fontWeight: '900', color: '#111111' },
-  quickSubtitle: { fontSize: 10, lineHeight: 14, color: '#777770', marginTop: 2 },
   sectionHeader: { marginTop: 24, marginBottom: 11, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   sectionTitle: { fontSize: 20, fontWeight: '900', color: '#111111' },
   sectionHint: { fontSize: 11, color: '#8A8A84', marginTop: 3 },
