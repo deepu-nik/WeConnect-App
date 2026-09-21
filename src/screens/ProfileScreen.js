@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, BackHandler, Image, KeyboardAvoidingView, Linking, Modal,
+  ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Modal,
   Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,25 +30,6 @@ const ProfileScreen = ({ route, navigation }) => {
   const [editVisible, setEditVisible] = useState(false);
   const [form, setForm] = useState(null);
   const [newSkill, setNewSkill] = useState('');
-  // Profile is a detail screen: every system back action should return to
-  // the Chats tab, not to whichever screen happened to open the profile.
-  // React Navigation 7's popTo removes the Profile route from the stack,
-  // avoiding the duplicate MainTabs/history problem caused by navigate().
-  const backToChats = useRef(false);
-
-  const goToChats = () => {
-    if (backToChats.current) return;
-    backToChats.current = true;
-
-    try {
-      navigation.popTo('MainTabs', { screen: 'Chats' });
-    } catch (error) {
-      backToChats.current = false;
-      console.error('Profile back navigation failed:', error);
-      navigation.navigate('MainTabs', { screen: 'Chats' });
-    }
-  };
-
   useEffect(() => {
     // Android system back button.
     const backSubscription = BackHandler.addEventListener('hardwareBackPress', () => {
