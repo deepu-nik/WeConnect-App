@@ -5,6 +5,7 @@ import { CheckCheck, ChevronRight, MessageCircle, Plus, Search, Sparkles, UserRo
 import { auth, db } from '../config/firebase';
 import { collection, doc, getDoc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { markChatRead } from '../services/chatService';
+import { getUserProfile } from '../services/userService';
 import Dashboard from '../components/Dashboard';
 
 const FALLBACK_AVATAR = 'https://via.placeholder.com/150';
@@ -63,7 +64,7 @@ const ChatsScreen = ({ navigation }) => {
     if (!currentUser?.uid) { setChats([]); setLoading(false); return undefined; }
     setLoading(true);
     const q = query(collection(db, 'chats'), where('participants', 'array-contains', currentUser.uid));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
       const next = await Promise.all(snapshot.docs.map(async (chatDoc) => {
         const data = chatDoc.data() || {};
         const participants = Array.isArray(data.participants) ? data.participants : [];
@@ -73,18 +74,18 @@ const ChatsScreen = ({ navigation }) => {
         let avatar = otherInfo.avatar || otherInfo.photoURL || '';
         let name = otherInfo.name || 'Student';
 
-        // Chat documents can contain an old/null avatar. The users document is
-        // the source of truth so profile-photo changes are reflected here too.
+        // Use the exact same profile source as ChatRoomScreen. Chat documents
+        // contain a snapshot of avatar data and can become stale after a user
+        // changes their profile photo.
         if (otherUserId) {
           try {
-            const userSnap = await getDoc(doc(db, 'users', otherUserId));
-            if (userSnap.exists()) {
-              const user = userSnap.data() || {};
-              avatar = user.photoURL || user.avatar || '';
-              name = user.displayName || user.name || name;
+            const profile = await getUserProfile(otherUserId);
+            if (profile) {
+              avatar = profile.avatar || avatar;
+              name = profile.name || name;
             }
           } catch (error) {
-            console.warn('Could not load chat avatar:', otherUserId, error);
+            console.warn('Could not load current chat profile:', otherUserId, error);
           }
         }
 
