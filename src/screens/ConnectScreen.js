@@ -159,7 +159,7 @@ const ConnectScreen = ({ navigation }) => {
 
   const customLocation = () => {
     if (Platform.OS !== 'ios') {
-      Alert.alert('Custom location', 'Choose one of the campus locations for now.');
+      Alert.alert('Custom location', 'Use one of the campus locations for now.');
       return;
     }
     Alert.prompt('Custom Location', 'Where are you?', [
@@ -246,6 +246,8 @@ const ConnectScreen = ({ navigation }) => {
   };
 
   const renderItem = ({ item }) => {
+    if (!item?.uid) return null;
+
     if (activeTab === 'requests') {
       const request = requests.find((entry) => entry.senderId === item.uid);
       return (
@@ -259,7 +261,7 @@ const ConnectScreen = ({ navigation }) => {
             <X size={19} color="#FF3B30" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.accept} onPress={() => request && handleRequest(request, true)}>
-            <Check size={18} color="#fff" />
+            <Check size={18} color="#111111" />
           </TouchableOpacity>
         </View>
       );
@@ -267,25 +269,25 @@ const ConnectScreen = ({ navigation }) => {
 
     return (
       <View style={styles.card}>
-        <TouchableOpacity onPress={() => openProfile(navigation, { uid: item.uid })}>
+        <TouchableOpacity onPress={() => item.uid && openProfile(navigation, { uid: item.uid })}>
           <Image source={{ uri: item.avatar }} style={styles.avatar} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.cardInfo} onPress={() => openProfile(navigation, { uid: item.uid })}>
+        <TouchableOpacity style={styles.cardInfo} onPress={() => item.uid && openProfile(navigation, { uid: item.uid })}>
           <Text style={styles.name}>{item.name}</Text>
           <Text style={styles.meta}>{activeTab === 'network' ? item.location : (item.bio || item.handle || 'Student')}</Text>
           {activeTab === 'network' && <Text style={styles.location}>{item.locationIcon} {item.location}</Text>}
         </TouchableOpacity>
         {activeTab === 'network' ? (
           <>
-            <TouchableOpacity style={styles.wave} onPress={() => Alert.alert('Wave sent', '👋 ' + item.name + ' will see your wave.')}>
+            <TouchableOpacity style={styles.wave} onPress={() => Alert.alert('Wave sent', '👋 ' + item.name + ' will see your wave.')} accessibilityLabel="Wave">
               <Hand size={19} color="#FF9500" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.chat} onPress={() => navigation.navigate('ChatRoom', { uid: item.uid, name: item.name, avatar: item.avatar })}>
-              <MessageCircle size={19} color="#fff" />
+            <TouchableOpacity style={styles.chat} onPress={() => navigation.navigate('ChatRoom', { uid: item.uid, name: item.name, avatar: item.avatar })} accessibilityLabel="Chat">
+              <MessageCircle size={19} color="#111111" />
             </TouchableOpacity>
           </>
         ) : (
-          <TouchableOpacity style={styles.connect} onPress={() => sendRequest(item)}>
+          <TouchableOpacity style={styles.connect} onPress={() => sendRequest(item)} accessibilityLabel="Connect">
             <UserPlus size={17} color="#111111" />
             <Text style={styles.connectText}>Connect</Text>
           </TouchableOpacity>
@@ -293,7 +295,6 @@ const ConnectScreen = ({ navigation }) => {
       </View>
     );
   };
-
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
