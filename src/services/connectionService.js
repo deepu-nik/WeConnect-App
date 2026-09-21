@@ -12,9 +12,17 @@ import {
   where,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { getUserProfile } from './userService';
 
 export const sendConnectionRequest = async ({ sender, receiver }) => {
   if (!sender?.uid || !receiver?.uid || sender.uid === receiver.uid) return;
+  const [senderProfile, receiverProfile] = await Promise.all([
+    getUserProfile(sender.uid),
+    getUserProfile(receiver.uid),
+  ]);
+  if (!senderProfile?.collegeId || !receiverProfile?.collegeId || senderProfile.collegeId !== receiverProfile.collegeId) {
+    throw new Error('You can only connect with students from your campus.');
+  }
 
   const request = {
     senderId: sender.uid,
@@ -66,6 +74,13 @@ export const declineConnectionRequest = async (request) => {
 
 export const connectUsersViaQr = async (currentUid, otherUid) => {
   if (!currentUid || !otherUid || currentUid === otherUid) throw new Error('Invalid QR profile.');
+  const [currentProfile, otherProfile] = await Promise.all([
+    getUserProfile(currentUid),
+    getUserProfile(otherUid),
+  ]);
+  if (!currentProfile?.collegeId || !otherProfile?.collegeId || currentProfile.collegeId !== otherProfile.collegeId) {
+    throw new Error('You can only connect with students from your campus.');
+  }
   const batch = writeBatch(db);
   batch.update(doc(db, 'users', currentUid), { connections: arrayUnion(otherUid) });
   batch.update(doc(db, 'users', otherUid), { connections: arrayUnion(currentUid) });
