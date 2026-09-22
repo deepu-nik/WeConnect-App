@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert, Animated, Dimensions, FlatList, Image, Keyboard, KeyboardAvoidingView,
+  ActivityIndicator, Alert, Animated, Dimensions, FlatList, Image, Keyboard, KeyboardAvoidingView,
   Modal, Platform, Pressable, Share, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -57,6 +57,7 @@ export default function StoryViewerScreen({ route, navigation }) {
   const [activityVisible, setActivityVisible] = useState(false);
   const [viewerProfiles, setViewerProfiles] = useState([]);
   const [viewerLoading, setViewerLoading] = useState(false);
+  const [activityTab, setActivityTab] = useState('viewers');
   const progress = useRef(new Animated.Value(0)).current;
   const imageTimer = useRef(null);
   const story = stories[index];
@@ -110,6 +111,7 @@ export default function StoryViewerScreen({ route, navigation }) {
 
   const openActivity = async () => {
     setActivityVisible(true);
+    setActivityTab('viewers');
     if (!isMine || !displayedStory?.viewers?.length) return;
     setViewerLoading(true);
     try {
@@ -254,31 +256,81 @@ export default function StoryViewerScreen({ route, navigation }) {
             </View>
 
             <View style={styles.activityTabs}>
-              <View style={styles.activityTabActive}><Eye size={15} color="#111" /><Text style={styles.activityTabText}>Viewers</Text></View>
-              <View style={styles.activityTab}><MessageCircle size={15} color="#777" /><Text style={styles.activityTabTextMuted}>{replies.length} replies</Text></View>
+              <TouchableOpacity
+                style={[styles.activityTab, activityTab === 'viewers' && styles.activityTabActive]}
+                onPress={() => setActivityTab('viewers')}
+                activeOpacity={0.82}
+              >
+                <Eye size={15} color={activityTab === 'viewers' ? '#111' : '#777'} />
+                <Text style={activityTab === 'viewers' ? styles.activityTabText : styles.activityTabTextMuted}>
+                  {'Viewers ' + (displayedStory?.viewers?.length ? '(' + displayedStory.viewers.length + ')' : '')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.activityTab, activityTab === 'replies' && styles.activityTabActive]}
+                onPress={() => setActivityTab('replies')}
+                activeOpacity={0.82}
+              >
+                <MessageCircle size={15} color={activityTab === 'replies' ? '#111' : '#777'} />
+                <Text style={activityTab === 'replies' ? styles.activityTabText : styles.activityTabTextMuted}>
+                  {'Replies ' + (replies.length ? '(' + replies.length + ')' : '')}
+                </Text>
+              </TouchableOpacity>
             </View>
 
-            {isMine ? (
-              viewerLoading ? <View style={styles.center}><ActivityIndicator color="#111" /></View> :
+            {activityTab === 'viewers' ? (
+              viewerLoading ? <View style={styles.center}><ActivityIndicator size="small" color="#111" /></View> :
               <FlatList
                 data={viewerProfiles}
-                keyExtractor={(item) => item.uid}
+                keyExtractor={(item, index) => item.uid || String(index)}
                 contentContainerStyle={styles.viewerList}
                 ListEmptyComponent={<View style={styles.center}><Text style={styles.emptyActivity}>No viewers yet. Share your story with classmates.</Text></View>}
                 renderItem={({ item }) => (
-                  <View style={styles.viewerRow}>
+                  <TouchableOpacity
+                    style={styles.viewerRow}
+                    activeOpacity={0.78}
+                    onPress={() => item?.uid && navigation.navigate('MainTabs', {
+                      screen: 'ProfileDetails',
+                      params: { uid: item.uid },
+                    })}
+                  >
                     <Image source={{ uri: item.avatar || FALLBACK_AVATAR }} style={styles.viewerAvatar} />
-                    <View style={{ flex: 1 }}><Text style={styles.viewerName}>{item.name || 'Student'}</Text><Text style={styles.viewerMeta}>{item.handle || item.course || 'WeConnect student'}</Text></View>
-                  </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.viewerName}>{item.name || 'Student'}</Text>
+                      <Text style={styles.viewerMeta}>{item.handle || item.course || 'WeConnect student'}</Text>
+                    </View>
+                    <ChevronRight size={17} color="#A1A19A" />
+                  </TouchableOpacity>
                 )}
               />
             ) : (
               <FlatList
                 data={replies}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item, index) => item.id || String(index)}
                 contentContainerStyle={styles.viewerList}
                 ListEmptyComponent={<View style={styles.center}><Text style={styles.emptyActivity}>No replies yet.</Text></View>}
-                renderItem={({ item }) => <View style={styles.replyRow}><Text style={styles.viewerName}>{item.senderName || 'Student'}</Text><Text style={styles.replyText}>{item.text}</Text></View>}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.replyRow}
+                    activeOpacity={item?.senderId ? 0.78 : 1}
+                    disabled={!item?.senderId}
+                    onPress={() => item?.senderId && navigation.navigate('MainTabs', {
+                      screen: 'ProfileDetails',
+                      params: { uid: item.senderId },
+                    })}
+                  >
+                    <View style={styles.replyRowTop}>
+                      <View style={styles.replyAvatar}>
+                        <Text style={styles.replyAvatarText}>{(item.senderName || 'S').slice(0, 1).toUpperCase()}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.viewerName}>{item.senderName || 'Student'}</Text>
+                        <Text style={styles.replyText}>{item.text}</Text>
+                      </View>
+                      {item?.senderId ? <ChevronRight size={17} color="#A1A19A" /> : null}
+                    </View>
+                  </TouchableOpacity>
+                )}
               />
             )}
           </View>
