@@ -35,7 +35,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { PinchGestureHandler, State } from 'react-native-gesture-handler';
 import { auth, db } from '../config/firebase';
-import { markChatRead } from '../services/chatService';
+import { createDirectChat, markChatRead } from '../services/chatService';
 import {
   deleteMessage,
   sendChatMessage as sendPersistedMessage,
@@ -44,14 +44,10 @@ import {
 } from '../services/chatMessageService';
 import { getUserProfile } from '../services/userService';
 import {
-  addDoc,
   collection,
   doc,
-  getDocs,
   onSnapshot,
   query,
-  serverTimestamp,
-  setDoc,
   updateDoc,
   where,
 } from 'firebase/firestore';
@@ -239,43 +235,13 @@ const ChatRoomScreen = ({ route, navigation }) => {
     if (chatId) return chatId;
     if (!currentUser || !otherUserId) throw new Error('Missing chat participants');
 
-    const [currentProfile, otherProfile] = await Promise.all([
-      getUserProfile(currentUser.uid),
-      getUserProfile(otherUserId),
-    ]);
-    if (!currentProfile?.collegeId || !otherProfile?.collegeId || currentProfile.collegeId !== otherProfile.collegeId) {
-      throw new Error('Messaging is currently limited to students from your campus.');
-    }
-    await assertCanMessage(currentUser.uid, otherUserId);
-
-    const deterministicChatId = [currentUser.uid, otherUserId].sort().join('_');
-    const chatRef = doc(db, 'chats', deterministicChatId);
-    const existing = await getDocs(query(collection(db, 'chats'), where('participants', 'array-contains', currentUser.uid)));
-    const existingMatch = existing.docs.find((item) => item.data()?.participants?.includes(otherUserId));
-    if (existingMatch) {
-      setChatId(existingMatch.id);
-      return existingMatch.id;
-    }
-    await setDoc(chatRef, {
-      collegeId: currentProfile.collegeId,
-      participants: [currentUser.uid, otherUserId],
-      updatedAt: serverTimestamp(),
-      lastMessage: '',
-      typing: { [currentUser.uid]: false, [otherUserId]: false },
-      unreadCount: { [currentUser.uid]: 0, [otherUserId]: 0 },
-      usersInfo: {
-        [currentUser.uid]: {
-          name: currentUser.displayName || 'You',
-          avatar: currentUser.photoURL || FALLBACK_AVATAR,
-        },
-        [otherUserId]: {
-          name: otherUserName,
-          avatar: otherUserAvatar,
-        },
-      },
+    const createdChatId = await createDirectChat({
+      currentUser,
+      otherUserId,
+      otherUser: { name: otherUserName, avatar: otherUserAvatar },
     });
-    setChatId(deterministicChatId);
-    return deterministicChatId;
+    setChatId(createdChatId);
+    return createdChatId;
   };
 
   const sendMessage = async (mediaUrl = null, mediaType = null, caption = null) => {
