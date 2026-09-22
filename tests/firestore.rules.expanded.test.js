@@ -378,6 +378,20 @@ describe('WeConnect Firestore expanded security rules', { concurrency: false }, 
   });
 
 
+  test('same-campus student can join a vault when given its invite code', async () => {
+    await assertSucceeds(
+      updateDoc(doc(dbAs('bob'), 'vaults', 'vault-dypiu'), {
+        members: ['alice', 'bob']
+      })
+    );
+
+    await assertFails(
+      updateDoc(doc(dbAs('other-college-user'), 'vaults', 'vault-dypiu'), {
+        members: ['alice', 'other-college-user']
+      })
+    );
+  });
+
   test('campus constrained story and vault queries are allowed', async () => {
     const alice = dbAs('alice');
 
