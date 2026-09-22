@@ -14,7 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { auth, db } from '../config/firebase';
 import { getUserProfile, getPrivateUserProfile, FALLBACK_AVATAR } from '../services/userService';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
-import { blockUser, isBlockedBetween, reportUser } from '../services/safetyService';
+import { blockUser, isBlockedByMe, reportUser } from '../services/safetyService';
 import { areConnected, sendConnectionRequest } from '../services/connectionService';
 
 const SKILL_COLORS = ['#007AFF', '#34C759', '#AF52DE', '#FF9500', '#FF3B30', '#5856D6'];
@@ -43,7 +43,7 @@ const ProfileScreen = ({ route, navigation }) => {
         const profile = await getUserProfile(targetUid);
         const privateProfile = isSelf ? await getPrivateUserProfile(targetUid) : null;
         if (!isSelf) {
-          try { if (await isBlockedBetween(targetUid)) setBlocked(true); } catch {}
+          try { if (await isBlockedByMe(targetUid)) setBlocked(true); } catch {}
           try { if (await areConnected(currentUser?.uid, targetUid)) setConnected(true); } catch {}
         }
         if (!active) return;
