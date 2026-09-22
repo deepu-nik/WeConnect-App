@@ -172,18 +172,16 @@ const ChatsScreen = ({ navigation }) => {
   };
 
   const clearSearch = () => { setSearchQuery(''); setStudentResults([]); };
-  const openChat = async (chat) => {
-    try {
-      const canonicalChatId = await createDirectChat({
-        currentUser,
-        otherUserId: chat.otherUserId,
-        otherUser: { name: chat.name, avatar: chat.avatar },
-      });
-      navigation.navigate('ChatRoom', { chatId: canonicalChatId, name: chat.name, avatar: chat.avatar, uid: chat.otherUserId });
-    } catch (error) {
-      console.error('Canonical chat open failed:', error);
-      navigation.navigate('ChatRoom', { chatId: chat.id, name: chat.name, avatar: chat.avatar, uid: chat.otherUserId });
-    }
+  const openChat = (chat) => {
+    // This chat document is already known from the live home-chat subscription.
+    // Navigate immediately instead of doing another Firestore/profile lookup before
+    // the transition. ChatRoom handles the already-existing document directly.
+    navigation.navigate('ChatRoom', {
+      chatId: chat.id,
+      name: chat.name,
+      avatar: chat.avatar,
+      uid: chat.otherUserId,
+    });
   };
   const startNewChat = async (user) => {
     clearSearch();
