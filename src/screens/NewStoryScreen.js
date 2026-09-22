@@ -19,8 +19,8 @@ export default function NewStoryScreen({ navigation }) {
       return;
     }
     const result = camera
-      ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images', 'videos'], quality: 1, videoMaxDuration: 60 })
-      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], quality: 1 });
+      ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images', 'videos'], quality: 0.85, videoMaxDuration: 15 })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], quality: 0.85 });
     if (!result.canceled) setAsset(result.assets[0]);
   };
 
@@ -28,7 +28,12 @@ export default function NewStoryScreen({ navigation }) {
     if (!asset || uploading) return;
     setUploading(true);
     try {
-      await createStory({ uri: asset.uri, type: asset.type === 'video' ? 'video' : 'image', caption });
+      await createStory({
+        uri: asset.uri,
+        type: asset.type === 'video' ? 'video' : 'image',
+        caption,
+        duration: asset.duration || null,
+      });
       navigation.goBack();
     } catch (error) {
       Alert.alert('Could not publish story', error.message);
@@ -45,7 +50,15 @@ export default function NewStoryScreen({ navigation }) {
         <TouchableOpacity disabled={!asset || uploading} onPress={publish}><Text style={[styles.publish, (!asset || uploading) && styles.disabled]}>Share</Text></TouchableOpacity>
       </View>
       <View style={styles.body}>
-        {asset ? <Image source={{ uri: asset.uri }} style={styles.preview} /> : <View style={styles.empty}><Text style={styles.emptyTitle}>Create your story</Text><Text style={styles.emptyText}>Share a photo or video with your campus.</Text></View>}
+        {asset ? (
+          <View>
+            {asset.type === 'video'
+              ? <View style={styles.videoPreview}><Text style={styles.videoLabel}>VIDEO · {Math.round((asset.duration || 0) / 1000)}s</Text></View>
+              : <Image source={{ uri: asset.uri }} style={styles.preview} />}
+          </View>
+        ) : (
+          <View style={styles.empty}><Text style={styles.emptyTitle}>Create your story</Text><Text style={styles.emptyText}>Share a photo or video with your campus.</Text></View>
+        )}
         <View style={styles.actions}>
           <TouchableOpacity style={styles.action} onPress={() => pick(true)}><Camera size={22} color="#007AFF" /><Text>Camera</Text></TouchableOpacity>
           <TouchableOpacity style={styles.action} onPress={() => pick(false)}><ImageIcon size={22} color="#007AFF" /><Text>Gallery</Text></TouchableOpacity>
@@ -57,5 +70,5 @@ export default function NewStoryScreen({ navigation }) {
   );
 }
 const styles = StyleSheet.create({
-  container:{flex:1,backgroundColor:'#fff'}, header:{height:58,paddingHorizontal:16,flexDirection:'row',alignItems:'center',justifyContent:'space-between',borderBottomWidth:1,borderBottomColor:'#eef2f7'}, title:{fontSize:18,fontWeight:'800',color:'#0f172a'},publish:{fontSize:16,fontWeight:'800',color:'#007AFF'},disabled:{color:'#cbd5e1'},body:{flex:1,padding:16},preview:{width:'100%',aspectRatio:9/14,borderRadius:18,backgroundColor:'#0f172a'},empty:{aspectRatio:9/14,borderRadius:18,backgroundColor:'#f8fafc',alignItems:'center',justifyContent:'center',padding:30},emptyTitle:{fontSize:22,fontWeight:'800',color:'#0f172a'},emptyText:{textAlign:'center',marginTop:8,color:'#64748b'},actions:{flexDirection:'row',gap:12,marginTop:14},action:{flex:1,height:48,borderRadius:14,backgroundColor:'#f1f5f9',alignItems:'center',justifyContent:'center',flexDirection:'row',gap:8},caption:{marginTop:14,minHeight:70,borderRadius:14,backgroundColor:'#f8fafc',padding:14,textAlignVertical:'top',color:'#0f172a'},overlay:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(0,0,0,.65)',alignItems:'center',justifyContent:'center'},uploading:{color:'#fff',marginTop:10,fontWeight:'700'}
+  container:{flex:1,backgroundColor:'#fff'}, header:{height:58,paddingHorizontal:16,flexDirection:'row',alignItems:'center',justifyContent:'space-between',borderBottomWidth:1,borderBottomColor:'#eef2f7'}, title:{fontSize:18,fontWeight:'800',color:'#0f172a'},publish:{fontSize:16,fontWeight:'800',color:'#007AFF'},disabled:{color:'#cbd5e1'},body:{flex:1,padding:16},preview:{width:'100%',aspectRatio:9/14,borderRadius:18,backgroundColor:'#0f172a'},videoPreview:{width:'100%',aspectRatio:9/14,borderRadius:18,backgroundColor:'#0f172a',alignItems:'center',justifyContent:'center'},videoLabel:{color:'#fff',fontWeight:'800'},empty:{aspectRatio:9/14,borderRadius:18,backgroundColor:'#f8fafc',alignItems:'center',justifyContent:'center',padding:30},emptyTitle:{fontSize:22,fontWeight:'800',color:'#0f172a'},emptyText:{textAlign:'center',marginTop:8,color:'#64748b'},actions:{flexDirection:'row',gap:12,marginTop:14},action:{flex:1,height:48,borderRadius:14,backgroundColor:'#f1f5f9',alignItems:'center',justifyContent:'center',flexDirection:'row',gap:8},caption:{marginTop:14,minHeight:70,borderRadius:14,backgroundColor:'#f8fafc',padding:14,textAlignVertical:'top',color:'#0f172a'},overlay:{...StyleSheet.absoluteFillObject,backgroundColor:'rgba(0,0,0,.65)',alignItems:'center',justifyContent:'center'},uploading:{color:'#fff',marginTop:10,fontWeight:'700'}
 });
