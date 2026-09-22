@@ -65,20 +65,24 @@ export const createGroup = async ({ name, description = '', memberIds = [] }) =>
 export const updateGroup = async (groupId, patch) => { if (groupId) await updateDoc(doc(db, GROUPS, groupId), patch); };
 
 export const addGroupMembers = async (groupId, users = []) => {
-  const group = await getGroup(groupId);
+  let group = await getGroup(groupId);
   if (!group || !group.admins.includes(auth.currentUser?.uid)) throw new Error('Only group admins can add members.');
-  const existing = new Set(group.members);
-  const candidates = users.filter((user) => user?.uid && !existing.has(user.uid)).slice(0, Math.max(0, 50 - group.members.length));
-  if (!candidates.length) return;
-  const patch = { members: arrayUnion(...candidates.map((user) => user.uid)), updatedAt: serverTimestamp(), lastMemberAdded: candidates[0].uid };
-  candidates.forEach((user) => {
-    patch['memberProfiles.' + user.uid] = { name: user.name || 'Student', avatar: user.avatar || user.photoURL || null };
-    patch['unreadCount.' + user.uid] = 0;
-    patch['typing.' + user.uid] = false;
-  });
-  await updateDoc(doc(db, GROUPS, groupId), patch);
+  for (const user of users) {
+    if (!user?.uid || group.members.includes(user.uid) || group.members.length >= 50) continue;
+    if (user.collegeId !== group.collegeId) continue;
+    const patch = {
+      members: arrayUnion(user.uid),
+      updatedAt: serverTimestamp(),
+      lastMemberAdded: user.uid,
+      ['memberProfiles.' + user.uid]: { name: user.name || 'Student', avatar: user.avatar || user.photoURL || null },
+      ['unreadCount.' + user.uid]: 0,
+      ['typing.' + user.uid]: false,
+    };
+    await updateDoc(doc(db, GROUPS, groupId), patch);
+    group = await getGroup(groupId);
+    if (!group) break;
+  }
 };
-
 export const removeGroupMember = async (groupId, uid) => {
   const group = await getGroup(groupId);
   if (!group || !group.admins.includes(auth.currentUser?.uid)) throw new Error('Only group admins can remove members.');
