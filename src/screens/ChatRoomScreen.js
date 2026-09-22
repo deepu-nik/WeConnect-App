@@ -34,6 +34,7 @@ import {
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { PinchGestureHandler, State } from 'react-native-gesture-handler';
+import { CommonActions } from '@react-navigation/native';
 import { auth, db } from '../config/firebase';
 import { createDirectChat, markChatRead } from '../services/chatService';
 import {
@@ -140,6 +141,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [mediaVisible, setMediaVisible] = useState(false);
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  const returningHomeRef = useRef(false);
 
   const imageMessages = useMemo(
     () => messages.filter((message) => message.mediaUrl && message.mediaType === 'image' && !message.deleted),
@@ -602,12 +604,37 @@ const ChatRoomScreen = ({ route, navigation }) => {
     );
   };
 
+  const returnToHomeChats = () => {
+    if (returningHomeRef.current) return;
+    returningHomeRef.current = true;
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{
+          name: 'MainTabs',
+          params: {
+            screen: 'Tabs',
+            params: { screen: 'Chats' },
+          },
+        }],
+      })
+    );
+  };
+
+  useEffect(() => {
+    return navigation.addListener('beforeRemove', (event) => {
+      if (returningHomeRef.current) return;
+      event.preventDefault();
+      returnToHomeChats();
+    });
+  }, [navigation]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" />
 
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerBack} onPress={() => navigation.canGoBack() && navigation.goBack()}>
+        <TouchableOpacity style={styles.headerBack} onPress={returnToHomeChats}>
           <ArrowLeft size={24} color="#111827" />
         </TouchableOpacity>
 
@@ -662,7 +689,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 10}
       >
         <FlatList
           ref={listRef}
@@ -1004,7 +1031,7 @@ const styles = StyleSheet.create({
   emojiRow: { flexDirection: 'row', justifyContent: 'space-around' },
   emojiButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   emojiButtonText: { fontSize: 24 },
-  composerShell: { paddingHorizontal: 8, paddingTop: 6, paddingBottom: Platform.OS === 'ios' ? 7 : 5, backgroundColor: '#F7F7F5' },
+  composerShell: { paddingHorizontal: 8, paddingTop: 6, paddingBottom: Platform.OS === 'ios' ? 7 : 12, backgroundColor: '#F7F7F5' },
   composer: { minHeight: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, paddingVertical: 5, borderRadius: 27, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E8E8E3', elevation: 3, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
   composerIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19 },
   textInputShell: { flex: 1, minHeight: 40, maxHeight: 100, flexDirection: 'row', alignItems: 'center', marginHorizontal: 2, paddingLeft: 8, borderRadius: 20, backgroundColor: '#F0F0EC' },
