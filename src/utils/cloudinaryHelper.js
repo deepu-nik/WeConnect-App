@@ -23,7 +23,7 @@ const getMimeType = (extension, type) => {
   return map[extension] || (type === 'audio' ? 'audio/mp4' : 'application/octet-stream');
 };
 
-export const uploadToCloudinary = async (fileUri, type = 'auto') => {
+export const uploadToCloudinary = async (fileUri, type = 'auto', options = {}) => {
   if (!fileUri || !CLOUD_NAME || !UPLOAD_PRESET) {
     console.error('Cloudinary configuration is missing.');
     return null;
@@ -34,21 +34,20 @@ export const uploadToCloudinary = async (fileUri, type = 'auto') => {
     const resourceType = type === 'image' ? 'image' : type === 'audio' ? 'video' : 'auto';
     const filename = 'upload_' + Date.now() + (extension ? '.' + extension : '');
     const mimeType = getMimeType(extension, type);
-
     const file = new File(fileUri);
+
     const form = new FormData();
     form.append('file', file);
     form.append('upload_preset', UPLOAD_PRESET);
+    form.append('folder', type === 'video' ? 'weconnect/stories/video' : type === 'image' ? 'weconnect/stories/image' : 'weconnect/uploads');
+    form.append('tags', type === 'video' || type === 'image' ? 'weconnect_story' : 'weconnect_media');
 
     const response = await expoFetch(
       `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${resourceType}/upload`,
       {
         method: 'POST',
         body: form,
-        headers: {
-          'X-File-Name': filename,
-          'X-File-Type': mimeType,
-        },
+        headers: { 'X-File-Name': filename, 'X-File-Type': mimeType },
       }
     );
 
@@ -56,6 +55,19 @@ export const uploadToCloudinary = async (fileUri, type = 'auto') => {
     if (!response.ok || !data.secure_url) {
       console.error('Cloudinary upload failed:', data);
       return null;
+    }
+
+    if (options.returnMetadata) {
+      return {
+        secureUrl: data.secure_url,
+        publicId: data.public_id || null,
+        resourceType: data.resource_type || resourceType,
+        format: data.format || null,
+        bytes: Number(data.bytes || 0),
+        duration: data.duration ? Number(data.duration) : null,
+        width: data.width ? Number(data.width) : null,
+        height: data.height ? Number(data.height) : null,
+      };
     }
 
     return data.secure_url;
