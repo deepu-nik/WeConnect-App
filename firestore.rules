@@ -89,6 +89,7 @@ service cloud.firestore {
     function isStoryCampus(storyId) {
       return verified() &&
         get(/databases/$(database)/documents/stories/$(storyId)).data.get('collegeId', '') == myCollegeId() &&
+        get(/databases/$(database)/documents/stories/$(storyId)).data.get('audience', []).hasAny([request.auth.uid]) &&
         myCollegeId() == 'dypiu';
     }
 
@@ -216,7 +217,8 @@ service cloud.firestore {
         request.resource.data.get('participants', []).size() == 2 &&
         request.resource.data.get('participants', []).hasAny([request.auth.uid]) &&
         request.resource.data.get('collegeId', '') == myCollegeId() &&
-        myCollegeId() == 'dypiu';
+        myCollegeId() == 'dypiu' &&
+        myUser().data.get('connections', []).hasAny(request.resource.data.get('participants', []));
 
       // Participants may update chat state, but never participants/usersInfo.
       allow update: if verified() &&
@@ -259,14 +261,14 @@ service cloud.firestore {
     // STORIES
     // -----------------------------------------------------------------------
     match /stories/{storyId} {
-      allow get, list: if isCampusStudent(resource.data.get('collegeId', ''));
+      allow get, list: if isCampusStudent(resource.data.get('collegeId', '')) && resource.data.get('audience', []).hasAny([request.auth.uid]);
 
       allow create: if verified() &&
         request.resource.data.userId == request.auth.uid &&
         request.resource.data.get('collegeId', '') == myCollegeId() &&
         myCollegeId() == 'dypiu';
 
-      allow update: if verified() &&
+      allow update: if verified() && resource.data.get('audience', []).hasAny([request.auth.uid]) &&
         resource.data.get('collegeId', '') == myCollegeId() &&
         myCollegeId() == 'dypiu' &&
         (
