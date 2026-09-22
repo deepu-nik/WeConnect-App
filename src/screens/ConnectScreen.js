@@ -483,7 +483,7 @@ const ConnectScreen = ({ navigation }) => {
           <View style={styles.qrCard}>
             <Image source={{ uri: currentUser?.photoURL || 'https://via.placeholder.com/150' }} style={styles.qrAvatar} />
             <Text style={styles.qrName}>{currentUser?.displayName || 'Student'}</Text>
-            <QRCode value={currentUser?.uid || 'weconnect'} size={190} />
+            <QRCode value={currentUser?.uid ? 'weconnect://profile/' + currentUser.uid : 'weconnect'} size={190} backgroundColor="#FFFFFF" color="#111111" />
             <Text style={styles.qrHint}>Let a classmate scan this code to open your profile.</Text>
             <TouchableOpacity style={styles.nativeScannerButton} onPress={openScanner} activeOpacity={0.85}>
               <ScanLine size={19} color="#111111" />
