@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BackHandler } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
 // Import screens
 import ChatsScreen from '../screens/ChatsScreen';
@@ -16,6 +18,26 @@ const Stack = createStackNavigator();
 
 const Tabs = () => {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    const handleHardwareBack = () => {
+      const state = navigation.getState();
+      const tabsRoute = state?.routes?.find((route) => route.name === 'Tabs');
+      const tabState = tabsRoute?.state;
+      const activeTab = tabState?.routes?.[tabState.index ?? 0]?.name;
+
+      if (activeTab && activeTab !== 'Chats') {
+        navigation.navigate('Tabs', { screen: 'Chats' });
+        return true;
+      }
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', handleHardwareBack);
+    return () => subscription.remove();
+  }, [navigation]);
+
   return (
   <Tab.Navigator
     initialRouteName="Chats"
