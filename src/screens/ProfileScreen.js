@@ -206,7 +206,7 @@ const ProfileScreen = ({ route, navigation }) => {
       if (result.canceled || !result.assets?.[0]?.uri) return;
 
       setUploading(true);
-      const url = await uploadToCloudinary(result.assets[0].uri, 'image');
+      const url = await uploadToCloudinary(result.assets[0].uri, 'image', { folder: type === 'cover' ? 'weconnect/profiles/covers' : 'weconnect/profiles/avatars', tags: type === 'cover' ? 'weconnect_profile_cover' : 'weconnect_profile_avatar' });
       if (!url) throw new Error('Upload failed');
 
       const field = type === 'avatar' ? 'photoURL' : 'coverPhoto';
