@@ -74,23 +74,64 @@ function dbAs(uid, emailVerified = true) {
   }).firestore();
 }
 
-async function seed() {
-  const admin = testEnv.withSecurityRulesDisabled((context) => context.firestore());
+const EMULATOR_BASE =
+  'http://127.0.0.1:8080/v1/projects/weconnect-8fd01-expanded/databases/(default)/documents';
 
+function toFirestoreValue(value) {
+  if (value === null) return { nullValue: null };
+  if (typeof value === 'boolean') return { booleanValue: value };
+  if (typeof value === 'string') return { stringValue: value };
+  if (typeof value === 'number') {
+    return Number.isInteger(value)
+      ? { integerValue: String(value) }
+      : { doubleValue: value };
+  }
+  if (Array.isArray(value)) {
+    return { arrayValue: { values: value.map(toFirestoreValue) } };
+  }
+  if (typeof value === 'object') {
+    return {
+      mapValue: {
+        fields: Object.fromEntries(
+          Object.entries(value).map(([key, item]) => [key, toFirestoreValue(item)])
+        ),
+      },
+    };
+  }
+  throw new TypeError(`Unsupported seed value: ${typeof value}`);
+}
+
+async function seedDoc(pathname, data) {
+  const encodedPath = pathname
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+  const response = await fetch(`${EMULATOR_BASE}/${encodedPath}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      fields: Object.fromEntries(
+        Object.entries(data).map(([key, value]) => [key, toFirestoreValue(value)])
+      ),
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to seed ${pathname}: ${response.status} ${await response.text()}`
+    );
+  }
+}
+
+async function seed() {
   await Promise.all(
-    Object.values(USERS).map((user) =>
-      setDoc(doc(admin, 'users', user.uid), user)
-    )
+    Object.values(USERS).map((user) => seedDoc(`users/${user.uid}`, user))
   );
 
-  await setDoc(doc(admin, 'userPrivate', 'alice'), {
-    email: 'alice@example.com',
-  });
-  await setDoc(doc(admin, 'userPrivate', 'bob'), {
-    email: 'bob@example.com',
-  });
+  await seedDoc('userPrivate/alice', { email: 'alice@example.com' });
+  await seedDoc('userPrivate/bob', { email: 'bob@example.com' });
 
-  await setDoc(doc(admin, 'chats', 'chat-alice-bob'), {
+  await seedDoc('chats/chat-alice-bob', {
     participants: ['alice', 'bob'],
     collegeId: 'dypiu',
     usersInfo: {},
@@ -100,7 +141,7 @@ async function seed() {
     typing: {},
   });
 
-  await setDoc(doc(admin, 'chats', 'chat-other'), {
+  await seedDoc('chats/chat-other', {
     participants: ['alice', 'other-college-user'],
     collegeId: 'other-college',
     usersInfo: {},
@@ -110,13 +151,13 @@ async function seed() {
     typing: {},
   });
 
-  await setDoc(doc(admin, 'chats/chat-alice-bob/messages', 'message-1'), {
+  await seedDoc('chats/chat-alice-bob/messages/message-1', {
     senderId: 'bob',
     text: 'hello',
     deleted: false,
   });
 
-  await setDoc(doc(admin, 'buzz_posts', 'post-dypiu'), {
+  await seedDoc('buzz_posts/post-dypiu', {
     authorId: 'alice',
     collegeId: 'dypiu',
     text: 'Campus post',
@@ -126,7 +167,7 @@ async function seed() {
     createdAt: '2026-01-01',
   });
 
-  await setDoc(doc(admin, 'buzz_posts', 'post-other'), {
+  await seedDoc('buzz_posts/post-other', {
     authorId: 'other-college-user',
     collegeId: 'other-college',
     text: 'Other post',
@@ -136,7 +177,7 @@ async function seed() {
     createdAt: '2026-01-01',
   });
 
-  await setDoc(doc(admin, 'stories', 'story-dypiu'), {
+  await seedDoc('stories/story-dypiu', {
     userId: 'alice',
     collegeId: 'dypiu',
     text: 'Campus story',
@@ -144,7 +185,7 @@ async function seed() {
     reactions: {},
   });
 
-  await setDoc(doc(admin, 'stories', 'story-other'), {
+  await seedDoc('stories/story-other', {
     userId: 'other-college-user',
     collegeId: 'other-college',
     text: 'Other story',
@@ -152,7 +193,7 @@ async function seed() {
     reactions: {},
   });
 
-  await setDoc(doc(admin, 'vaults', 'vault-dypiu'), {
+  await seedDoc('vaults/vault-dypiu', {
     collegeId: 'dypiu',
     createdBy: 'alice',
     members: ['alice', 'bob'],
@@ -160,7 +201,7 @@ async function seed() {
     name: 'CSE Vault',
   });
 
-  await setDoc(doc(admin, 'vaults', 'vault-private'), {
+  await seedDoc('vaults/vault-private', {
     collegeId: 'dypiu',
     createdBy: 'alice',
     members: ['alice'],
@@ -168,7 +209,7 @@ async function seed() {
     name: 'Private Vault',
   });
 
-  await setDoc(doc(admin, 'vault_files', 'file-dypiu'), {
+  await seedDoc('vault_files/file-dypiu', {
     vaultId: 'vault-dypiu',
     uploader: { uid: 'alice' },
     name: 'notes.pdf',
@@ -250,8 +291,7 @@ describe('WeConnect Firestore expanded security rules', { concurrency: false }, 
   });
 
   test('only the receiver can accept or decline a pending connection request', async () => {
-    const admin = testEnv.withSecurityRulesDisabled((context) => context.firestore());
-    await setDoc(doc(admin, 'connectionRequests', 'req-1'), {
+    await seedDoc('connectionRequests/req-1', {
       senderId: 'alice',
       receiverId: 'bob',
       status: 'pending',
@@ -267,7 +307,7 @@ describe('WeConnect Firestore expanded security rules', { concurrency: false }, 
       })
     );
 
-    await setDoc(doc(admin, 'connectionRequests', 'req-2'), {
+    await seedDoc('connectionRequests/req-2', {
       senderId: 'alice',
       receiverId: 'bob',
       status: 'pending',
@@ -284,8 +324,7 @@ describe('WeConnect Firestore expanded security rules', { concurrency: false }, 
   });
 
   test('connection request participants cannot rewrite sender or receiver IDs', async () => {
-    const admin = testEnv.unauthenticatedContext().firestore();
-    await setDoc(doc(admin, 'connectionRequests', 'req-immutable'), {
+    await seedDoc('connectionRequests/req-immutable', {
       senderId: 'alice',
       receiverId: 'bob',
       status: 'pending',
