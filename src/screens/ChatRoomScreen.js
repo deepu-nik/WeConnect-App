@@ -61,7 +61,7 @@ import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import { openProfile } from '../navigation/navigationHelpers';
 import { isBlockedByMe } from '../services/safetyService';
 import { assertCanMessage } from '../services/connectionService';
-import { addGroupMembers, getGroupChat, leaveGroupChat, updateGroupChat } from '../services/groupService';
+import { leaveGroupChat } from '../services/groupService';
 
 const QUICK_REACTIONS = ['❤️', '😂', '👍', '🔥', '😮', '👏'];
 const COMPOSER_EMOJIS = [
@@ -148,8 +148,6 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [isGroupChat, setIsGroupChat] = useState(Boolean(routeIsGroup));
   const [groupMembers, setGroupMembers] = useState([]);
   const [groupAdmins, setGroupAdmins] = useState([]);
-  const [groupCandidates, setGroupCandidates] = useState([]);
-  const [groupCandidateIds, setGroupCandidateIds] = useState([]);
   const [groupActionLoading, setGroupActionLoading] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const returningHomeRef = useRef(false);
