@@ -655,7 +655,11 @@ const ChatRoomScreen = ({ route, navigation }) => {
                     key={emoji}
                     style={styles.reactionAction}
                     onPress={async () => {
-                      await isGroup ? toggleGroupMessageReaction(groupId, item.id, emoji) : toggleMessageReaction(chatId, item.id, currentUser.uid, emoji);
+                      if (isGroup) {
+                        await toggleGroupMessageReaction(groupId, item.id, emoji);
+                      } else {
+                        await toggleMessageReaction(chatId, item.id, currentUser.uid, emoji);
+                      }
                       setSelectedMessageId(null);
                     }}
                   >
