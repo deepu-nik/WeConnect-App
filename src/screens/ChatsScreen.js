@@ -5,7 +5,7 @@ import { CheckCheck, ChevronRight, MessageCircle, Plus, Search, Sparkles, UserRo
 import { auth, db } from '../config/firebase';
 import { getUserProfile } from '../services/userService';
 import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
-import { markChatRead } from '../services/chatService';
+import { createDirectChat, markChatRead } from '../services/chatService';
 import Dashboard from '../components/Dashboard';
 
 const FALLBACK_AVATAR = 'https://via.placeholder.com/150';
@@ -88,12 +88,17 @@ const ChatsScreen = ({ navigation }) => {
               typing: Boolean(data.typing?.[otherUserId]),
             };
           }).filter((chat) => chat.otherUserId && chat.otherUserId !== currentUser.uid);
-          // Render immediately from the chat document, then enrich names/avatars from the canonical profile.
-          setChats(rawChats.sort((a, b) => b.timestamp - a.timestamp));
+          // A legacy/random chat id can exist for the same pair. Collapse those records by person so one student never appears twice.
+          const uniqueByPerson = Array.from(rawChats.reduce((map, chat) => {
+            const existing = map.get(chat.otherUserId);
+            if (!existing || chat.timestamp > existing.timestamp) map.set(chat.otherUserId, chat);
+            return map;
+          }, new Map()).values());
+          setChats(uniqueByPerson.sort((a, b) => b.timestamp - a.timestamp));
           setLoading(false);
           setRefreshing(false);
 
-          Promise.all(rawChats.map(async (chat) => {
+          Promise.all(uniqueByPerson.map(async (chat) => {
             if (profileCache.current.has(chat.otherUserId)) {
               return { ...chat, ...profileCache.current.get(chat.otherUserId) };
             }
@@ -167,8 +172,29 @@ const ChatsScreen = ({ navigation }) => {
   };
 
   const clearSearch = () => { setSearchQuery(''); setStudentResults([]); };
-  const openChat = (chat) => navigation.navigate('ChatRoom', { chatId: chat.id, name: chat.name, avatar: chat.avatar, uid: chat.otherUserId });
-  const startNewChat = (user) => { clearSearch(); navigation.navigate('ChatRoom', { uid: user.uid, name: user.name, avatar: user.avatar }); };
+  const openChat = async (chat) => {
+    try {
+      const canonicalChatId = await createDirectChat({
+        currentUser,
+        otherUserId: chat.otherUserId,
+        otherUser: { name: chat.name, avatar: chat.avatar },
+      });
+      navigation.navigate('ChatRoom', { chatId: canonicalChatId, name: chat.name, avatar: chat.avatar, uid: chat.otherUserId });
+    } catch (error) {
+      console.error('Canonical chat open failed:', error);
+      navigation.navigate('ChatRoom', { chatId: chat.id, name: chat.name, avatar: chat.avatar, uid: chat.otherUserId });
+    }
+  };
+  const startNewChat = async (user) => {
+    clearSearch();
+    try {
+      const canonicalChatId = await createDirectChat({ currentUser, otherUserId: user.uid, otherUser: user });
+      navigation.navigate('ChatRoom', { chatId: canonicalChatId, uid: user.uid, name: user.name, avatar: user.avatar });
+    } catch (error) {
+      console.error('New chat creation failed:', error);
+      navigation.navigate('ChatRoom', { uid: user.uid, name: user.name, avatar: user.avatar });
+    }
+  };
 
   const markRead = async (chat) => {
     if (!chat.unreadCount || !currentUser?.uid) return;
