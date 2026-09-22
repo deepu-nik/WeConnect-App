@@ -73,11 +73,11 @@ const AuthenticatedStack = () => (
 );
 
 const AppNavigator = () => {
-  const { user, loading, refreshEmailVerification, resendVerificationEmail, logout } = useContext(AuthContext);
+  const { user, emailVerified, loading, refreshEmailVerification, resendVerificationEmail, logout } = useContext(AuthContext);
   const navigationRef = useRef(null);
 
   useEffect(() => {
-    if (!user?.emailVerified) return undefined;
+    if (!emailVerified) return undefined;
 
     const openProfileFromUrl = (url) => {
       const uid = getProfileUidFromUrl(url);
@@ -91,7 +91,7 @@ const AppNavigator = () => {
     Linking.getInitialURL().then(openProfileFromUrl).catch(() => {});
     const subscription = Linking.addEventListener('url', ({ url }) => openProfileFromUrl(url));
     return () => subscription.remove();
-  }, [user?.emailVerified]);
+  }, [emailVerified]);
 
   if (loading) {
     return (
@@ -105,7 +105,7 @@ const AppNavigator = () => {
     <NavigationContainer ref={navigationRef}>
       {!user ? (
         <AuthStack />
-      ) : !user.emailVerified ? (
+      ) : !emailVerified ? (
         <VerifyStack
           user={user}
           refreshEmailVerification={refreshEmailVerification}
