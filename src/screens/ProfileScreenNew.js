@@ -187,20 +187,69 @@ export default function ProfileScreenNew({ route, navigation }) {
       });
       if (result.canceled || !result.assets?.[0]?.uri) return;
       setUploading(true);
-      const url = await uploadToCloudinary(result.assets[0].uri, 'image', {
+      const uploaded = await uploadToCloudinary(result.assets[0].uri, 'image', {
         folder: type === 'cover' ? 'weconnect/profiles/covers' : 'weconnect/profiles/avatars',
         tags: type === 'cover' ? 'weconnect_profile_cover' : 'weconnect_profile_avatar',
+        returnMetadata: true,
       });
-      if (!url) throw new Error('Image upload failed.');
-      const patch = type === 'avatar' ? { avatar: url, photoURL: url } : { coverPhoto: url };
+      if (!uploaded?.secureUrl) throw new Error('Image upload failed.');
+      const patch = type === 'avatar'
+        ? { avatar: uploaded.secureUrl, photoURL: uploaded.secureUrl, avatarPublicId: uploaded.publicId || null }
+        : { coverPhoto: uploaded.secureUrl, coverPhotoPublicId: uploaded.publicId || null };
       await updateDoc(doc(db, 'users', currentUser.uid), patch);
-      if (type === 'avatar') await updateProfile(currentUser, { photoURL: url });
+      if (type === 'avatar') await updateProfile(currentUser, { photoURL: uploaded.secureUrl });
       setUser((prev) => ({ ...prev, ...patch }));
     } catch (error) {
       Alert.alert('Upload failed', error?.message || 'Could not update the image.');
     } finally {
       setUploading(false);
     }
+  };
+
+  const removeImage = (type) => {
+    if (!isSelf) return;
+    const isAvatar = type === 'avatar';
+    const label = isAvatar ? 'profile picture' : 'cover picture';
+    Alert.alert(
+      'Remove picture?',
+      `Your ${label} will be removed from your profile.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setUploading(true);
+              const patch = isAvatar
+                ? { avatar: null, photoURL: null, avatarPublicId: null }
+                : { coverPhoto: null, coverPhotoPublicId: null };
+              await updateDoc(doc(db, 'users', currentUser.uid), patch);
+              if (isAvatar) await updateProfile(currentUser, { photoURL: null });
+              setUser((prev) => ({ ...prev, ...patch }));
+              setFullAvatar(false);
+              setFullCover(false);
+            } catch (error) {
+              Alert.alert('Could not remove', error?.message || 'Please try again.');
+            } finally {
+              setUploading(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const openImageActions = (type) => {
+    if (!isSelf) return;
+    const hasImage = type === 'avatar' ? Boolean(user?.avatar) : Boolean(user?.coverPhoto);
+    const label = type === 'avatar' ? 'Profile picture' : 'Cover picture';
+    const actions = [
+      { text: 'Change picture', onPress: () => pickImage(type) },
+    ];
+    if (hasImage) actions.push({ text: 'Remove picture', style: 'destructive', onPress: () => removeImage(type) });
+    actions.push({ text: 'Cancel', style: 'cancel' });
+    Alert.alert(label, 'Choose an action', actions);
   };
 
   const openSkillEditor = () => {
@@ -348,14 +397,14 @@ export default function ProfileScreenNew({ route, navigation }) {
               <Settings size={20} color={TEXT} />
             </TouchableOpacity>
           ) : null}
-          {isSelf ? <TouchableOpacity style={styles.coverEdit} onPress={() => pickImage('cover')}><Camera size={18} color={TEXT} /></TouchableOpacity> : null}
+          {isSelf ? <TouchableOpacity style={styles.coverEdit} onPress={() => openImageActions('cover')} accessibilityLabel="Edit cover picture"><Camera size={18} color={TEXT} /></TouchableOpacity> : null}
           {uploading ? <View style={styles.uploading}><ActivityIndicator color={TEXT} /></View> : null}
         </View>
 
         <View style={styles.profileCard}>
           <TouchableOpacity style={styles.avatarShell} onPress={() => setFullAvatar(true)} activeOpacity={0.9}>
             <Image source={{ uri: user.avatar || FALLBACK_AVATAR }} style={styles.avatar} />
-            {isSelf ? <TouchableOpacity style={styles.avatarEdit} onPress={() => pickImage('avatar')}><Camera size={14} color={TEXT} /></TouchableOpacity> : null}
+            {isSelf ? <TouchableOpacity style={styles.avatarEdit} onPress={() => openImageActions('avatar')} accessibilityLabel="Edit profile picture"><Camera size={14} color={TEXT} /></TouchableOpacity> : null}
           </TouchableOpacity>
 
           <View style={styles.heroActions}>
