@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useRef } from 'react';
 import { View, ActivityIndicator, Linking } from 'react-native';
-import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
+import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { AuthContext } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -76,7 +76,7 @@ const AuthenticatedStack = () => (
 const AppNavigator = () => {
   const { user, emailVerified, loading, refreshEmailVerification, resendVerificationEmail, logout } = useContext(AuthContext);
   const navigationRef = useRef(null);
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   useEffect(() => {
     if (!emailVerified) return undefined;
@@ -107,7 +107,7 @@ const AppNavigator = () => {
     <NavigationContainer
       ref={navigationRef}
       theme={{
-        dark: isDark,
+        dark: false,
         colors: {
           primary: '#FFFC00',
           background: colors.background,
@@ -116,7 +116,7 @@ const AppNavigator = () => {
           border: colors.border,
           notification: '#FF3B30',
         },
-        fonts: (isDark ? DarkTheme : DefaultTheme).fonts,
+        fonts: DefaultTheme.fonts,
       }}
     >
       {!user ? (
