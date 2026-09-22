@@ -5,14 +5,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { updateProfile } from 'firebase/auth';
-import { doc, getDocs, collection, query, where, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, query, where, updateDoc } from 'firebase/firestore';
 import {
   Camera, CheckCircle, Code, Ellipsis, Github, Globe, Instagram, Link as LinkIcon,
   Linkedin, MapPin, Plus, Settings, Trash2, Twitter, UserRound, X, Youtube,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { auth, db } from '../config/firebase';
-import { getUserProfile, FALLBACK_AVATAR } from '../services/userService';
+import { getUserProfile, getPrivateUserProfile, FALLBACK_AVATAR } from '../services/userService';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import { blockUser, isBlockedByMe, reportUser } from '../services/safetyService';
 
@@ -38,11 +38,12 @@ const ProfileScreen = ({ route, navigation }) => {
     (async () => {
       try {
         const profile = await getUserProfile(targetUid);
+        const privateProfile = isSelf ? await getPrivateUserProfile(targetUid) : null;
         if (!isSelf) {
           try { if (await isBlockedByMe(targetUid)) setBlocked(true); } catch {}
         }
         if (!active) return;
-        setUser(profile || {
+        setUser(profile ? { ...profile, ...(privateProfile || {}) } : {
           uid: targetUid,
           name: route?.params?.name || 'Student',
           handle: '@student',
@@ -166,13 +167,13 @@ const ProfileScreen = ({ route, navigation }) => {
         instagram: form.instagram.trim(),
         linkedin: form.linkedin.trim(),
         github: form.github.trim(),
-        whatsapp: form.whatsapp.trim(),
         course: form.course.trim(),
         gradYear: form.gradYear.trim(),
         projectsCount: Number.parseInt(form.projectsCount, 10) || 0,
         skills: form.skills,
       };
       await updateDoc(doc(db, 'users', currentUser.uid), next);
+      await updateDoc(doc(db, 'userPrivate', currentUser.uid), { whatsapp: form.whatsapp.trim() });
       await updateProfile(currentUser, { displayName: next.displayName });
       setUser((prev) => ({ ...prev, ...next }));
       setEditVisible(false);
