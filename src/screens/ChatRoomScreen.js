@@ -61,7 +61,7 @@ import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import { openProfile } from '../navigation/navigationHelpers';
 import { isBlockedByMe } from '../services/safetyService';
 import { assertCanMessage } from '../services/connectionService';
-import { leaveGroupChat } from '../services/groupService';
+import { addGroupMembers, leaveGroupChat, updateGroupChat } from '../services/groupService';
 
 const QUICK_REACTIONS = ['❤️', '😂', '👍', '🔥', '😮', '👏'];
 const COMPOSER_EMOJIS = [
@@ -149,6 +149,10 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [groupMembers, setGroupMembers] = useState([]);
   const [groupAdmins, setGroupAdmins] = useState([]);
   const [groupActionLoading, setGroupActionLoading] = useState(false);
+  const [groupAddVisible, setGroupAddVisible] = useState(false);
+  const [groupAddCandidates, setGroupAddCandidates] = useState([]);
+  const [selectedGroupAddIds, setSelectedGroupAddIds] = useState([]);
+  const [groupNameDraft, setGroupNameDraft] = useState('');
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const returningHomeRef = useRef(false);
 
@@ -635,6 +639,60 @@ const ChatRoomScreen = ({ route, navigation }) => {
     );
   };
 
+  const openGroupAddMembers = async () => {
+    if (!isGroupChat || !chatId || !groupAdmins.includes(currentUser?.uid)) return;
+    try {
+      const profile = await getUserProfile(currentUser.uid);
+      const snapshot = await getDocs(query(collection(db, 'users'), where('collegeId', '==', profile?.collegeId || '')));
+      const memberIds = new Set(groupMembers.map((member) => member.uid));
+      const candidates = snapshot.docs.map((item) => {
+        const data = item.data() || {};
+        return { ...data, uid: data.uid || item.id, name: data.name || data.displayName || 'Student', avatar: data.avatar || data.photoURL || FALLBACK_AVATAR };
+      }).filter((member) => !memberIds.has(member.uid));
+      setGroupAddCandidates(candidates);
+      setSelectedGroupAddIds([]);
+      setGroupAddVisible(true);
+    } catch (error) {
+      Alert.alert('Could not load students', error?.message || 'Please try again.');
+    }
+  };
+
+  const handleAddGroupMembers = async () => {
+    const selected = groupAddCandidates.filter((member) => selectedGroupAddIds.includes(member.uid));
+    if (!selected.length) {
+      setGroupAddVisible(false);
+      return;
+    }
+    try {
+      setGroupActionLoading(true);
+      await addGroupMembers(chatId, selected);
+      setGroupAddVisible(false);
+      setSelectedGroupAddIds([]);
+    } catch (error) {
+      Alert.alert('Could not add members', error?.message || 'Please try again.');
+    } finally {
+      setGroupActionLoading(false);
+    }
+  };
+
+  const renameGroup = () => {
+    if (!isGroupChat || !groupAdmins.includes(currentUser?.uid)) return;
+    setGroupNameDraft(otherUserName);
+    Alert.prompt?.('Rename group', 'Choose a new group name.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Save', onPress: async (value) => {
+        const nextName = String(value || '').trim();
+        if (!nextName) return;
+        try {
+          await updateGroupChat(chatId, { groupName: nextName });
+          setOtherUserName(nextName);
+        } catch (error) {
+          Alert.alert('Could not rename group', error?.message || 'Please try again.');
+        }
+      }},
+    ], 'plain-text', otherUserName);
+  };
+
   const returnToHomeChats = () => {
     if (returningHomeRef.current) return;
     returningHomeRef.current = true;
@@ -941,17 +999,31 @@ const ChatRoomScreen = ({ route, navigation }) => {
             <Text style={styles.detailsMeta}>{isGroupChat ? groupMembers.length + ' members' : 'Conversation'}</Text>
 
             {isGroupChat ? (
-              <ScrollView style={styles.groupMembersList} contentContainerStyle={{ paddingBottom: 4 }}>
-                {groupMembers.map((member) => (
-                  <TouchableOpacity key={member.uid} style={styles.groupMemberMini} onPress={() => member.uid !== currentUser?.uid && openProfile(navigation, { uid: member.uid, name: member.name, avatar: member.avatar })}>
-                    <Image source={{ uri: member.avatar || FALLBACK_AVATAR }} style={styles.groupMemberMiniAvatar} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.groupMemberMiniName}>{member.name || 'Student'}{member.uid === currentUser?.uid ? ' (You)' : ''}</Text>
-                      {groupAdmins.includes(member.uid) ? <Text style={styles.groupAdminText}>Admin</Text> : null}
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+              <>
+                <ScrollView style={styles.groupMembersList} contentContainerStyle={{ paddingBottom: 4 }}>
+                  {groupMembers.map((member) => (
+                    <TouchableOpacity key={member.uid} style={styles.groupMemberMini} onPress={() => member.uid !== currentUser?.uid && openProfile(navigation, { uid: member.uid, name: member.name, avatar: member.avatar })}>
+                      <Image source={{ uri: member.avatar || FALLBACK_AVATAR }} style={styles.groupMemberMiniAvatar} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.groupMemberMiniName}>{member.name || 'Student'}{member.uid === currentUser?.uid ? ' (You)' : ''}</Text>
+                        {groupAdmins.includes(member.uid) ? <Text style={styles.groupAdminText}>Admin</Text> : null}
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                {groupAdmins.includes(currentUser?.uid) ? (
+                  <>
+                    <TouchableOpacity style={styles.detailsAction} onPress={openGroupAddMembers}>
+                      <Text style={styles.detailsActionText}>Add members</Text>
+                    </TouchableOpacity>
+                    {Platform.OS === 'ios' ? (
+                      <TouchableOpacity style={styles.detailsAction} onPress={renameGroup}>
+                        <Text style={styles.detailsActionText}>Rename group</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </>
+                ) : null}
+              </>
             ) : (
               <TouchableOpacity
                 style={styles.detailsAction}
@@ -1005,6 +1077,29 @@ const ChatRoomScreen = ({ route, navigation }) => {
             </TouchableOpacity>
           </Pressable>
         </Pressable>
+      </Modal>
+
+      <Modal visible={groupAddVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setGroupAddVisible(false)}>
+        <SafeAreaView style={styles.groupAddModal}>
+          <View style={styles.groupAddHeader}>
+            <TouchableOpacity onPress={() => setGroupAddVisible(false)}><X size={23} color="#111111" /></TouchableOpacity>
+            <Text style={styles.detailsName}>Add members</Text>
+            <TouchableOpacity onPress={handleAddGroupMembers} disabled={groupActionLoading}><Text style={styles.groupAddDone}>{groupActionLoading ? '...' : 'Done'}</Text></TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16 }}>
+            {groupAddCandidates.map((member) => {
+              const selected = selectedGroupAddIds.includes(member.uid);
+              return (
+                <TouchableOpacity key={member.uid} style={[styles.groupMemberRowFull, selected && styles.groupMemberRowFullSelected]} onPress={() => setSelectedGroupAddIds((current) => selected ? current.filter((id) => id !== member.uid) : [...current, member.uid])}>
+                  <Image source={{ uri: member.avatar || FALLBACK_AVATAR }} style={styles.groupMemberMiniAvatar} />
+                  <View style={{ flex: 1 }}><Text style={styles.groupMemberMiniName}>{member.name}</Text></View>
+                  <View style={[styles.memberCheck, selected && styles.memberCheckSelected]}>{selected ? <Text style={styles.memberCheckGlyph}>✓</Text> : null}</View>
+                </TouchableOpacity>
+              );
+            })}
+            {!groupAddCandidates.length ? <Text style={styles.groupEmpty}>Everyone in your campus is already in this group.</Text> : null}
+          </ScrollView>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -1158,6 +1253,11 @@ const styles = StyleSheet.create({
   groupMemberMiniAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#E8E8E3', marginRight: 9 },
   groupMemberMiniName: { fontSize: 12, fontWeight: '800', color: '#111111' },
   groupAdminText: { fontSize: 9, fontWeight: '800', color: '#777770', marginTop: 1 },
+  groupAddModal: { flex: 1, backgroundColor: '#F6F6F2' },
+  groupAddHeader: { minHeight: 62, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E5E5DF' },
+  groupAddDone: { fontSize: 13, fontWeight: '900', color: '#111111' },
+  groupMemberRowFull: { minHeight: 58, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5DF', paddingHorizontal: 10, marginBottom: 7, flexDirection: 'row', alignItems: 'center' },
+  groupMemberRowFullSelected: { borderColor: '#111111', backgroundColor: '#FFFEE6' },
   detailsCancelText: { fontSize: 14, fontWeight: '800', color: '#707070' },
 });
 
