@@ -39,7 +39,6 @@ import { createDirectChat, markChatRead } from '../services/chatService';
 import {
   addGroupMembers,
   deleteGroupMessage,
-  getGroup,
   leaveGroup,
   markGroupRead,
   sendGroupMessage,
