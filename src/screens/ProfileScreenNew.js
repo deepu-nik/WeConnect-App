@@ -342,7 +342,7 @@ export default function ProfileScreenNew({ route, navigation }) {
           {isSelf ? (
             <TouchableOpacity
               style={styles.settingsButton}
-              onPress={() => navigation.getParent()?.getParent()?.navigate('Settings')}
+              onPress={() => navigation.navigate('Settings')}
               accessibilityLabel="Open Settings"
             >
               <Settings size={20} color={TEXT} />
