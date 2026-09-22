@@ -375,29 +375,27 @@ const ConnectScreen = ({ navigation }) => {
               <MessageCircle size={19} color="#111111" />
             </TouchableOpacity>
           </>
-        ) : (
-          {(() => {
-            const requestPending = sentRequests.some((request) => request.receiverId === item.uid && request.status === 'pending');
-            const requestSending = sendingRequestId === item.uid;
-            return (
-              <TouchableOpacity
-                style={[styles.connect, requestPending && styles.connectPending]}
-                onPress={() => sendRequest(item)}
-                disabled={requestPending || requestSending}
-                accessibilityLabel={requestPending ? 'Connection request sent' : 'Connect'}
-              >
-                {requestSending ? (
-                  <ActivityIndicator size="small" color="#111111" />
-                ) : requestPending ? (
-                  <Check size={17} color="#111111" />
-                ) : (
-                  <UserPlus size={17} color="#111111" />
-                )}
-                <Text style={styles.connectText}>{requestSending ? 'Sending…' : requestPending ? 'Request sent' : 'Connect'}</Text>
-              </TouchableOpacity>
-            );
-          })()}
-        )}
+        ) : (() => {
+          const requestPending = sentRequests.some((request) => request.receiverId === item.uid && request.status === 'pending');
+          const requestSending = sendingRequestId === item.uid;
+          return (
+            <TouchableOpacity
+              style={[styles.connect, requestPending && styles.connectPending]}
+              onPress={() => sendRequest(item)}
+              disabled={requestPending || requestSending}
+              accessibilityLabel={requestPending ? 'Connection request sent' : 'Connect'}
+            >
+              {requestSending ? (
+                <ActivityIndicator size="small" color="#111111" />
+              ) : requestPending ? (
+                <Check size={17} color="#111111" />
+              ) : (
+                <UserPlus size={17} color="#111111" />
+              )}
+              <Text style={styles.connectText}>{requestSending ? 'Sending…' : requestPending ? 'Request sent' : 'Connect'}</Text>
+            </TouchableOpacity>
+          );
+        })()}
       </View>
     );
   };
