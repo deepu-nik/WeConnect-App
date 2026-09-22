@@ -596,12 +596,6 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <KeyboardGestureArea
-        interpolator="ios"
-        offset={COMPOSER_BASE_INPUT_HEIGHT}
-        style={styles.keyboardAvoid}
-        textInputNativeID="chat-input"
-      >
       <StatusBar barStyle="dark-content" />
 
       <View style={styles.header}>
@@ -657,7 +651,12 @@ const ChatRoomScreen = ({ route, navigation }) => {
         </View>
       ) : null}
 
-
+      <KeyboardGestureArea
+        interpolator="ios"
+        offset={COMPOSER_BASE_INPUT_HEIGHT}
+        style={styles.keyboardAvoid}
+        textInputNativeID="chat-input"
+      >
         <FlatList
           ref={listRef}
           data={messages}
