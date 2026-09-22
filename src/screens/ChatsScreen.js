@@ -100,6 +100,7 @@ const ChatsScreen = ({ navigation }) => {
             try {
               const profile = await getUserProfile(chat.otherUserId);
               if (!profile || profile.uid === currentUser.uid) return null;
+              if (!Array.isArray(profile.connections) || !profile.connections.includes(currentUser.uid)) return null;
               const canonical = { name: profile.name || chat.name, avatar: profile.avatar || chat.avatar };
               profileCache.current.set(chat.otherUserId, canonical);
               return { ...chat, ...canonical };
