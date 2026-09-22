@@ -54,7 +54,7 @@ const MainTabNavigator = () => (
     <Stack.Screen name="Tabs" component={Tabs} />
     <Stack.Screen
       name="ProfileDetails"
-      component={ProfileScreen}
+      component={ProfileScreenNew}
       options={{
         presentation: 'card',
         animation: 'slide_from_right',
