@@ -270,7 +270,10 @@ service cloud.firestore {
         resource.data.get('collegeId', '') == myCollegeId() &&
         myCollegeId() == 'dypiu' &&
         (
-          resource.data.userId == request.auth.uid ||
+          (
+            resource.data.userId == request.auth.uid &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['caption'])
+          ) ||
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewers', 'reactions'])
         );
 
