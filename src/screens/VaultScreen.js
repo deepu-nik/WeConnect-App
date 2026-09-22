@@ -449,7 +449,7 @@ const VaultScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="auto" />
 
       {/* HEADER */}
       {currentVault ? (
