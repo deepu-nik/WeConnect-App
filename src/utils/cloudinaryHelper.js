@@ -39,8 +39,15 @@ export const uploadToCloudinary = async (fileUri, type = 'auto', options = {}) =
     const form = new FormData();
     form.append('file', file);
     form.append('upload_preset', UPLOAD_PRESET);
-    form.append('folder', type === 'video' ? 'weconnect/stories/video' : type === 'image' ? 'weconnect/stories/image' : 'weconnect/uploads');
-    form.append('tags', type === 'video' || type === 'image' ? 'weconnect_story' : 'weconnect_media');
+    form.append(
+      'folder',
+      options.folder || (type === 'video'
+        ? 'weconnect/stories/video'
+        : type === 'image'
+          ? 'weconnect/stories/image'
+          : 'weconnect/uploads')
+    );
+    form.append('tags', options.tags || (type === 'video' || type === 'image' ? 'weconnect_story' : 'weconnect_media'));
 
     const response = await expoFetch(
       `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${resourceType}/upload`,
