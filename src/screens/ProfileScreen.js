@@ -268,7 +268,7 @@ const ProfileScreen = ({ route, navigation }) => {
           {user.coverPhoto ? <Image source={{ uri: user.coverPhoto }} style={styles.coverImage} /> : <View style={styles.coverFallback} />}
           <View style={styles.coverShade} />
           <SafeAreaView style={styles.topBar}>
-            {isSelf && <TouchableOpacity style={styles.circleBtn} onPress={() => navigation.navigate('DeleteAccount')}><Settings size={21} color="#fff" /></TouchableOpacity>}
+            {isSelf && <TouchableOpacity style={styles.circleBtn} onPress={() => navigation.navigate('Settings')}><Settings size={21} color="#fff" /></TouchableOpacity>}
           </SafeAreaView>
           {isSelf && <TouchableOpacity style={styles.coverEdit} onPress={() => pickImage('cover')}><Camera size={18} color="#fff" /></TouchableOpacity>}
         </View>
