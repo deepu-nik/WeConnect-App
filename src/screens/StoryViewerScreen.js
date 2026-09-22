@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Animated, Dimensions, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { VideoView, useVideoPlayer } from 'expo-video';
@@ -9,10 +9,10 @@ import { deleteStory, markStoryViewed, reactToStory, replyToStory, subscribeToSt
 const { width, height } = Dimensions.get('window');
 const IMAGE_DURATION_MS = 5000;
 
-function StoryMedia({ story, paused, onVideoProgress, onVideoEnd }) {
+function StoryMedia({ story, paused, muted, onVideoProgress, onVideoEnd }) {
   const player = useVideoPlayer(story?.mediaUrl || null, (instance) => {
     instance.loop = false;
-    instance.muted = true;
+    instance.muted = muted;
     instance.timeUpdateEventInterval = 0.1;
   });
 
@@ -29,7 +29,8 @@ function StoryMedia({ story, paused, onVideoProgress, onVideoEnd }) {
       endSub.remove();
       player.pause();
     };
-  }, [player, story?.id, story?.mediaType, paused, onVideoProgress, onVideoEnd]);
+    player.muted = muted;
+  }, [player, story?.id, story?.mediaType, paused, muted, onVideoProgress, onVideoEnd]);
 
   if (story?.mediaType !== 'video') {
     return <Image source={{ uri: story?.mediaUrl }} style={styles.media} resizeMode="contain" />;
@@ -92,10 +93,10 @@ export default function StoryViewerScreen({ route, navigation }) {
     if (story) markStoryViewed(story.id).catch(() => {});
   }, [story?.id]);
 
-  const handleVideoProgress = (currentTime, duration) => {
+  const handleVideoProgress = useCallback((currentTime, duration) => {
     if (!duration) return;
     progress.setValue(Math.min(1, currentTime / duration));
-  };
+  }, [progress]);
 
   const isMine = story?.userId === auth.currentUser?.uid;
   const reactionSummary = Object.entries(displayedStory?.reactions || {})
@@ -109,6 +110,7 @@ export default function StoryViewerScreen({ route, navigation }) {
       <StoryMedia
         story={displayedStory}
         paused={paused}
+        muted={muted}
         onVideoProgress={handleVideoProgress}
         onVideoEnd={goNext}
       />
