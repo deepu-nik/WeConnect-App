@@ -26,8 +26,12 @@ const Avatar = ({ uri, name, size = 56, onPress }) => {
   const [imageError, setImageError] = useState(false);
   const body = (
     <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}>
-      <Image source={{ uri: uri || FALLBACK_AVATAR }} style={{ width: size, height: size, borderRadius: size / 2 }} />
-      <View style={styles.avatarFallback}><Text style={[styles.avatarInitials, { fontSize: Math.max(11, size * 0.25) }]}>{initials(name)}</Text></View>
+      <Image source={{ uri: uri || FALLBACK_AVATAR }} onError={() => setImageError(true)} style={{ width: size, height: size, borderRadius: size / 2 }} />
+      {(!uri || imageError) ? (
+        <View style={styles.avatarFallback}>
+          <Text style={[styles.avatarInitials, { fontSize: Math.max(11, size * 0.25) }]}>{initials(name)}</Text>
+        </View>
+      ) : null}
     </View>
   );
   return onPress ? <TouchableOpacity onPress={onPress} activeOpacity={0.82}>{body}</TouchableOpacity> : body;
@@ -67,7 +71,7 @@ const ChatsScreen = ({ navigation }) => {
         );
 
         unsubscribe = onSnapshot(q, (snapshot) => {
-          const next = snapshot.docs.map((chatDoc) => {
+          const rawChats = snapshot.docs.map((chatDoc) => {
             const data = chatDoc.data() || {};
             const participants = Array.isArray(data.participants) ? data.participants : [];
             const otherUserId = participants.find((uid) => uid !== currentUser.uid);
@@ -82,8 +86,25 @@ const ChatsScreen = ({ navigation }) => {
               unreadCount: Number(data.unreadCount?.[currentUser.uid] || 0),
               typing: Boolean(data.typing?.[otherUserId]),
             };
-          }).sort((a, b) => b.timestamp - a.timestamp);
-          setChats(next);
+          });
+          Promise.all(rawChats.map(async (chat) => {
+            if (!chat.otherUserId) return null;
+            try {
+              const profile = await getUserProfile(chat.otherUserId);
+              if (!profile || profile.uid === currentUser.uid) return null;
+              return {
+                ...chat,
+                name: profile.name || chat.name,
+                avatar: profile.avatar || chat.avatar,
+              };
+            } catch {
+              return chat.name === 'You' ? null : chat;
+            }
+          })).then((resolved) => {
+            if (!active) return;
+            const next = resolved.filter(Boolean).sort((a, b) => b.timestamp - a.timestamp);
+            setChats(next);
+          });
           setLoading(false);
           setRefreshing(false);
         }, (error) => {
