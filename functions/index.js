@@ -1,5 +1,5 @@
 const { onSchedule } = require('firebase-functions/v2/scheduler');
-const { onDocumentDeleted } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentDeleted } = require('firebase-functions/v2/firestore');
 const { defineJsonSecret } = require('firebase-functions/params');
 const { logger } = require('firebase-functions');
 const admin = require('firebase-admin');
@@ -77,5 +77,61 @@ exports.deleteStoryMedia = onDocumentDeleted(
   async (event) => {
     await deleteCloudinaryAsset(event.data?.data());
     logger.info('Deleted Cloudinary story asset.', { storyId: event.params.storyId });
+  }
+);
+
+
+exports.sendMessageNotification = onDocumentCreated(
+  'chats/{chatId}/messages/{messageId}',
+  async (event) => {
+    const message = event.data?.data();
+    if (!message?.senderId) return;
+
+    const chatSnap = await db.doc(`chats/${event.params.chatId}`).get();
+    if (!chatSnap.exists) return;
+    const chat = chatSnap.data() || {};
+    const participants = Array.isArray(chat.participants) ? chat.participants : [];
+    const recipientId = participants.find((uid) => uid !== message.senderId);
+    if (!recipientId) return;
+
+    const [recipientSnap, senderSnap] = await Promise.all([
+      db.doc(`userPrivate/${recipientId}`).get(),
+      db.doc(`users/${message.senderId}`).get(),
+    ]);
+
+    const expoPushToken = recipientSnap.data()?.expoPushToken;
+    if (!expoPushToken) return;
+
+    const senderName = senderSnap.data()?.name || senderSnap.data()?.displayName || 'New message';
+    const body = message.text
+      || (message.mediaType === 'video' ? 'Sent you a video' : message.mediaType === 'image' ? 'Sent you a photo' : 'Sent you a message');
+
+    const response = await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: expoPushToken,
+        sound: 'default',
+        title: senderName,
+        body,
+        channelId: 'messages',
+        data: {
+          chatId: event.params.chatId,
+          senderId: message.senderId,
+          messageId: event.params.messageId,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      logger.error('Expo push request failed.', { status: response.status, recipientId });
+      return;
+    }
+
+    const result = await response.json();
+    logger.info('Message notification sent.', { recipientId, ticket: result?.data });
   }
 );
