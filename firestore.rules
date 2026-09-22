@@ -200,7 +200,8 @@ service cloud.firestore {
         request.resource.data.status in ['accepted', 'declined'] &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
 
-      allow delete: if false;
+      allow delete: if verified() &&
+        (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
     }
 
     // -----------------------------------------------------------------------
