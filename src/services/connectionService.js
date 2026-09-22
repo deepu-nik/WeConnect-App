@@ -99,6 +99,15 @@ export const subscribeToConnectionRequests = (uid, callback) => {
   });
 };
 
+export const subscribeToSentConnectionRequests = (uid, callback) => {
+  const q = query(collection(db, 'connectionRequests'), where('senderId', '==', uid));
+  return onSnapshot(q, (snapshot) => {
+    callback(snapshot.docs
+      .map((item) => ({ id: item.id, ...item.data() }))
+      .filter((item) => item.status === 'pending'));
+  });
+};
+
 
 export const areConnected = async (currentUid, otherUid) => {
   if (!currentUid || !otherUid || currentUid === otherUid) return false;
