@@ -11,6 +11,7 @@ import LoginScreen from '../screens/LoginScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import VerifyEmailScreen from '../screens/VerifyEmailScreen';
+import DeleteAccountScreen from '../screens/DeleteAccountScreen';
 import ChatRoomScreen from '../screens/ChatRoomScreen';
 import NewStoryScreen from '../screens/NewStoryScreen';
 import StoryViewerScreen from '../screens/StoryViewerScreen';
@@ -45,6 +46,7 @@ const AuthenticatedStack = () => {
      }}>
       {/* The Main App (Tabs) is the first screen */}
       <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+      <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
       
       {/* The Chat Room sits on top of the tabs */}
      <Stack.Screen name="NewStory" component={NewStoryScreen} />
