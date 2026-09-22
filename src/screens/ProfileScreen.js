@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { updateProfile } from 'firebase/auth';
-import { doc, getDoc, getDocs, collection, query, where, updateDoc } from 'firebase/firestore';
+import { doc, getDocs, collection, query, where, updateDoc } from 'firebase/firestore';
 import {
   Camera, CheckCircle, Code, Ellipsis, Github, Globe, Instagram, Link as LinkIcon,
   Linkedin, MapPin, Plus, Settings, Trash2, Twitter, UserRound, X, Youtube,
