@@ -95,13 +95,17 @@ service cloud.firestore {
     // USERS
     // -----------------------------------------------------------------------
     match /users/{userId} {
-      allow get: if signedIn() && request.auth.uid == userId && !resource.data.keys().hasAny(['collegeId']) || isCampusStudent(resource.data.get('collegeId', ''));
+      allow get: if (
+        (signedIn() && request.auth.uid == userId && !resource.data.keys().hasAny(['collegeId'])) ||
+        isCampusStudent(resource.data.get('collegeId', ''))
+      );
       allow list: if isCampusStudent(resource.data.get('collegeId', ''));
       allow create: if signedIn() &&
         request.auth.uid == userId &&
         request.resource.data.uid == userId &&
         request.resource.data.get('collegeId', '') == 'dypiu' &&
-        request.resource.data.get('collegeName', '') != '';
+        request.resource.data.get('collegeName', '') != '' &&
+        !request.resource.data.keys().hasAny(['email', 'whatsapp']);
 
       // Existing accounts may be backfilled with college fields by AuthContext.
       allow update: if
