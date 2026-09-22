@@ -384,7 +384,6 @@ export default function ProfileScreenNew({ route, navigation }) {
             {(user.skills || []).map((skill) => (
               <View style={styles.skillPill} key={skill}>
                 <Code2 size={13} color={TEXT} /><Text style={styles.skillText}>{skill}</Text>
-                {isSelf ? <TouchableOpacity onPress={() => removeSkill(skill)}><X size={13} color="#777770" /></TouchableOpacity> : null}
               </View>
             ))}
             {!user.skills?.length ? <Text style={styles.emptyText}>Add technologies, subjects or skills you are currently learning.</Text> : null}
