@@ -31,7 +31,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
     } catch (err) {
       const messages = {
         'auth/invalid-email': 'Please enter a valid email address.',
-        'auth/user-not-found': 'No account was found for that email.',
+        'auth/user-not-found': 'If an account exists for that email, a reset link will be sent.',
         'auth/network-request-failed': 'Network error. Please check your connection.',
         'auth/too-many-requests': 'Too many requests. Please try again later.',
       };
