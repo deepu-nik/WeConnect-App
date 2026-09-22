@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal,
 import { ArrowLeft, MoreVertical, Send, UserPlus, Users, X } from 'lucide-react-native';
 import { auth } from '../config/firebase';
 import { getUserProfile } from '../services/userService';
-import { addGroupMembers, deleteGroupMessage, getGroup, leaveGroup, markGroupRead, removeGroupMember, sendGroupMessage, subscribeToGroupMessages, updateGroup } from '../services/groupService';
+import { addGroupMembers, deleteGroupMessage, getGroup, leaveGroup, markGroupRead, removeGroupMember, sendGroupMessage, subscribeToGroup, subscribeToGroupMessages, updateGroup } from '../services/groupService';
 
 const FALLBACK = 'https://via.placeholder.com/100';
 
