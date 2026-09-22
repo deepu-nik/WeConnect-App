@@ -24,7 +24,11 @@ export const subscribeToStories = (onStories, onError) => {
         return;
       }
 
-      const q = query(collection(db, 'stories'), where('audience', 'array-contains', auth.currentUser.uid));
+      const q = query(
+        collection(db, 'stories'),
+        where('collegeId', '==', profile.collegeId),
+        where('audience', 'array-contains', auth.currentUser.uid)
+      );
       unsubscribe = onSnapshot(q, (snapshot) => {
         const now = Date.now();
         const stories = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((story) => story.collegeId === profile.collegeId).filter((story) => {
@@ -123,7 +127,11 @@ export const deleteStory = async (storyId) => {
 export const getActiveStories = async () => {
   const profile = await getUserProfile(auth.currentUser?.uid);
   if (!profile?.collegeId) return [];
-  const snapshot = await getDocs(query(collection(db, 'stories'), where('audience', 'array-contains', auth.currentUser.uid)));
+  const snapshot = await getDocs(query(
+    collection(db, 'stories'),
+    where('collegeId', '==', profile.collegeId),
+    where('audience', 'array-contains', auth.currentUser.uid)
+  ));
   const now = Date.now();
   return snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((story) => story.collegeId === profile.collegeId).filter((story) => {
     const expires = story.expiresAt?.toDate ? story.expiresAt.toDate().getTime() : new Date(story.expiresAt || 0).getTime();
