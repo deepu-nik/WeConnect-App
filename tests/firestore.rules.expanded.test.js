@@ -547,6 +547,14 @@ describe('WeConnect Firestore expanded security rules', { concurrency: false }, 
     );
   });
 
+  test('verified user can delete their own profile but not another user profile', async () => {
+    const aliceDb = dbAs('alice');
+    const bobDb = dbAs('bob');
+
+    await assertSucceeds(deleteDoc(doc(aliceDb, 'users', 'alice')));
+    await assertFails(deleteDoc(doc(bobDb, 'users', 'alice')));
+  });
+
   test('user can create and remove their own block, but cannot edit another block', async () => {
     const aliceDb = dbAs('alice');
     const bobDb = dbAs('bob');
