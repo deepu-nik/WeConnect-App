@@ -74,7 +74,7 @@ function dbAs(uid, emailVerified = true) {
 }
 
 async function seed() {
-  const admin = testEnv.unauthenticatedContext().firestore();
+  const admin = testEnv.withSecurityRulesDisabled((context) => context.firestore());
 
   await Promise.all(
     Object.values(USERS).map((user) =>
@@ -249,7 +249,7 @@ describe('WeConnect Firestore expanded security rules', { concurrency: false }, 
   });
 
   test('only the receiver can accept or decline a pending connection request', async () => {
-    const admin = testEnv.unauthenticatedContext().firestore();
+    const admin = testEnv.withSecurityRulesDisabled((context) => context.firestore());
     await setDoc(doc(admin, 'connectionRequests', 'req-1'), {
       senderId: 'alice',
       receiverId: 'bob',
