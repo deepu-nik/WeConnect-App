@@ -3,6 +3,7 @@ import {
   setDoc,
   collection,
   doc,
+  getDoc,
   getDocs,
   query,
   serverTimestamp,
@@ -40,10 +41,12 @@ export const createDirectChat = async ({ currentUser, otherUser, otherUserId }) 
   }
   await assertCanMessage(currentUser.uid, otherUserId);
 
+  const chatId = [currentUser.uid, otherUserId].sort().join('_');
+  const deterministic = await getDoc(doc(db, 'chats', chatId));
+  if (deterministic.exists()) return deterministic.id;
+
   const existing = await findDirectChat(currentUser.uid, otherUserId);
   if (existing) return existing.id;
-
-  const chatId = [currentUser.uid, otherUserId].sort().join('_');
   const chatData = {
     collegeId: currentProfile.collegeId,
     participants: [currentUser.uid, otherUserId],
