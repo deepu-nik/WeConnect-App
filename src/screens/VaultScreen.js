@@ -76,16 +76,38 @@ const VaultScreen = ({ navigation }) => {
   useEffect(() => {
     if (!currentUser) return;
     
-    const q = query(collection(db, 'vaults'), where('members', 'array-contains', currentUser.uid));
+    const loadVaults = async () => {
+      const profile = await getUserProfile(currentUser.uid);
+      if (!profile?.collegeId) {
+        setVaults([]);
+        setLoading(false);
+        return;
+      }
+
+      const q = query(
+        collection(db, 'vaults'),
+        where('collegeId', '==', profile.collegeId),
+        where('members', 'array-contains', currentUser.uid)
+      );
     
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedVaults = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       fetchedVaults.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
       setVaults(fetchedVaults);
       setLoading(false);
     });
 
-    return () => unsubscribe();
+      return unsubscribe;
+    };
+
+    let unsubscribe;
+    loadVaults().then((cleanup) => { unsubscribe = cleanup; }).catch((error) => {
+      console.error('Vault subscription failed:', error);
+      setVaults([]);
+      setLoading(false);
+    });
+
+    return () => { if (unsubscribe) unsubscribe(); };
   }, [currentUser]);
 
   // --- 2. FETCH FILES WHEN INSIDE A VAULT ---
