@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Modal, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CheckCheck, ChevronRight, MessageCircle, Plus, Search, Sparkles, UserRoundPlus, X } from 'lucide-react-native';
+import { CheckCheck, ChevronRight, MessageCircle, Plus, Search, Sparkles, UserRoundPlus, Users, X } from 'lucide-react-native';
 import { auth, db } from '../config/firebase';
 import { getUserProfile } from '../services/userService';
 import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { createDirectChat, markChatRead } from '../services/chatService';
 import Dashboard from '../components/Dashboard';
+import { subscribeToGroups } from '../services/groupService';
 
 const FALLBACK_AVATAR = 'https://via.placeholder.com/150';
 
@@ -48,6 +49,8 @@ const ChatsScreen = ({ navigation }) => {
   const [filter, setFilter] = useState('all');
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [dashboardVisible, setDashboardVisible] = useState(false);
+  const [groups, setGroups] = useState([]);
+  const [actionMenuVisible, setActionMenuVisible] = useState(false);
   const profileCache = useRef(new Map());
 
   useEffect(() => {
@@ -136,6 +139,11 @@ const ChatsScreen = ({ navigation }) => {
     };
   }, [currentUser?.uid]);
 
+  useEffect(() => {
+    if (!currentUser?.uid) { setGroups([]); return undefined; }
+    return subscribeToGroups(currentUser.uid, setGroups, (error) => console.error('Groups subscription failed:', error));
+  }, [currentUser?.uid]);
+
   const unreadCount = useMemo(() => chats.filter((chat) => chat.unreadCount > 0).length, [chats]);
   const filteredChats = useMemo(() => filter === 'unread' ? chats.filter((chat) => chat.unreadCount > 0) : chats, [chats, filter]);
   const searchMode = Boolean(searchQuery.trim());
@@ -216,6 +224,20 @@ const ChatsScreen = ({ navigation }) => {
     </TouchableOpacity>
   );
 
+  const renderGroup = (group) => (
+    <TouchableOpacity style={styles.groupCard} activeOpacity={0.86} onPress={() => navigation.navigate('GroupChat', { groupId: group.id })}>
+      <View style={styles.groupAvatar}><Users size={21} color="#111111" /></View>
+      <View style={styles.chatContent}>
+        <View style={styles.chatTopRow}>
+          <Text style={styles.chatName} numberOfLines={1}>{group.name}</Text>
+          <Text style={styles.chatTime}>{dateLabel(group.updatedAt?.toDate?.() || new Date())}</Text>
+        </View>
+        <Text style={styles.lastMessage} numberOfLines={1}>{group.lastMessage || (group.members.length + ' members')}</Text>
+      </View>
+      <ChevronRight size={16} color="#B8B8B3" />
+    </TouchableOpacity>
+  );
+
   const renderStudent = ({ item }) => (
     <TouchableOpacity style={styles.studentResult} activeOpacity={0.82} onPress={() => startNewChat(item)}>
       <Avatar uri={item.avatar} name={item.name} size={50} />
@@ -271,6 +293,12 @@ const ChatsScreen = ({ navigation }) => {
           </>
         ) : (
           <View style={styles.chatList}>
+            {groups.length ? (
+              <View style={styles.groupsSection}>
+                <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>Groups</Text><Text style={styles.sectionHint}>{groups.length} group{groups.length === 1 ? '' : 's'}</Text></View></View>
+                {groups.map(renderGroup)}
+              </View>
+            ) : null}
             {filteredChats.length ? filteredChats.map((chat) => <View key={chat.id}>{renderChat({ item: chat })}</View>) : (
               <View style={styles.emptyState}>
                 <View style={styles.emptyIcon}>{filter === 'unread' ? <CheckCheck size={28} color="#111111" /> : <MessageCircle size={28} color="#111111" />}</View>
@@ -284,7 +312,27 @@ const ChatsScreen = ({ navigation }) => {
         <View style={styles.footerSpace} />
       </ScrollView>
 
-      <TouchableOpacity style={styles.fab} activeOpacity={0.86} onPress={() => navigation.navigate('Connect')} accessibilityLabel="Start a new conversation"><Plus size={25} color="#111111" strokeWidth={2.6} /></TouchableOpacity>
+      <TouchableOpacity style={styles.fab} activeOpacity={0.86} onPress={() => setActionMenuVisible(true)} accessibilityLabel="Create chat or group"><Plus size={25} color="#111111" strokeWidth={2.6} /></TouchableOpacity>
+
+      <Modal visible={actionMenuVisible} transparent animationType="fade" onRequestClose={() => setActionMenuVisible(false)}>
+        <TouchableOpacity style={styles.actionOverlay} activeOpacity={1} onPress={() => setActionMenuVisible(false)}>
+          <View style={styles.actionSheet}>
+            <View style={styles.actionSheetHandle} />
+            <Text style={styles.actionTitle}>Start something new</Text>
+            <Text style={styles.actionSubtitle}>Choose what you want to create.</Text>
+            <TouchableOpacity style={styles.actionOption} onPress={() => { setActionMenuVisible(false); navigation.navigate('Connect'); }}>
+              <View style={styles.actionIcon}><MessageCircle size={20} color="#111111" /></View>
+              <View style={{ flex: 1 }}><Text style={styles.actionOptionTitle}>New conversation</Text><Text style={styles.actionOptionText}>Message a connected student.</Text></View>
+              <ChevronRight size={18} color="#888880" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionOption} onPress={() => { setActionMenuVisible(false); navigation.navigate('CreateGroup'); }}>
+              <View style={styles.actionIcon}><Users size={20} color="#111111" /></View>
+              <View style={{ flex: 1 }}><Text style={styles.actionOptionTitle}>Create group</Text><Text style={styles.actionOptionText}>Bring classmates into one chat.</Text></View>
+              <ChevronRight size={18} color="#888880" />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       <Modal visible={!!avatarPreview} transparent animationType="fade" onRequestClose={() => setAvatarPreview(null)}>
         <TouchableOpacity style={styles.avatarModalOverlay} activeOpacity={1} onPress={() => setAvatarPreview(null)}>
@@ -361,6 +409,18 @@ const styles = StyleSheet.create({
   emptyButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
   emptySearch: { alignItems: 'center', paddingVertical: 45 },
   footerSpace: { height: 80 },
+  groupsSection: { marginBottom: 8 },
+  groupCard: { minHeight: 74, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#FFFEE6', borderWidth: 1, borderColor: '#E8E5A0', flexDirection: 'row', alignItems: 'center', marginBottom: 7 },
+  groupAvatar: { width: 50, height: 50, borderRadius: 17, backgroundColor: '#FFFC00', alignItems: 'center', justifyContent: 'center', marginRight: 11 },
+  actionOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.42)', justifyContent: 'flex-end' },
+  actionSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 18, paddingBottom: 28 },
+  actionSheetHandle: { alignSelf: 'center', width: 42, height: 4, borderRadius: 2, backgroundColor: '#D5D5CE', marginBottom: 15 },
+  actionTitle: { fontSize: 21, fontWeight: '900', color: '#111111' },
+  actionSubtitle: { fontSize: 12, color: '#777770', marginTop: 3, marginBottom: 13 },
+  actionOption: { minHeight: 70, borderRadius: 18, backgroundColor: '#F6F6F2', borderWidth: 1, borderColor: '#E4E4DE', paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 8 },
+  actionIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#FFFC00', alignItems: 'center', justifyContent: 'center' },
+  actionOptionTitle: { fontSize: 14, fontWeight: '900', color: '#111111' },
+  actionOptionText: { fontSize: 11, color: '#777770', marginTop: 2 },
   fab: { position: 'absolute', right: 19, bottom: 18, width: 57, height: 57, borderRadius: 20, backgroundColor: '#FFFC00', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 6 },
   avatarModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.62)', alignItems: 'center', justifyContent: 'center', padding: 30 },
   avatarModalCard: { width: 280, borderRadius: 24, overflow: 'hidden', backgroundColor: '#FFFFFF', alignItems: 'center', paddingBottom: 18 },
