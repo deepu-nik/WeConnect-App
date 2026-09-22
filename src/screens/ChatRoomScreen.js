@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -6,9 +6,7 @@ import {
   FlatList,
   Image,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   Share,
   StatusBar,
@@ -18,7 +16,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  KeyboardChatScrollView,
+  KeyboardGestureArea,
+  KeyboardStickyView,
+} from 'react-native-keyboard-controller';
+import { useSharedValue, withTiming } from 'react-native-reanimated';
 import {
   ArrowLeft,
   Camera,
@@ -66,6 +70,8 @@ const COMPOSER_EMOJIS = [
 ];
 
 const FALLBACK_AVATAR = 'https://via.placeholder.com/150';
+const COMPOSER_MARGIN = 0;
+const COMPOSER_BASE_INPUT_HEIGHT = 40;
 
 const TypingIndicator = () => {
   const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
@@ -112,6 +118,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
   } = route.params || {};
 
   const currentUser = auth.currentUser;
+  const insets = useSafeAreaInsets();
+  const extraContentPadding = useSharedValue(0);
   const listRef = useRef(null);
   const typingTimeout = useRef(null);
   const viewerScale = useRef(new Animated.Value(1)).current;
@@ -431,6 +439,29 @@ const ChatRoomScreen = ({ route, navigation }) => {
     setInputText((value) => value + emoji);
   };
 
+  const handleInputLayout = useCallback((event) => {
+    const height = event.nativeEvent.layout.height;
+
+    extraContentPadding.value = withTiming(
+      Math.max(height - COMPOSER_BASE_INPUT_HEIGHT, 0),
+      { duration: 180 }
+    );
+  }, [extraContentPadding]);
+
+  const renderChatScrollComponent = useCallback(
+    (props) => (
+      <KeyboardChatScrollView
+        {...props}
+        automaticallyAdjustContentInsets={false}
+        contentInsetAdjustmentBehavior="never"
+        keyboardDismissMode="interactive"
+        offset={insets.bottom - COMPOSER_MARGIN}
+        extraContentPadding={extraContentPadding}
+      />
+    ),
+    [extraContentPadding, insets.bottom]
+  );
+
   const renderMessage = ({ item }) => {
     const isMe = item.senderId === currentUser?.uid;
     const reactions = Object.entries(item.reactions || {}).filter(([, users]) => Array.isArray(users) && users.length);
@@ -564,7 +595,13 @@ const ChatRoomScreen = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <KeyboardGestureArea
+        interpolator="ios"
+        offset={COMPOSER_BASE_INPUT_HEIGHT}
+        style={styles.keyboardAvoid}
+        textInputNativeID="chat-input"
+      >
       <StatusBar barStyle="dark-content" />
 
       <View style={styles.header}>
@@ -620,11 +657,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
         </View>
       ) : null}
 
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
-      >
+
         <FlatList
           ref={listRef}
           data={messages}
@@ -633,8 +666,9 @@ const ChatRoomScreen = ({ route, navigation }) => {
           inverted
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          keyboardDismissMode="interactive"
           contentContainerStyle={styles.listContent}
+          renderScrollComponent={renderChatScrollComponent}
           ListHeaderComponent={
             isOtherUserTyping ? (
               <View style={styles.typingIndicatorRow}>
@@ -654,7 +688,13 @@ const ChatRoomScreen = ({ route, navigation }) => {
           }
         />
 
-        {replyingTo ? (
+        <KeyboardStickyView
+          offset={{
+            opened: insets.bottom - COMPOSER_MARGIN,
+            closed: 0,
+          }}
+        >
+          {replyingTo ? (
           <View style={styles.replyBar}>
             <View style={styles.replyAccent} />
             <View style={styles.replyContent}>
@@ -697,6 +737,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
             <View style={styles.textInputShell}>
               <TextInput
+                nativeID="chat-input"
+                onLayout={handleInputLayout}
                 value={inputText}
                 onChangeText={handleTextChange}
                 placeholder="Message…"
@@ -737,7 +779,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
             </View>
           ) : null}
         </View>
-      </KeyboardAvoidingView>
+        </KeyboardStickyView>
+      </KeyboardGestureArea>
 
       <Modal visible={!!fullScreenImage} transparent animationType="fade" onRequestClose={closeFullScreenImage}>
         <View style={styles.mediaViewer}>
@@ -959,7 +1002,7 @@ const styles = StyleSheet.create({
   emojiRow: { flexDirection: 'row', justifyContent: 'space-around' },
   emojiButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   emojiButtonText: { fontSize: 24 },
-  composerShell: { paddingHorizontal: 8, paddingTop: 6, paddingBottom: Platform.OS === 'ios' ? 7 : 5, backgroundColor: '#F7F7F5' },
+  composerShell: { paddingHorizontal: 8, paddingTop: 6, paddingBottom: 8, backgroundColor: '#F7F7F5' },
   composer: { minHeight: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, paddingVertical: 5, borderRadius: 27, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E8E8E3', elevation: 3, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
   composerIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19 },
   textInputShell: { flex: 1, minHeight: 40, maxHeight: 100, flexDirection: 'row', alignItems: 'center', marginHorizontal: 2, paddingLeft: 8, borderRadius: 20, backgroundColor: '#F0F0EC' },
