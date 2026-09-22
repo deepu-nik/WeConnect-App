@@ -2,6 +2,7 @@ import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Import screens
 import ChatsScreen from '../screens/ChatsScreen';
@@ -13,7 +14,9 @@ import VaultScreen from '../screens/VaultScreen';
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
-const Tabs = () => (
+const Tabs = () => {
+  const insets = useSafeAreaInsets();
+  return (
   <Tab.Navigator
     initialRouteName="Chats"
     backBehavior="none"
@@ -30,7 +33,7 @@ const Tabs = () => (
       },
       tabBarActiveTintColor: '#111111',
       tabBarInactiveTintColor: '#8A8A8A',
-      tabBarStyle: { height: 66, paddingBottom: 10, paddingTop: 6, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E8E8E3', elevation: 0 },
+      tabBarStyle: { height: 66 + insets.bottom, paddingBottom: 10 + insets.bottom, paddingTop: 6, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E8E8E3', elevation: 0 },
       tabBarLabelStyle: { fontSize: 10, fontWeight: '800' },
     })}
   >
@@ -40,7 +43,8 @@ const Tabs = () => (
     <Tab.Screen name="Connect" component={ConnectScreen} options={{ title: 'Connect' }} />
     <Tab.Screen name="Profile" component={ProfileScreenNew} options={{ title: 'Profile' }} />
   </Tab.Navigator>
-);
+  );
+};
 
 const MainTabNavigator = () => (
   <Stack.Navigator
