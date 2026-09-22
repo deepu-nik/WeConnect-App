@@ -17,9 +17,12 @@ import { auth, db } from '../config/firebase';
 const deleteQueryDocs = async (q) => {
   const snapshot = await getDocs(q);
   if (!snapshot.size) return;
-  const batch = writeBatch(db);
-  snapshot.docs.forEach((item) => batch.delete(item.ref));
-  await batch.commit();
+
+  for (let start = 0; start < snapshot.docs.length; start += 450) {
+    const batch = writeBatch(db);
+    snapshot.docs.slice(start, start + 450).forEach((item) => batch.delete(item.ref));
+    await batch.commit();
+  }
 };
 
 export const deleteMyAccount = async (password) => {
