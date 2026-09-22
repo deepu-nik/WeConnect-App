@@ -12,6 +12,10 @@ import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import VerifyEmailScreen from '../screens/VerifyEmailScreen';
 import DeleteAccountScreen from '../screens/DeleteAccountScreen';
+import SettingsScreen from '../screens/SettingsScreen';
+import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
+import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
+import CommunityGuidelinesScreen from '../screens/CommunityGuidelinesScreen';
 import ChatRoomScreen from '../screens/ChatRoomScreen';
 import NewStoryScreen from '../screens/NewStoryScreen';
 import StoryViewerScreen from '../screens/StoryViewerScreen';
@@ -46,6 +50,10 @@ const AuthenticatedStack = () => {
      }}>
       {/* The Main App (Tabs) is the first screen */}
       <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+      <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+      <Stack.Screen name="CommunityGuidelines" component={CommunityGuidelinesScreen} />
       <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
       
       {/* The Chat Room sits on top of the tabs */}
