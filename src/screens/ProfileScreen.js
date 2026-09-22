@@ -15,6 +15,7 @@ import { auth, db } from '../config/firebase';
 import { getUserProfile, getPrivateUserProfile, FALLBACK_AVATAR } from '../services/userService';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import { blockUser, isBlockedByMe, reportUser } from '../services/safetyService';
+import { areConnected, sendConnectionRequest } from '../services/connectionService';
 
 const SKILL_COLORS = ['#007AFF', '#34C759', '#AF52DE', '#FF9500', '#FF3B30', '#5856D6'];
 
@@ -33,6 +34,8 @@ const ProfileScreen = ({ route, navigation }) => {
   const [newSkill, setNewSkill] = useState('');
   const [fullScreenAvatar, setFullScreenAvatar] = useState(null);
   const [blocked, setBlocked] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   useEffect(() => {
     let active = true;
     (async () => {
@@ -41,6 +44,7 @@ const ProfileScreen = ({ route, navigation }) => {
         const privateProfile = isSelf ? await getPrivateUserProfile(targetUid) : null;
         if (!isSelf) {
           try { if (await isBlockedByMe(targetUid)) setBlocked(true); } catch {}
+          try { if (await areConnected(currentUser?.uid, targetUid)) setConnected(true); } catch {}
         }
         if (!active) return;
         setUser(profile ? { ...profile, ...(privateProfile || {}) } : {
@@ -287,13 +291,37 @@ const ProfileScreen = ({ route, navigation }) => {
               <TouchableOpacity style={styles.editButton} onPress={openEdit}><Text style={styles.editText}>Edit Profile</Text></TouchableOpacity>
             ) : (
               <>
-                <TouchableOpacity
-                  style={[styles.messageButton, blocked && { opacity: 0.5 }]}
-                  disabled={blocked}
-                  onPress={() => navigation.navigate('ChatRoom', { uid: user.uid, name: user.name, avatar: user.avatar })}
-                >
-                  <Text style={styles.messageText}>{blocked ? 'Blocked' : 'Message'}</Text>
-                </TouchableOpacity>
+                {connected ? (
+                  <TouchableOpacity
+                    style={[styles.messageButton, blocked && { opacity: 0.5 }]}
+                    disabled={blocked}
+                    onPress={() => navigation.navigate('ChatRoom', { uid: user.uid, name: user.name, avatar: user.avatar })}
+                  >
+                    <Text style={styles.messageText}>{blocked ? 'Blocked' : 'Message'}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.messageButton}
+                    disabled={connecting || blocked}
+                    onPress={async () => {
+                      if (blocked || connecting) return;
+                      setConnecting(true);
+                      try {
+                        await sendConnectionRequest({
+                          sender: { uid: currentUser.uid, name: currentUser.displayName || 'Student', avatar: currentUser.photoURL || null },
+                          receiver: user,
+                        });
+                        Alert.alert('Request sent', 'Connect with this student first. Messaging unlocks after they accept.');
+                      } catch (error) {
+                        Alert.alert('Could not connect', error?.message || 'Please try again.');
+                      } finally {
+                        setConnecting(false);
+                      }
+                    }}
+                  >
+                    <Text style={styles.messageText}>{connecting ? 'Sending…' : blocked ? 'Blocked' : 'Connect'}</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity style={styles.circleAction} onPress={() => Alert.alert(user.name, 'Choose an action.', [
                   { text: 'Cancel', style: 'cancel' },
                   { text: blocked ? 'Unblock' : 'Block', style: 'destructive', onPress: async () => {
