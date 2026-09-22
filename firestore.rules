@@ -234,14 +234,17 @@ service cloud.firestore {
 
       match /messages/{messageId} {
         allow get, list: if verified() &&
-          get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []).hasAny([request.auth.uid]);
+          get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []).hasAny([request.auth.uid]) &&
+          myUser().data.get('connections', []).hasAny(get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []));
 
         allow create: if verified() &&
           get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []).hasAny([request.auth.uid]) &&
+          myUser().data.get('connections', []).hasAny(get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', [])) &&
           request.resource.data.senderId == request.auth.uid;
 
         allow update: if verified() &&
           get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []).hasAny([request.auth.uid]) &&
+          myUser().data.get('connections', []).hasAny(get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', [])) &&
           (
             (
               resource.data.senderId == request.auth.uid &&
