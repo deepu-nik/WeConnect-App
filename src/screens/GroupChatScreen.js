@@ -52,6 +52,8 @@ export default function GroupChatScreen({ route, navigation }) {
 
   const isAdmin = Boolean(group?.admins?.includes(uid));
 
+  useEffect(() => { if (group) markGroupRead(groupId, uid).catch(() => {}); }, [group?.id]);
+
   const loadConnections = async () => {
     try {
       const me = await getUserProfile(uid);
