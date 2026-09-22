@@ -2,6 +2,8 @@ import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query
 import { auth, db } from '../config/firebase';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import { getUserProfile } from './userService';
+import { createDirectChat } from './chatService';
+import { sendChatMessage } from './chatMessageService';
 
 const STORY_LIFETIME_MS = 24 * 60 * 60 * 1000;
 
@@ -80,8 +82,42 @@ export const getActiveStories = async () => {
     return created >= cutoff;
   });
 };
-export const reactToStory = async (storyId, emoji) => {
+const sendStoryInteractionToChat = async ({ story, kind, emoji, text }) => {
+  const viewer = auth.currentUser;
+  if (!viewer?.uid || !story?.userId || viewer.uid === story.userId) return;
+  const chatId = await createDirectChat({
+    currentUser: viewer,
+    otherUserId: story.userId,
+    otherUser: {
+      name: story.userName || 'Student',
+      avatar: story.userAvatar || null,
+    },
+  });
+  const id = `story-${story.id}-${kind}-${viewer.uid}-${Date.now()}`;
+  const messageText = kind === 'reaction'
+    ? `${emoji} reacted to your story`
+    : text.trim();
+  await sendChatMessage({
+    chatId,
+    message: {
+      id,
+      text: messageText,
+      storyContext: {
+        type: kind,
+        storyId: story.id,
+        mediaUrl: story.mediaUrl || null,
+        caption: story.caption || '',
+        reaction: kind === 'reaction' ? emoji : null,
+        senderId: viewer.uid,
+      },
+    },
+  });
+};
+
+export const reactToStory = async (storyOrId, emoji) => {
   const uid = auth.currentUser?.uid;
+  const storyId = typeof storyOrId === 'string' ? storyOrId : storyOrId?.id;
+  const story = typeof storyOrId === 'object' ? storyOrId : null;
   if (!storyId || !uid || !emoji) return;
   const ref = doc(db, 'stories', storyId);
   const snapshot = await getDoc(ref);
@@ -91,17 +127,32 @@ export const reactToStory = async (storyId, emoji) => {
   reactions[emoji] = users.includes(uid) ? users.filter((id) => id !== uid) : [...users, uid];
   if (!reactions[emoji].length) delete reactions[emoji];
   await updateDoc(ref, { reactions });
+  if (story && !users.includes(uid)) {
+    await sendStoryInteractionToChat({ story, kind: 'reaction', emoji });
+  }
 };
 
-export const replyToStory = async (storyId, text) => {
+export const replyToStory = async (story, text) => {
   const uid = auth.currentUser?.uid;
+  const storyId = typeof story === 'string' ? story : story?.id;
   if (!storyId || !uid || !text?.trim()) return;
-  return addDoc(collection(db, 'stories', storyId, 'replies'), {
+  const reply = await addDoc(collection(db, 'stories', storyId, 'replies'), {
     senderId: uid,
     senderName: auth.currentUser.displayName || 'Student',
     text: text.trim(),
     createdAt: serverTimestamp(),
   });
+  if (typeof story === 'object') {
+    await sendStoryInteractionToChat({ story, kind: 'reply', text });
+  }
+  return reply;
+};
+
+export const subscribeToStory = (storyId, onStory, onError) => {
+  if (!storyId) return () => {};
+  return onSnapshot(doc(db, 'stories', storyId), (snapshot) => {
+    if (snapshot.exists()) onStory({ id: snapshot.id, ...snapshot.data() });
+  }, onError);
 };
 
 export const subscribeToStoryReplies = (storyId, onReplies, onError) => {
