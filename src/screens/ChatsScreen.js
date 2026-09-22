@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Modal, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CheckCheck, ChevronRight, MessageCircle, Plus, Search, Sparkles, UserRoundPlus, X } from 'lucide-react-native';
@@ -48,6 +48,7 @@ const ChatsScreen = ({ navigation }) => {
   const [filter, setFilter] = useState('all');
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [dashboardVisible, setDashboardVisible] = useState(false);
+  const profileCache = useRef(new Map());
 
   useEffect(() => {
     if (!currentUser?.uid) { setChats([]); setLoading(false); return undefined; }
@@ -86,26 +87,29 @@ const ChatsScreen = ({ navigation }) => {
               unreadCount: Number(data.unreadCount?.[currentUser.uid] || 0),
               typing: Boolean(data.typing?.[otherUserId]),
             };
-          });
+          }).filter((chat) => chat.otherUserId && chat.otherUserId !== currentUser.uid);
+          // Render immediately from the chat document, then enrich names/avatars from the canonical profile.
+          setChats(rawChats.sort((a, b) => b.timestamp - a.timestamp));
+          setLoading(false);
+          setRefreshing(false);
+
           Promise.all(rawChats.map(async (chat) => {
-            if (!chat.otherUserId) return null;
+            if (profileCache.current.has(chat.otherUserId)) {
+              return { ...chat, ...profileCache.current.get(chat.otherUserId) };
+            }
             try {
               const profile = await getUserProfile(chat.otherUserId);
               if (!profile || profile.uid === currentUser.uid) return null;
-              return {
-                ...chat,
-                name: profile.name || chat.name,
-                avatar: profile.avatar || chat.avatar,
-              };
+              const canonical = { name: profile.name || chat.name, avatar: profile.avatar || chat.avatar };
+              profileCache.current.set(chat.otherUserId, canonical);
+              return { ...chat, ...canonical };
             } catch {
               return chat.name === 'You' ? null : chat;
             }
           })).then((resolved) => {
             if (!active) return;
-            const next = resolved.filter(Boolean).sort((a, b) => b.timestamp - a.timestamp);
-            setChats(next);
+            setChats(resolved.filter(Boolean).sort((a, b) => b.timestamp - a.timestamp));
           });
-          setLoading(false);
           setRefreshing(false);
         }, (error) => {
           console.error('Chats subscription failed:', error);
