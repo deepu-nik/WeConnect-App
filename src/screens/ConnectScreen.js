@@ -355,9 +355,14 @@ const ConnectScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Text style={styles.title}>Connect</Text>
-        <TouchableOpacity style={styles.qrButton} onPress={openScanner}>
-          <ScanLine size={22} color="#111111" />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.qrButton} onPress={openQr} accessibilityLabel="Show my QR code">
+            <QrIcon size={22} color="#111111" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.qrButton} onPress={openScanner} accessibilityLabel="Scan QR code">
+            <ScanLine size={22} color="#111111" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <Text style={styles.sectionLabel}>WHERE ARE YOU?</Text>
@@ -499,6 +504,7 @@ const ConnectScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: { fontSize: 28, fontWeight: '800', color: '#111111' },
   qrActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   qrButton: { backgroundColor: '#F0F0EC', padding: 9, borderRadius: 12 },
