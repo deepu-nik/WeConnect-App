@@ -18,7 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
   Camera,
@@ -51,6 +51,7 @@ import { getUserProfile } from '../services/userService';
 import {
   collection,
   doc,
+  getDocs,
   onSnapshot,
   query,
   updateDoc,
@@ -116,6 +117,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
   } = route.params || {};
 
   const currentUser = auth.currentUser;
+  const insets = useSafeAreaInsets();
   const listRef = useRef(null);
   const typingTimeout = useRef(null);
   const viewerScale = useRef(new Animated.Value(1)).current;
@@ -755,7 +757,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
           </View>
         ) : null}
 
-        <View style={styles.composerShell}>
+        <View style={[styles.composerShell, { paddingBottom: (Platform.OS === 'ios' ? 7 : 12) + insets.bottom }]}>
           <View style={styles.composer}>
             <TouchableOpacity style={styles.composerIcon} onPress={openCameraAndSend} disabled={isUploading}>
               <Camera size={21} color="#475569" />
