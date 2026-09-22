@@ -155,7 +155,7 @@ service cloud.firestore {
     // -----------------------------------------------------------------------
     match /blocks/{blockId} {
       allow get: if verified() && resource.data.get('blockerId', '') == request.auth.uid;
-      allow list: if false;
+      allow list: if verified() && resource.data.get('blockerId', '') == request.auth.uid;
       allow create: if verified() &&
         request.resource.data.get('blockerId', '') == request.auth.uid &&
         request.resource.data.get('blockedId', '') != request.auth.uid &&
