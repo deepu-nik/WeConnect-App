@@ -11,7 +11,7 @@ const normalizeTimestamp = (value) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? new Date() : date;
 };
-export const normalizeMessage = (message = {}) => ({ ...message, createdAt: normalizeTimestamp(message.createdAt), text: message.text || '', mediaUrl: message.mediaUrl || null, mediaType: message.mediaType || null, status: message.status || MESSAGE_STATUS.SENT });
+export const normalizeMessage = (message = {}) => ({ ...message, createdAt: normalizeTimestamp(message.createdAt), text: message.text || '', mediaUrl: message.mediaUrl || null, mediaType: message.mediaType || null, storyContext: message.storyContext || null, status: message.status || MESSAGE_STATUS.SENT });
 const readPending = async () => { const raw = await AsyncStorage.getItem(PENDING_KEY); return raw ? JSON.parse(raw) : {}; };
 const writePending = (store) => AsyncStorage.setItem(PENDING_KEY, JSON.stringify(store));
 export const loadPendingMessages = async (chatId) => { const store = await readPending(); return (store[chatId] || []).map(normalizeMessage); };
@@ -26,7 +26,7 @@ export const sendChatMessage = async ({ chatId, message }) => {
     const chatSnapshot = await transaction.get(chatRef); if (!chatSnapshot.exists()) throw new Error('Chat does not exist');
     const chat = chatSnapshot.data(); const participants = Array.isArray(chat.participants) ? chat.participants : []; const unreadCount = { ...(chat.unreadCount || {}) };
     participants.forEach((uid) => { unreadCount[uid] = uid === senderId ? 0 : Number(unreadCount[uid] || 0) + 1; });
-    transaction.set(messageRef, { text: message.text || '', senderId, mediaUrl: message.mediaUrl || null, mediaType: message.mediaType || null, replyTo: message.replyTo || null, createdAt: serverTimestamp(), status: MESSAGE_STATUS.SENT });
+    transaction.set(messageRef, { text: message.text || '', senderId, mediaUrl: message.mediaUrl || null, mediaType: message.mediaType || null, replyTo: message.replyTo || null, storyContext: message.storyContext || null, createdAt: serverTimestamp(), status: MESSAGE_STATUS.SENT });
     transaction.update(chatRef, { lastMessage: message.mediaUrl ? (message.mediaType === 'video' ? '🎥 Video' : '📷 Photo') : (message.text || ''), updatedAt: serverTimestamp(), unreadCount, ['typing.' + senderId]: false });
   });
 };
