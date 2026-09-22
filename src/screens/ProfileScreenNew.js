@@ -158,6 +158,53 @@ export default function ProfileScreenNew({ route, navigation }) {
     }
   };
 
+  const removeImage = async (type) => {
+    if (!isSelf) return;
+    Alert.alert(
+      type === 'avatar' ? 'Remove profile picture?' : 'Remove cover picture?',
+      'This will remove the current image from your profile.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setUploading(true);
+              const patch = type === 'avatar' ? { avatar: '', photoURL: '' } : { coverPhoto: '' };
+              await updateDoc(doc(db, 'users', currentUser.uid), patch);
+              if (type === 'avatar') await updateProfile(currentUser, { photoURL: '' });
+              setUser((prev) => ({ ...prev, ...patch }));
+              if (type === 'avatar') setFullAvatar(false);
+            } catch (error) {
+              Alert.alert('Could not remove', error?.message || 'Please try again.');
+            } finally {
+              setUploading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const openImageActions = (type) => {
+    if (!isSelf) return;
+    const hasImage = type === 'avatar' ? Boolean(user?.avatar) : Boolean(user?.coverPhoto);
+    if (!hasImage) {
+      pickImage(type);
+      return;
+    }
+    Alert.alert(
+      type === 'avatar' ? 'Profile picture' : 'Cover picture',
+      'Choose what you want to do.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Change', onPress: () => pickImage(type) },
+        { text: 'Delete', style: 'destructive', onPress: () => removeImage(type) },
+      ]
+    );
+  };
+
   const pickImage = async (type) => {
     if (!isSelf) return;
     try {
@@ -314,14 +361,14 @@ export default function ProfileScreenNew({ route, navigation }) {
           {user.coverPhoto ? <Image source={{ uri: user.coverPhoto }} style={styles.coverImage} /> : <View style={styles.coverFallback}><GraduationCap size={70} color="#5E5E58" /></View>}
           <View style={styles.coverOverlay} />
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.getParent()?.navigate('Tabs', { screen: 'Chats' })}><ChevronRight size={22} color="#FFFFFF" style={{ transform: [{ rotate: '180deg' }] }} /></TouchableOpacity>
-          {isSelf ? <TouchableOpacity style={styles.coverEdit} onPress={() => pickImage('cover')}><Camera size={18} color={TEXT} /></TouchableOpacity> : null}
+          {isSelf ? <TouchableOpacity style={styles.coverEdit} onPress={() => openImageActions('cover')}><Camera size={18} color={TEXT} /></TouchableOpacity> : null}
           {uploading ? <View style={styles.uploading}><ActivityIndicator color={TEXT} /></View> : null}
         </View>
 
         <View style={styles.profileCard}>
           <TouchableOpacity style={styles.avatarShell} onPress={() => setFullAvatar(true)} activeOpacity={0.9}>
             <Image source={{ uri: user.avatar || FALLBACK_AVATAR }} style={styles.avatar} />
-            {isSelf ? <TouchableOpacity style={styles.avatarEdit} onPress={() => pickImage('avatar')}><Camera size={14} color={TEXT} /></TouchableOpacity> : null}
+            {isSelf ? <TouchableOpacity style={styles.avatarEdit} onPress={() => openImageActions('avatar')}><Camera size={14} color={TEXT} /></TouchableOpacity> : null}
           </TouchableOpacity>
 
           <View style={styles.heroActions}>
