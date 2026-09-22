@@ -61,6 +61,7 @@ import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import { openProfile } from '../navigation/navigationHelpers';
 import { isBlockedByMe } from '../services/safetyService';
 import { assertCanMessage } from '../services/connectionService';
+import { addGroupMembers, getGroupChat, leaveGroupChat, updateGroupChat } from '../services/groupService';
 
 const QUICK_REACTIONS = ['❤️', '😂', '👍', '🔥', '😮', '👏'];
 const COMPOSER_EMOJIS = [
@@ -114,6 +115,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
     uid: otherUserId,
     name: routeName = 'Student',
     avatar: routeAvatar = FALLBACK_AVATAR,
+    isGroup: routeIsGroup = false,
   } = route.params || {};
 
   const currentUser = auth.currentUser;
@@ -143,6 +145,12 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [mediaVisible, setMediaVisible] = useState(false);
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  const [isGroupChat, setIsGroupChat] = useState(Boolean(routeIsGroup));
+  const [groupMembers, setGroupMembers] = useState([]);
+  const [groupAdmins, setGroupAdmins] = useState([]);
+  const [groupCandidates, setGroupCandidates] = useState([]);
+  const [groupCandidateIds, setGroupCandidateIds] = useState([]);
+  const [groupActionLoading, setGroupActionLoading] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const returningHomeRef = useRef(false);
 
@@ -160,7 +168,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
   useEffect(() => {
     let active = true;
     const loadOtherUser = async () => {
-      if (!otherUserId) return;
+      if (routeIsGroup || !otherUserId) return;
       try {
         const profile = await getUserProfile(otherUserId);
         if (!active || !profile) return;
@@ -172,7 +180,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
     };
     loadOtherUser();
     return () => { active = false; };
-  }, [otherUserId, routeName, routeAvatar]);
+  }, [otherUserId, routeName, routeAvatar, routeIsGroup]);
 
   useEffect(() => {
     const findExistingChat = async () => {
@@ -223,14 +231,25 @@ const ChatRoomScreen = ({ route, navigation }) => {
     const unsubscribeChat = onSnapshot(doc(db, 'chats', chatId), (snapshot) => {
       if (!snapshot.exists()) return;
       const data = snapshot.data();
-      setIsOtherUserTyping(Boolean(data.typing?.[otherUserId]));
+      const group = data.type === 'group' || Array.isArray(data.participants) && data.participants.length > 2;
+      setIsGroupChat(group);
+      if (group) {
+        const participants = Array.isArray(data.participants) ? data.participants : [];
+        setOtherUserName(data.groupName || routeName || 'Group chat');
+        setOtherUserAvatar(data.groupAvatar || routeAvatar || FALLBACK_AVATAR);
+        setGroupAdmins(Array.isArray(data.admins) ? data.admins : []);
+        setGroupMembers(participants.map((uid) => ({ uid, ...(data.usersInfo?.[uid] || {}) })));
+        setIsOtherUserTyping(participants.some((uid) => uid !== currentUser?.uid && Boolean(data.typing?.[uid])));
+      } else {
+        setIsOtherUserTyping(Boolean(data.typing?.[otherUserId]));
+      }
     });
 
     return () => {
       unsubscribeMessages();
       unsubscribeChat();
     };
-  }, [chatId, currentUser, otherUserId]);
+  }, [chatId, currentUser, otherUserId, routeName, routeAvatar]);
 
   useEffect(() => () => {
     if (typingTimeout.current) clearTimeout(typingTimeout.current);
@@ -655,14 +674,14 @@ const ChatRoomScreen = ({ route, navigation }) => {
         <TouchableOpacity
           style={styles.headerProfile}
           activeOpacity={0.75}
-          onPress={() => openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar })}
+          onPress={() => isGroupChat ? setDetailsVisible(true) : openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar })}
         >
           <Image source={{ uri: otherUserAvatar }} style={styles.headerAvatar} />
           <View style={styles.headerIdentity}>
             <Text style={styles.headerName} numberOfLines={1}>{otherUserName}</Text>
             <View style={styles.onlineRow}>
               <View style={styles.onlineDot} />
-              <Text style={styles.headerStatus}>{isOtherUserTyping ? 'typing…' : 'Chat'}</Text>
+              <Text style={styles.headerStatus}>{isOtherUserTyping ? 'typing…' : isGroupChat ? groupMembers.length + ' members' : 'Chat'}</Text>
             </View>
           </View>
         </TouchableOpacity>
@@ -921,16 +940,32 @@ const ChatRoomScreen = ({ route, navigation }) => {
           <Pressable style={styles.detailsCard} onPress={() => {}}>
             <Image source={{ uri: otherUserAvatar }} style={styles.detailsAvatar} />
             <Text style={styles.detailsName}>{otherUserName}</Text>
-            <Text style={styles.detailsMeta}>Conversation</Text>
-            <TouchableOpacity
-              style={styles.detailsAction}
-              onPress={() => {
-                setDetailsVisible(false);
-                openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar });
-              }}
-            >
-              <Text style={styles.detailsActionText}>View profile</Text>
-            </TouchableOpacity>
+            <Text style={styles.detailsMeta}>{isGroupChat ? groupMembers.length + ' members' : 'Conversation'}</Text>
+
+            {isGroupChat ? (
+              <ScrollView style={styles.groupMembersList} contentContainerStyle={{ paddingBottom: 4 }}>
+                {groupMembers.map((member) => (
+                  <TouchableOpacity key={member.uid} style={styles.groupMemberMini} onPress={() => member.uid !== currentUser?.uid && openProfile(navigation, { uid: member.uid, name: member.name, avatar: member.avatar })}>
+                    <Image source={{ uri: member.avatar || FALLBACK_AVATAR }} style={styles.groupMemberMiniAvatar} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.groupMemberMiniName}>{member.name || 'Student'}{member.uid === currentUser?.uid ? ' (You)' : ''}</Text>
+                      {groupAdmins.includes(member.uid) ? <Text style={styles.groupAdminText}>Admin</Text> : null}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            ) : (
+              <TouchableOpacity
+                style={styles.detailsAction}
+                onPress={() => {
+                  setDetailsVisible(false);
+                  openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar });
+                }}
+              >
+                <Text style={styles.detailsActionText}>View profile</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
               style={styles.detailsAction}
               onPress={() => {
@@ -940,6 +975,33 @@ const ChatRoomScreen = ({ route, navigation }) => {
             >
               <Text style={styles.detailsActionText}>Shared photos</Text>
             </TouchableOpacity>
+
+            {isGroupChat ? (
+              <TouchableOpacity
+                style={[styles.detailsAction, { backgroundColor: '#FFFEE6' }]}
+                disabled={groupActionLoading}
+                onPress={() => {
+                  Alert.alert('Leave group?', 'You will stop receiving messages from this group.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Leave', style: 'destructive', onPress: async () => {
+                      try {
+                        setGroupActionLoading(true);
+                        await leaveGroupChat(chatId);
+                        setDetailsVisible(false);
+                        returnToHomeChats();
+                      } catch (error) {
+                        Alert.alert('Could not leave group', error?.message || 'Please try again.');
+                      } finally {
+                        setGroupActionLoading(false);
+                      }
+                    }},
+                  ]);
+                }}
+              >
+                <Text style={[styles.detailsActionText, { color: '#D11A2A' }]}>Leave group</Text>
+              </TouchableOpacity>
+            ) : null}
+
             <TouchableOpacity style={styles.detailsCancel} onPress={() => setDetailsVisible(false)}>
               <Text style={styles.detailsCancelText}>Close</Text>
             </TouchableOpacity>
@@ -1093,6 +1155,11 @@ const styles = StyleSheet.create({
   detailsAction: { width: '100%', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#EEEEEA', alignItems: 'center' },
   detailsActionText: { fontSize: 14, fontWeight: '800', color: '#111111' },
   detailsCancel: { marginTop: 12, paddingVertical: 10 },
+  groupMembersList: { maxHeight: 220, width: '100%', marginVertical: 8 },
+  groupMemberMini: { minHeight: 48, flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
+  groupMemberMiniAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#E8E8E3', marginRight: 9 },
+  groupMemberMiniName: { fontSize: 12, fontWeight: '800', color: '#111111' },
+  groupAdminText: { fontSize: 9, fontWeight: '800', color: '#777770', marginTop: 1 },
   detailsCancelText: { fontSize: 14, fontWeight: '800', color: '#707070' },
 });
 
