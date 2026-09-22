@@ -5,7 +5,6 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackHandler } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useTheme } from '../context/ThemeContext';
 
 // Import screens
 import ChatsScreen from '../screens/ChatsScreen';
@@ -20,7 +19,7 @@ const Stack = createStackNavigator();
 const Tabs = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const { colors } = useTheme();
+  const colors = { text: '#111111', muted: '#74746D', surface: '#FFFFFF', border: '#E4E4DE' };
 
   useEffect(() => {
     const handleHardwareBack = () => {
