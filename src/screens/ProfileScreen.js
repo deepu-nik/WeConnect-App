@@ -207,7 +207,7 @@ const ProfileScreen = ({ route, navigation }) => {
 
       setUploading(true);
       const url = await uploadToCloudinary(result.assets[0].uri, 'image', { folder: type === 'cover' ? 'weconnect/profiles/covers' : 'weconnect/profiles/avatars', tags: type === 'cover' ? 'weconnect_profile_cover' : 'weconnect_profile_avatar' });
-      if (!url) throw new Error('Upload failed');
+      if (!url) throw new Error(type === 'cover' ? 'Cover photo upload failed. Check Cloudinary profile media configuration.' : 'Profile photo upload failed.');
 
       const field = type === 'avatar' ? 'photoURL' : 'coverPhoto';
       const patch = { [field]: url };
@@ -225,7 +225,7 @@ const ProfileScreen = ({ route, navigation }) => {
       }));
     } catch (error) {
       console.error('Image upload failed:', error);
-      Alert.alert('Error', 'Could not update the image.');
+      Alert.alert(type === 'cover' ? 'Cover photo failed' : 'Profile photo failed', error?.message || 'Could not update the image.');
     } finally {
       setUploading(false);
     }
