@@ -15,10 +15,18 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { collection, onSnapshot, doc, updateDoc, query, where } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
-import { acceptConnectionRequest, connectUsersViaQr, declineConnectionRequest, sendConnectionRequest, subscribeToConnectionRequests } from '../services/connectionService';
+import {
+  acceptConnectionRequest,
+  connectUsersViaQr,
+  declineConnectionRequest,
+  sendConnectionRequest,
+  subscribeToConnectionRequests,
+  subscribeToSentConnectionRequests,
+} from '../services/connectionService';
 import { getUserProfile, normalizeUser } from '../services/userService';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import { openProfile } from '../navigation/navigationHelpers';
+import FeedbackModal from '../components/FeedbackModal';
 
 const LOCATIONS = [
   ['Library', '📚', '#111111'],
@@ -35,6 +43,9 @@ const ConnectScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState([]);
   const [requests, setRequests] = useState([]);
+  const [sentRequests, setSentRequests] = useState([]);
+  const [sendingRequestId, setSendingRequestId] = useState(null);
+  const [feedback, setFeedback] = useState({ visible: false, type: 'success', title: '', message: '' });
   const [myLocation, setMyLocation] = useState('Classroom');
   const [myLocationIcon, setMyLocationIcon] = useState('📍');
   const [myLocationPhoto, setMyLocationPhoto] = useState('');
@@ -104,6 +115,11 @@ const ConnectScreen = ({ navigation }) => {
   useEffect(() => {
     if (!currentUser) return undefined;
     return subscribeToConnectionRequests(currentUser.uid, setRequests);
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) return undefined;
+    return subscribeToSentConnectionRequests(currentUser.uid, setSentRequests);
   }, [currentUser]);
 
   const connectedUsers = useMemo(
@@ -193,15 +209,32 @@ const ConnectScreen = ({ navigation }) => {
   };
 
   const sendRequest = async (user) => {
+    if (!user?.uid || sendingRequestId === user.uid) return;
+    setSendingRequestId(user.uid);
     try {
       await sendConnectionRequest({
         sender: { ...normalizeUser(currentUser.uid, { name: currentUser.displayName, photoURL: currentUser.photoURL }) },
         receiver: user,
       });
-      Alert.alert('Request sent', 'Your connection request has been sent.');
+      setSentRequests((current) => current.some((item) => item.receiverId === user.uid)
+        ? current
+        : [...current, { id: 'optimistic-' + user.uid, receiverId: user.uid, status: 'pending' }]);
+      setFeedback({
+        visible: true,
+        type: 'success',
+        title: 'Request sent',
+        message: 'Your connection request has been sent. The Connect button will stay disabled until the request is accepted or declined.',
+      });
     } catch (error) {
       console.error('Connection request failed:', error);
-      Alert.alert('Error', 'Could not send the connection request.');
+      setFeedback({
+        visible: true,
+        type: 'error',
+        title: 'Could not send request',
+        message: error?.message || 'Please try again in a moment.',
+      });
+    } finally {
+      setSendingRequestId(null);
     }
   };
 
@@ -343,10 +376,27 @@ const ConnectScreen = ({ navigation }) => {
             </TouchableOpacity>
           </>
         ) : (
-          <TouchableOpacity style={styles.connect} onPress={() => sendRequest(item)} accessibilityLabel="Connect">
-            <UserPlus size={17} color="#111111" />
-            <Text style={styles.connectText}>Connect</Text>
-          </TouchableOpacity>
+          {(() => {
+            const requestPending = sentRequests.some((request) => request.receiverId === item.uid && request.status === 'pending');
+            const requestSending = sendingRequestId === item.uid;
+            return (
+              <TouchableOpacity
+                style={[styles.connect, requestPending && styles.connectPending]}
+                onPress={() => sendRequest(item)}
+                disabled={requestPending || requestSending}
+                accessibilityLabel={requestPending ? 'Connection request sent' : 'Connect'}
+              >
+                {requestSending ? (
+                  <ActivityIndicator size="small" color="#111111" />
+                ) : requestPending ? (
+                  <Check size={17} color="#111111" />
+                ) : (
+                  <UserPlus size={17} color="#111111" />
+                )}
+                <Text style={styles.connectText}>{requestSending ? 'Sending…' : requestPending ? 'Request sent' : 'Connect'}</Text>
+              </TouchableOpacity>
+            );
+          })()}
         )}
       </View>
     );
@@ -451,6 +501,14 @@ const ConnectScreen = ({ navigation }) => {
           />
         )}
       </View>
+
+      <FeedbackModal
+        visible={feedback.visible}
+        type={feedback.type}
+        title={feedback.title}
+        message={feedback.message}
+        onClose={() => setFeedback((current) => ({ ...current, visible: false }))}
+      />
 
       <Modal visible={!!locationPreview} transparent animationType="fade" onRequestClose={() => setLocationPreview(null)}>
         <View style={styles.locationModalOverlay}>
