@@ -612,6 +612,11 @@ const UpdatesScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
+      <TouchableOpacity style={styles.createFab} onPress={() => setModalVisible(true)} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Create a campus update">
+        <Plus size={19} color="#111111" strokeWidth={2.8} />
+        <Text style={styles.createFabText}>Create</Text>
+      </TouchableOpacity>
+
       {/* MAIN FEED */}
       {loading ? (
         <View style={styles.centerContainer}><ActivityIndicator size="large" color="#111111" /></View>
@@ -886,6 +891,8 @@ const styles = StyleSheet.create({
   headerZapIcon: { marginLeft: 6, marginTop: 2 },
   headerIconBtn: { padding: 4 },
   headerPlusWrapper: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  createFab: { position: 'absolute', left: 16, bottom: 18, minHeight: 52, paddingHorizontal: 17, borderRadius: 18, backgroundColor: '#FFFC00', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: '#E3E000', shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.16, shadowRadius: 9, elevation: 6, zIndex: 20 },
+  createFabText: { color: '#111111', fontSize: 13, fontWeight: '900' },
 
   feedContent: { paddingBottom: 100, paddingTop: 10 },
   
