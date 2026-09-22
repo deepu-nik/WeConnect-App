@@ -11,13 +11,15 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [emailVerified, setEmailVerified] = useState(false);
 
   const refreshEmailVerification = async () => {
     const currentUser = auth.currentUser;
     if (!currentUser) return false;
     await reload(currentUser);
-    setUser(auth.currentUser);
-    return Boolean(auth.currentUser?.emailVerified);
+    const verified = Boolean(auth.currentUser?.emailVerified);
+    setEmailVerified(verified);
+    return verified;
   };
 
   const resendVerificationEmail = async () => {
@@ -35,6 +37,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     return onAuthStateChanged(auth, async (nextUser) => {
       setUser(nextUser);
+      setEmailVerified(Boolean(nextUser?.emailVerified));
       if (!nextUser) {
         setProfile(null);
         setLoading(false);
@@ -88,6 +91,7 @@ export const AuthProvider = ({ children }) => {
       user,
       profile,
       loading,
+      emailVerified,
       refreshEmailVerification,
       resendVerificationEmail,
       logout,
