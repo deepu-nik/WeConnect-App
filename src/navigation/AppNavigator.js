@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useRef } from 'react';
 import { View, ActivityIndicator, Linking } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { AuthContext } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -116,6 +116,7 @@ const AppNavigator = () => {
           border: colors.border,
           notification: '#FF3B30',
         },
+        fonts: (isDark ? DarkTheme : DefaultTheme).fonts,
       }}
     >
       {!user ? (
