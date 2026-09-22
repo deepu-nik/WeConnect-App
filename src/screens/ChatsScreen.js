@@ -6,6 +6,7 @@ import { auth, db } from '../config/firebase';
 import { getUserProfile } from '../services/userService';
 import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { createDirectChat, markChatRead } from '../services/chatService';
+import { createGroupChat } from '../services/groupService';
 import Dashboard from '../components/Dashboard';
 
 const FALLBACK_AVATAR = 'https://via.placeholder.com/150';
@@ -48,6 +49,13 @@ const ChatsScreen = ({ navigation }) => {
   const [filter, setFilter] = useState('all');
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [dashboardVisible, setDashboardVisible] = useState(false);
+  const [composerVisible, setComposerVisible] = useState(false);
+  const [groupVisible, setGroupVisible] = useState(false);
+  const [groupName, setGroupName] = useState('');
+  const [groupCandidates, setGroupCandidates] = useState([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState([]);
+  const [loadingGroupCandidates, setLoadingGroupCandidates] = useState(false);
+  const [creatingGroup, setCreatingGroup] = useState(false);
   const profileCache = useRef(new Map());
 
   useEffect(() => {
@@ -75,30 +83,39 @@ const ChatsScreen = ({ navigation }) => {
           const rawChats = snapshot.docs.map((chatDoc) => {
             const data = chatDoc.data() || {};
             const participants = Array.isArray(data.participants) ? data.participants : [];
-            const otherUserId = participants.find((uid) => uid !== currentUser.uid);
+            const isGroup = data.type === 'group' || participants.length > 2;
+            const otherUserId = isGroup ? null : participants.find((uid) => uid !== currentUser.uid);
             const otherInfo = data.usersInfo?.[otherUserId] || {};
             return {
               id: chatDoc.id,
+              isGroup,
+              memberCount: participants.length,
               otherUserId,
-              name: otherInfo.name || 'Student',
-              avatar: otherInfo.avatar || FALLBACK_AVATAR,
+              name: isGroup ? (data.groupName || 'Group chat') : (otherInfo.name || 'Student'),
+              avatar: isGroup ? (data.groupAvatar || FALLBACK_AVATAR) : (otherInfo.avatar || FALLBACK_AVATAR),
               lastMessage: data.lastMessage || 'Start the conversation',
               timestamp: data.updatedAt?.toDate?.() || new Date(0),
               unreadCount: Number(data.unreadCount?.[currentUser.uid] || 0),
-              typing: Boolean(data.typing?.[otherUserId]),
+              typing: isGroup
+                ? participants.some((uid) => uid !== currentUser.uid && Boolean(data.typing?.[uid]))
+                : Boolean(data.typing?.[otherUserId]),
             };
-          }).filter((chat) => chat.otherUserId && chat.otherUserId !== currentUser.uid);
-          // A legacy/random chat id can exist for the same pair. Collapse those records by person so one student never appears twice.
-          const uniqueByPerson = Array.from(rawChats.reduce((map, chat) => {
+          }).filter((chat) => chat.isGroup || (chat.otherUserId && chat.otherUserId !== currentUser.uid));
+
+          const directChats = rawChats.filter((chat) => !chat.isGroup);
+          const groups = rawChats.filter((chat) => chat.isGroup);
+          const uniqueDirect = Array.from(directChats.reduce((map, chat) => {
             const existing = map.get(chat.otherUserId);
             if (!existing || chat.timestamp > existing.timestamp) map.set(chat.otherUserId, chat);
             return map;
           }, new Map()).values());
+          const uniqueByPerson = [...uniqueDirect, ...groups];
           setChats(uniqueByPerson.sort((a, b) => b.timestamp - a.timestamp));
           setLoading(false);
           setRefreshing(false);
 
           Promise.all(uniqueByPerson.map(async (chat) => {
+            if (chat.isGroup) return chat;
             if (profileCache.current.has(chat.otherUserId)) {
               return { ...chat, ...profileCache.current.get(chat.otherUserId) };
             }
@@ -110,13 +127,12 @@ const ChatsScreen = ({ navigation }) => {
               profileCache.current.set(chat.otherUserId, canonical);
               return { ...chat, ...canonical };
             } catch {
-              return chat.name === 'You' ? null : chat;
+              return chat;
             }
           })).then((resolved) => {
             if (!active) return;
             setChats(resolved.filter(Boolean).sort((a, b) => b.timestamp - a.timestamp));
           });
-          setRefreshing(false);
         }, (error) => {
           console.error('Chats subscription failed:', error);
           setChats([]);
@@ -172,7 +188,63 @@ const ChatsScreen = ({ navigation }) => {
   };
 
   const clearSearch = () => { setSearchQuery(''); setStudentResults([]); };
+
+  const openGroupComposer = async () => {
+    setComposerVisible(false);
+    setGroupVisible(true);
+    setLoadingGroupCandidates(true);
+    try {
+      const me = await getUserProfile(currentUser.uid);
+      const connectedIds = new Set(me?.connections || []);
+      const snapshot = await getDocs(query(collection(db, 'users'), where('collegeId', '==', me?.collegeId || '')));
+      const candidates = snapshot.docs
+        .map((item) => {
+          const data = item.data() || {};
+          return { ...data, uid: data.uid || item.id, name: data.name || data.displayName || 'Student', avatar: data.avatar || data.photoURL || FALLBACK_AVATAR };
+        })
+        .filter((user) => user.uid !== currentUser.uid && connectedIds.has(user.uid));
+      setGroupCandidates(candidates);
+    } catch (error) {
+      console.error('Group candidates failed:', error);
+      setGroupCandidates([]);
+    } finally {
+      setLoadingGroupCandidates(false);
+    }
+  };
+
+  const toggleGroupMember = (uid) => {
+    setSelectedGroupIds((current) => current.includes(uid) ? current.filter((id) => id !== uid) : [...current, uid]);
+  };
+
+  const handleCreateGroup = async () => {
+    if (creatingGroup) return;
+    const selected = groupCandidates.filter((member) => selectedGroupIds.includes(member.uid));
+    if (!groupName.trim()) {
+      Alert.alert('Group name required', 'Give your group a name.');
+      return;
+    }
+    if (!selected.length) {
+      Alert.alert('Add members', 'Select at least one classmate.');
+      return;
+    }
+    setCreatingGroup(true);
+    try {
+      const chatId = await createGroupChat({ name: groupName, members: selected });
+      setGroupVisible(false);
+      setGroupName('');
+      setSelectedGroupIds([]);
+      navigation.navigate('ChatRoom', { chatId, isGroup: true, name: groupName.trim(), avatar: '' });
+    } catch (error) {
+      Alert.alert('Could not create group', error?.message || 'Make sure you are connected with the selected students.');
+    } finally {
+      setCreatingGroup(false);
+    }
+  };
   const openChat = async (chat) => {
+    if (chat.isGroup) {
+      navigation.navigate('ChatRoom', { chatId: chat.id, isGroup: true, name: chat.name, avatar: chat.avatar });
+      return;
+    }
     try {
       const canonicalChatId = await createDirectChat({
         currentUser,
@@ -286,7 +358,51 @@ const ChatsScreen = ({ navigation }) => {
         <View style={styles.footerSpace} />
       </ScrollView>
 
-      <TouchableOpacity style={styles.fab} activeOpacity={0.86} onPress={() => navigation.navigate('Connect')} accessibilityLabel="Start a new conversation"><Plus size={25} color="#111111" strokeWidth={2.6} /></TouchableOpacity>
+      <TouchableOpacity style={styles.fab} activeOpacity={0.86} onPress={() => setComposerVisible(true)} accessibilityLabel="Create a conversation or group"><Plus size={25} color="#111111" strokeWidth={2.6} /></TouchableOpacity>
+
+      <Modal visible={composerVisible} transparent animationType="fade" onRequestClose={() => setComposerVisible(false)}>
+        <TouchableOpacity style={styles.actionOverlay} activeOpacity={1} onPress={() => setComposerVisible(false)}>
+          <View style={styles.actionSheet}>
+            <Text style={styles.actionSheetTitle}>Start something new</Text>
+            <TouchableOpacity style={styles.actionRow} onPress={() => { setComposerVisible(false); navigation.navigate('Connect'); }}>
+              <View style={styles.actionIcon}><MessageCircle size={20} color="#111111" /></View>
+              <View style={styles.actionCopy}><Text style={styles.actionTitle}>New conversation</Text><Text style={styles.actionSubtitle}>Message a classmate</Text></View>
+              <ChevronRight size={18} color="#8A8A84" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionRow} onPress={openGroupComposer}>
+              <View style={styles.actionIcon}><UserRoundPlus size={20} color="#111111" /></View>
+              <View style={styles.actionCopy}><Text style={styles.actionTitle}>New group</Text><Text style={styles.actionSubtitle}>Create a group chat with your connections</Text></View>
+              <ChevronRight size={18} color="#8A8A84" />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal visible={groupVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setGroupVisible(false)}>
+        <SafeAreaView style={styles.groupModal}>
+          <View style={styles.groupHeader}>
+            <TouchableOpacity onPress={() => setGroupVisible(false)}><X size={23} color="#111111" /></TouchableOpacity>
+            <Text style={styles.groupTitle}>New group</Text>
+            <TouchableOpacity onPress={handleCreateGroup} disabled={creatingGroup}><Text style={styles.groupCreateText}>{creatingGroup ? '...' : 'Create'}</Text></TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={styles.groupBody} keyboardShouldPersistTaps="handled">
+            <Text style={styles.groupLabel}>GROUP NAME</Text>
+            <TextInput value={groupName} onChangeText={setGroupName} placeholder="e.g. DSA Study Group" placeholderTextColor="#999999" style={styles.groupNameInput} maxLength={40} />
+            <Text style={styles.groupLabel}>ADD CONNECTIONS</Text>
+            {loadingGroupCandidates ? <ActivityIndicator size="small" color="#111111" /> : groupCandidates.length ? groupCandidates.map((member) => {
+              const selected = selectedGroupIds.includes(member.uid);
+              return (
+                <TouchableOpacity key={member.uid} style={[styles.groupMemberRow, selected && styles.groupMemberSelected]} onPress={() => toggleGroupMember(member.uid)}>
+                  <Avatar uri={member.avatar} name={member.name} size={46} />
+                  <View style={styles.groupMemberInfo}><Text style={styles.groupMemberName}>{member.name}</Text><Text style={styles.groupMemberMeta}>{member.username ? '@' + member.username : 'Connected student'}</Text></View>
+                  <View style={[styles.memberCheck, selected && styles.memberCheckSelected]}>{selected ? <Text style={styles.memberCheckGlyph}>✓</Text> : null}</View>
+                </TouchableOpacity>
+              );
+            }) : <Text style={styles.groupEmpty}>You need at least one connection to create a group.</Text>}
+            <Text style={styles.groupFootnote}>Groups use the same WeConnect chat room as direct messages. No separate chat experience.</Text>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
 
       <Modal visible={!!avatarPreview} transparent animationType="fade" onRequestClose={() => setAvatarPreview(null)}>
         <TouchableOpacity style={styles.avatarModalOverlay} activeOpacity={1} onPress={() => setAvatarPreview(null)}>
@@ -363,6 +479,31 @@ const styles = StyleSheet.create({
   emptyButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
   emptySearch: { alignItems: 'center', paddingVertical: 45 },
   footerSpace: { height: 80 },
+  actionOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.42)', justifyContent: 'flex-end' },
+  actionSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 26, borderTopRightRadius: 26, padding: 18, paddingBottom: 28 },
+  actionSheetTitle: { fontSize: 18, fontWeight: '900', color: '#111111', marginBottom: 10 },
+  actionRow: { minHeight: 68, borderRadius: 18, backgroundColor: '#F7F7F5', marginTop: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center' },
+  actionIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#FFFC00', alignItems: 'center', justifyContent: 'center' },
+  actionCopy: { flex: 1, paddingHorizontal: 11 },
+  actionTitle: { fontSize: 14, fontWeight: '900', color: '#111111' },
+  actionSubtitle: { fontSize: 11, color: '#777770', marginTop: 3 },
+  groupModal: { flex: 1, backgroundColor: '#F6F6F2' },
+  groupHeader: { minHeight: 62, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E5E5DF' },
+  groupTitle: { fontSize: 17, fontWeight: '900', color: '#111111' },
+  groupCreateText: { fontSize: 13, fontWeight: '900', color: '#111111' },
+  groupBody: { padding: 16, paddingBottom: 30 },
+  groupLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1.1, color: '#8B8B84', marginTop: 12, marginBottom: 8 },
+  groupNameInput: { minHeight: 52, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E4E4DE', paddingHorizontal: 14, color: '#111111', fontSize: 15 },
+  groupMemberRow: { minHeight: 64, borderRadius: 17, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5DF', paddingHorizontal: 10, marginBottom: 7, flexDirection: 'row', alignItems: 'center' },
+  groupMemberSelected: { borderColor: '#111111', backgroundColor: '#FFFEE6' },
+  groupMemberInfo: { flex: 1, paddingHorizontal: 10 },
+  groupMemberName: { fontSize: 14, fontWeight: '800', color: '#22221F' },
+  groupMemberMeta: { fontSize: 11, color: '#85857E', marginTop: 2 },
+  memberCheck: { width: 25, height: 25, borderRadius: 13, borderWidth: 1.5, borderColor: '#C8C8C2', alignItems: 'center', justifyContent: 'center' },
+  memberCheckSelected: { backgroundColor: '#111111', borderColor: '#111111' },
+  memberCheckGlyph: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  groupEmpty: { fontSize: 13, lineHeight: 19, color: '#777770', paddingVertical: 20 },
+  groupFootnote: { marginTop: 18, fontSize: 11, lineHeight: 17, color: '#8A8A84' },
   fab: { position: 'absolute', right: 19, bottom: 18, width: 57, height: 57, borderRadius: 20, backgroundColor: '#FFFC00', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 6 },
   avatarModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.62)', alignItems: 'center', justifyContent: 'center', padding: 30 },
   avatarModalCard: { width: 280, borderRadius: 24, overflow: 'hidden', backgroundColor: '#FFFFFF', alignItems: 'center', paddingBottom: 18 },
