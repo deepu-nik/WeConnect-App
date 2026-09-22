@@ -24,10 +24,10 @@ export const subscribeToStories = (onStories, onError) => {
         return;
       }
 
-      const q = query(collection(db, 'stories'), where('collegeId', '==', profile.collegeId));
+      const q = query(collection(db, 'stories'), where('audience', 'array-contains', auth.currentUser.uid));
       unsubscribe = onSnapshot(q, (snapshot) => {
         const now = Date.now();
-        const stories = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((story) => {
+        const stories = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((story) => story.collegeId === profile.collegeId).filter((story) => {
           const expires = story.expiresAt?.toDate ? story.expiresAt.toDate().getTime() : new Date(story.expiresAt || 0).getTime();
           return expires > now;
         });
@@ -103,6 +103,7 @@ export const createStory = async ({ uri, type = 'image', caption = '', duration 
       expiresAt: new Date(Date.now() + STORY_LIFETIME_MS),
       viewers: [],
       reactions: {},
+      audience: Array.from(new Set([auth.currentUser.uid, ...(profile.connections || [])])),
     });
   } catch (error) {
     console.error('Story metadata save failed after media upload:', error);
@@ -122,9 +123,9 @@ export const deleteStory = async (storyId) => {
 export const getActiveStories = async () => {
   const profile = await getUserProfile(auth.currentUser?.uid);
   if (!profile?.collegeId) return [];
-  const snapshot = await getDocs(query(collection(db, 'stories'), where('collegeId', '==', profile.collegeId)));
+  const snapshot = await getDocs(query(collection(db, 'stories'), where('audience', 'array-contains', auth.currentUser.uid)));
   const now = Date.now();
-  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((story) => {
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((story) => story.collegeId === profile.collegeId).filter((story) => {
     const expires = story.expiresAt?.toDate ? story.expiresAt.toDate().getTime() : new Date(story.expiresAt || 0).getTime();
     return expires > now;
   });
