@@ -143,6 +143,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [mediaVisible, setMediaVisible] = useState(false);
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const returningHomeRef = useRef(false);
 
   const imageMessages = useMemo(
@@ -234,6 +235,20 @@ const ChatRoomScreen = ({ route, navigation }) => {
   useEffect(() => () => {
     if (typingTimeout.current) clearTimeout(typingTimeout.current);
   }, []);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSubscription = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSubscription = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
 
   const setTyping = (value) => {
     if (!chatId || !currentUser) return;
@@ -690,7 +705,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
-        behavior="padding"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
       >
         <FlatList
@@ -761,7 +776,11 @@ const ChatRoomScreen = ({ route, navigation }) => {
           style={[
             styles.composerShell,
             {
-              paddingBottom: 8 + insets.bottom,
+              paddingBottom: Platform.OS === 'ios'
+                ? 7 + insets.bottom
+                : keyboardVisible
+                  ? 6
+                  : 8 + insets.bottom,
             },
           ]}
         >
@@ -1040,7 +1059,7 @@ const styles = StyleSheet.create({
   emojiRow: { flexDirection: 'row', justifyContent: 'space-around' },
   emojiButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   emojiButtonText: { fontSize: 24 },
-  composerShell: { paddingHorizontal: 8, paddingTop: 6, paddingBottom: Platform.OS === 'ios' ? 7 : 12, backgroundColor: '#F7F7F5' },
+  composerShell: { paddingHorizontal: 8, paddingTop: 6, backgroundColor: '#F7F7F5' },
   composer: { minHeight: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, paddingVertical: 5, borderRadius: 27, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E8E8E3', elevation: 3, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
   composerIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19 },
   textInputShell: { flex: 1, minHeight: 40, maxHeight: 100, flexDirection: 'row', alignItems: 'center', marginHorizontal: 2, paddingLeft: 8, borderRadius: 20, backgroundColor: '#F0F0EC' },
