@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, KeyboardAvoidingView, Modal, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { ArrowLeft, MoreVertical, Send, Shield, UserPlus, Users, X } from 'lucide-react-native';
+import { ArrowLeft, MoreVertical, Send, UserPlus, Users, X } from 'lucide-react-native';
 import { auth } from '../config/firebase';
 import { getUserProfile } from '../services/userService';
 import { addGroupMembers, deleteGroupMessage, getGroup, leaveGroup, removeGroupMember, sendGroupMessage, subscribeToGroupMessages, updateGroup } from '../services/groupService';
