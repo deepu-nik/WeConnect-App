@@ -293,6 +293,24 @@ describe('WeConnect Firestore expanded security rules', { concurrency: false }, 
     );
   });
 
+  test('private contact fields cannot be exposed through public profiles', async () => {
+    const db = dbAs('alice');
+
+    await assertFails(
+      updateDoc(doc(db, 'users', 'alice'), { whatsapp: '9999999999' })
+    );
+    await assertFails(
+      updateDoc(doc(db, 'users', 'alice'), { email: 'alice@example.com' })
+    );
+
+    await assertSucceeds(
+      updateDoc(doc(db, 'userPrivate', 'alice'), { whatsapp: '9999999999' })
+    );
+    await assertFails(
+      updateDoc(doc(db, 'userPrivate', 'alice'), { email: 'bob@example.com' })
+    );
+  });
+
   test('only the receiver can accept or decline a pending connection request', async () => {
     await seedDoc('connectionRequests/req-1', {
       senderId: 'alice',
