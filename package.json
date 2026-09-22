@@ -7,7 +7,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "test:rules": "node --test tests/firestore.rules.test.js tests/firestore.rules.expanded.test.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -60,7 +61,8 @@
     "@types/react": "~19.2.4",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~57.0.2",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "@firebase/rules-unit-testing": "^5.0.2"
   },
   "private": true
 }
