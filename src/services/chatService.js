@@ -1,5 +1,6 @@
 import {
   addDoc,
+  setDoc,
   collection,
   doc,
   getDocs,
@@ -10,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { getUserProfile } from './userService';
+import { assertCanMessage } from './connectionService';
 
 export const findDirectChat = async (currentUid, otherUid) => {
   if (!currentUid || !otherUid) return null;
@@ -36,11 +38,13 @@ export const createDirectChat = async ({ currentUser, otherUser, otherUserId }) 
   if (!currentProfile?.collegeId || !otherProfile?.collegeId || currentProfile.collegeId !== otherProfile.collegeId) {
     throw new Error('Messaging is currently limited to students from your campus.');
   }
+  await assertCanMessage(currentUser.uid, otherUserId);
 
   const existing = await findDirectChat(currentUser.uid, otherUserId);
   if (existing) return existing.id;
 
-  const chat = await addDoc(collection(db, 'chats'), {
+  const chatId = [currentUser.uid, otherUserId].sort().join('_');
+  const chatData = {
     collegeId: currentProfile.collegeId,
     participants: [currentUser.uid, otherUserId],
     updatedAt: serverTimestamp(),
@@ -57,9 +61,9 @@ export const createDirectChat = async ({ currentUser, otherUser, otherUserId }) 
         avatar: otherUser.avatar || null,
       },
     },
-  });
-
-  return chat.id;
+  };
+  await setDoc(doc(db, 'chats', chatId), chatData, { merge: true });
+  return chatId;
 };
 
 export const markChatRead = async (chatId, uid) => {
