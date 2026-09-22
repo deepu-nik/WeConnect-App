@@ -144,8 +144,32 @@ const ChatsScreen = ({ navigation }) => {
     return subscribeToGroups(currentUser.uid, setGroups, (error) => console.error('Groups subscription failed:', error));
   }, [currentUser?.uid]);
 
-  const unreadCount = useMemo(() => chats.filter((chat) => chat.unreadCount > 0).length, [chats]);
-  const filteredChats = useMemo(() => filter === 'unread' ? chats.filter((chat) => chat.unreadCount > 0) : chats, [chats, filter]);
+  const unreadCount = useMemo(() =>
+    chats.filter((chat) => chat.unreadCount > 0).length +
+    groups.filter((group) => Number(group.unreadCount?.[currentUser?.uid] || 0) > 0).length,
+    [chats, groups, currentUser?.uid]
+  );
+  const chatListItems = useMemo(() => {
+    const direct = chats
+      .filter((chat) => filter !== 'unread' || chat.unreadCount > 0)
+      .map((chat) => ({ ...chat, itemType: 'direct', sortTime: chat.timestamp?.getTime?.() || 0 }));
+    const groupItems = groups
+      .filter((group) => filter !== 'unread' || Number(group.unreadCount?.[currentUser?.uid] || 0) > 0)
+      .map((group) => ({
+        ...group,
+        itemType: 'group',
+        id: `group:${group.id}`,
+        name: group.name,
+        avatar: group.avatar || null,
+        lastMessage: group.lastMessage || `${group.members?.length || 0} members`,
+        unreadCount: Number(group.unreadCount?.[currentUser?.uid] || 0),
+        timestamp: group.updatedAt?.toDate?.() || new Date(0),
+        sortTime: group.updatedAt?.toMillis?.() || 0,
+        groupId: group.id,
+      }));
+    return [...direct, ...groupItems].sort((a, b) => b.sortTime - a.sortTime);
+  }, [chats, groups, filter, currentUser?.uid]);
+  const filteredChats = useMemo(() => chatListItems, [chatListItems]);
   const searchMode = Boolean(searchQuery.trim());
   const matchingChats = useMemo(() => {
     const text = searchQuery.trim().toLowerCase();
@@ -207,36 +231,42 @@ const ChatsScreen = ({ navigation }) => {
     try { await markChatRead(chat.id, currentUser.uid); } catch (error) { console.error('Mark chat read failed:', error); }
   };
 
-  const renderChat = ({ item }) => (
-    <TouchableOpacity style={[styles.chatCard, item.unreadCount > 0 && styles.chatCardUnread]} activeOpacity={0.86} onPress={() => openChat(item)} onLongPress={() => markRead(item)} delayLongPress={350}>
-      <Avatar uri={item.avatar} name={item.name} onPress={() => setAvatarPreview({ name: item.name, avatar: item.avatar })} />
-      <View style={styles.chatContent}>
-        <View style={styles.chatTopRow}>
-          <Text style={[styles.chatName, item.unreadCount > 0 && styles.chatNameUnread]} numberOfLines={1}>{item.name}</Text>
-          <Text style={[styles.chatTime, item.unreadCount > 0 && styles.chatTimeUnread]}>{dateLabel(item.timestamp)}</Text>
+  const renderChat = ({ item }) => {
+    const isGroup = item.itemType === 'group';
+    const displayAvatar = item.avatar || FALLBACK_AVATAR;
+    return (
+      <TouchableOpacity
+        style={[styles.chatCard, item.unreadCount > 0 && styles.chatCardUnread]}
+        activeOpacity={0.86}
+        onPress={() => isGroup
+          ? navigation.navigate('ChatRoom', { chatType: 'group', groupId: item.groupId, name: item.name, avatar: displayAvatar })
+          : openChat(item)}
+        onLongPress={() => !isGroup && markRead(item)}
+        delayLongPress={350}
+      >
+        {isGroup ? (
+          <View style={[styles.avatar, styles.groupListAvatar]}>
+            <Users size={21} color="#111111" />
+          </View>
+        ) : (
+          <Avatar uri={item.avatar} name={item.name} onPress={() => setAvatarPreview({ name: item.name, avatar: item.avatar })} />
+        )}
+        <View style={styles.chatContent}>
+          <View style={styles.chatTopRow}>
+            <Text style={[styles.chatName, item.unreadCount > 0 && styles.chatNameUnread]} numberOfLines={1}>{item.name}</Text>
+            <Text style={[styles.chatTime, item.unreadCount > 0 && styles.chatTimeUnread]}>{dateLabel(item.timestamp)}</Text>
+          </View>
+          <View style={styles.chatBottomRow}>
+            <Text style={[styles.lastMessage, item.unreadCount > 0 && styles.lastMessageUnread]} numberOfLines={1}>
+              {item.typing ? 'typing…' : item.lastMessage}
+            </Text>
+            {item.unreadCount > 0 ? <View style={styles.unreadBadge}><Text style={styles.unreadBadgeText}>{item.unreadCount > 99 ? '99+' : item.unreadCount}</Text></View> : null}
+          </View>
         </View>
-        <View style={styles.chatBottomRow}>
-          <Text style={[styles.lastMessage, item.unreadCount > 0 && styles.lastMessageUnread]} numberOfLines={1}>{item.typing ? 'typing…' : item.lastMessage}</Text>
-          {item.unreadCount > 0 ? <View style={styles.unreadBadge}><Text style={styles.unreadBadgeText}>{item.unreadCount > 99 ? '99+' : item.unreadCount}</Text></View> : null}
-        </View>
-      </View>
-      <ChevronRight size={16} color="#B8B8B3" />
-    </TouchableOpacity>
-  );
-
-  const renderGroup = (group) => (
-    <TouchableOpacity style={styles.groupCard} activeOpacity={0.86} onPress={() => navigation.navigate('GroupChat', { groupId: group.id })}>
-      <View style={styles.groupAvatar}><Users size={21} color="#111111" /></View>
-      <View style={styles.chatContent}>
-        <View style={styles.chatTopRow}>
-          <Text style={styles.chatName} numberOfLines={1}>{group.name}</Text>
-          <Text style={styles.chatTime}>{dateLabel(group.updatedAt?.toDate?.() || new Date())}</Text>
-        </View>
-        <Text style={styles.lastMessage} numberOfLines={1}>{group.lastMessage || (group.members.length + ' members')}</Text>
-      </View>
-      <ChevronRight size={16} color="#B8B8B3" />
-    </TouchableOpacity>
-  );
+        <ChevronRight size={16} color="#B8B8B3" />
+      </TouchableOpacity>
+    );
+  };
 
   const renderStudent = ({ item }) => (
     <TouchableOpacity style={styles.studentResult} activeOpacity={0.82} onPress={() => startNewChat(item)}>
@@ -293,12 +323,6 @@ const ChatsScreen = ({ navigation }) => {
           </>
         ) : (
           <View style={styles.chatList}>
-            {groups.length ? (
-              <View style={styles.groupsSection}>
-                <View style={styles.sectionHeader}><View><Text style={styles.sectionTitle}>Groups</Text><Text style={styles.sectionHint}>{groups.length} group{groups.length === 1 ? '' : 's'}</Text></View></View>
-                {groups.map(renderGroup)}
-              </View>
-            ) : null}
             {filteredChats.length ? filteredChats.map((chat) => <View key={chat.id}>{renderChat({ item: chat })}</View>) : (
               <View style={styles.emptyState}>
                 <View style={styles.emptyIcon}>{filter === 'unread' ? <CheckCheck size={28} color="#111111" /> : <MessageCircle size={28} color="#111111" />}</View>
@@ -409,9 +433,7 @@ const styles = StyleSheet.create({
   emptyButtonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
   emptySearch: { alignItems: 'center', paddingVertical: 45 },
   footerSpace: { height: 80 },
-  groupsSection: { marginBottom: 8 },
-  groupCard: { minHeight: 74, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#FFFEE6', borderWidth: 1, borderColor: '#E8E5A0', flexDirection: 'row', alignItems: 'center', marginBottom: 7 },
-  groupAvatar: { width: 50, height: 50, borderRadius: 17, backgroundColor: '#FFFC00', alignItems: 'center', justifyContent: 'center', marginRight: 11 },
+  groupListAvatar: { marginRight: 11, width: 50, height: 50, borderRadius: 17, backgroundColor: '#FFFC00', alignItems: 'center', justifyContent: 'center' },
   actionOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.42)', justifyContent: 'flex-end' },
   actionSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 18, paddingBottom: 28 },
   actionSheetHandle: { alignSelf: 'center', width: 42, height: 4, borderRadius: 2, backgroundColor: '#D5D5CE', marginBottom: 15 },
