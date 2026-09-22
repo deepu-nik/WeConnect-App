@@ -164,7 +164,7 @@ export default function StoryViewerScreen({ route, navigation }) {
         </View>
 
         {!isMine ? (
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.replyWrap}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.replyWrap} keyboardVerticalOffset={Platform.OS === 'android' ? 8 : 0}>
             <TextInput
               value={replyText}
               onChangeText={setReplyText}
