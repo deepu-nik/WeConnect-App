@@ -23,6 +23,13 @@ export const getGroup = async (groupId) => {
   return snapshot.exists() ? normalize(snapshot.id, snapshot.data()) : null;
 };
 
+export const subscribeToGroup = (groupId, onGroup, onError) => {
+  if (!groupId) return () => {};
+  return onSnapshot(doc(db, GROUPS, groupId), (snapshot) => {
+    onGroup(snapshot.exists() ? normalize(snapshot.id, snapshot.data()) : null);
+  }, onError);
+};
+
 export const createGroup = async ({ name, description = '', memberIds = [] }) => {
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error('You must be signed in.');
