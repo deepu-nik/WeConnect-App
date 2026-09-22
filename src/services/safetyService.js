@@ -39,3 +39,16 @@ export const reportUser = async ({ targetId, reason, details = '' }) => {
     createdAt: serverTimestamp(),
   });
 };
+
+
+export const isBlockedBetween = async (otherId) => {
+  const uid = auth.currentUser?.uid;
+  if (!uid || !otherId || uid === otherId) return false;
+
+  const [mine, theirs] = await Promise.all([
+    getDoc(doc(db, 'blocks', getBlockId(uid, otherId))),
+    getDoc(doc(db, 'blocks', getBlockId(otherId, uid))),
+  ]);
+
+  return mine.exists() || theirs.exists();
+};
