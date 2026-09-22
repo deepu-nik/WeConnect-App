@@ -152,7 +152,6 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [groupAddVisible, setGroupAddVisible] = useState(false);
   const [groupAddCandidates, setGroupAddCandidates] = useState([]);
   const [selectedGroupAddIds, setSelectedGroupAddIds] = useState([]);
-  const [groupNameDraft, setGroupNameDraft] = useState('');
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const returningHomeRef = useRef(false);
 
@@ -677,7 +676,6 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
   const renameGroup = () => {
     if (!isGroupChat || !groupAdmins.includes(currentUser?.uid)) return;
-    setGroupNameDraft(otherUserName);
     Alert.prompt?.('Rename group', 'Choose a new group name.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Save', onPress: async (value) => {
