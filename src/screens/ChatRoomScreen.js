@@ -60,7 +60,7 @@ import {
 } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import { openProfile } from '../navigation/navigationHelpers';
-import { isBlockedByMe } from '../services/safetyService';
+import { blockUser, isBlockedByMe, reportUser } from '../services/safetyService';
 import { assertCanMessage } from '../services/connectionService';
 
 const QUICK_REACTIONS = ['❤️', '😂', '👍', '🔥', '😮', '👏'];
@@ -955,6 +955,36 @@ const ChatRoomScreen = ({ route, navigation }) => {
               }}
             >
               <Text style={styles.detailsActionText}>Shared photos</Text>
+            </TouchableOpacity>
+            <View style={styles.detailsDivider} />
+            <TouchableOpacity
+              style={styles.detailsSafetyAction}
+              onPress={async () => {
+                setDetailsVisible(false);
+                try {
+                  await blockUser(otherUserId);
+                  setBlocked(true);
+                  Alert.alert('Student blocked', 'You will no longer be able to message this student.');
+                } catch (error) {
+                  Alert.alert('Could not block', error?.message || 'Please try again.');
+                }
+              }}
+            >
+              <Text style={styles.detailsSafetyText}>Block student</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.detailsSafetyAction}
+              onPress={() => {
+                setDetailsVisible(false);
+                Alert.alert('Report student', 'Choose a reason.', [
+                  { text: 'Spam / scam', onPress: () => reportUser({ targetId: otherUserId, reason: 'Spam / scam' }).catch(() => {}) },
+                  { text: 'Harassment / abuse', onPress: () => reportUser({ targetId: otherUserId, reason: 'Harassment / abuse' }).catch(() => {}) },
+                  { text: 'Impersonation', onPress: () => reportUser({ targetId: otherUserId, reason: 'Impersonation' }).catch(() => {}) },
+                  { text: 'Cancel', style: 'cancel' },
+                ]);
+              }}
+            >
+              <Text style={styles.detailsSafetyText}>Report student</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.detailsCancel} onPress={() => setDetailsVisible(false)}>
               <Text style={styles.detailsCancelText}>Close</Text>
