@@ -107,16 +107,26 @@ export const markGroupRead = async (groupId, uid = auth.currentUser?.uid) => {
   await updateDoc(doc(db, GROUPS, groupId), { ['unreadCount.' + uid]: 0 });
 };
 
-export const sendGroupMessage = async ({ groupId, text }) => {
-  const uid = auth.currentUser?.uid; const clean = String(text || '').trim();
-  if (!uid || !groupId || !clean) return;
+export const sendGroupMessage = async ({ groupId, text, mediaUrl = null, mediaType = null, replyTo = null }) => {
+  const uid = auth.currentUser?.uid;
+  const clean = String(text || '').trim();
+  if (!uid || !groupId || (!clean && !mediaUrl)) return;
   const messageRef = doc(collection(db, GROUPS, groupId, 'messages')); const groupRef = doc(db, GROUPS, groupId);
   await runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(groupRef); if (!snapshot.exists()) throw new Error('Group does not exist.');
     const group = snapshot.data(); if (!group.members?.includes(uid)) throw new Error('You are no longer a member of this group.');
     const unreadCount = { ...(group.unreadCount || {}) }; (group.members || []).forEach((id) => { unreadCount[id] = id === uid ? 0 : Number(unreadCount[id] || 0) + 1; });
-    transaction.set(messageRef, { senderId: uid, text: clean, createdAt: serverTimestamp(), deleted: false });
-    transaction.update(groupRef, { lastMessage: clean, updatedAt: serverTimestamp(), unreadCount, ['typing.' + uid]: false });
+    const preview = clean || (mediaType === 'video' ? '🎥 Video' : mediaType === 'image' ? '📷 Photo' : 'Attachment');
+    transaction.set(messageRef, {
+      senderId: uid,
+      text: clean,
+      mediaUrl: mediaUrl || null,
+      mediaType: mediaType || null,
+      replyTo: replyTo || null,
+      createdAt: serverTimestamp(),
+      deleted: false,
+    });
+    transaction.update(groupRef, { lastMessage: preview, updatedAt: serverTimestamp(), unreadCount, ['typing.' + uid]: false });
   });
 };
 
@@ -131,4 +141,9 @@ export const toggleGroupMessageReaction = async (groupId, messageId, emoji) => {
     reactions[emoji] = users.includes(uid) ? users.filter((id) => id !== uid) : [...users, uid];
     if (!reactions[emoji].length) delete reactions[emoji]; transaction.update(ref, { reactions });
   });
+};
+
+export const setGroupTyping = async (groupId, uid = auth.currentUser?.uid, value = false) => {
+  if (!groupId || !uid) return;
+  await updateDoc(doc(db, GROUPS, groupId), { ['typing.' + uid]: Boolean(value) });
 };
