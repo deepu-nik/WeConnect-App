@@ -56,6 +56,7 @@ import {
 } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import { openProfile } from '../navigation/navigationHelpers';
+import { isBlockedByMe } from '../services/safetyService';
 
 const QUICK_REACTIONS = ['❤️', '😂', '👍', '🔥', '😮', '👏'];
 const COMPOSER_EMOJIS = [
@@ -136,6 +137,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [mediaVisible, setMediaVisible] = useState(false);
   const [detailsVisible, setDetailsVisible] = useState(false);
+  const [blocked, setBlocked] = useState(false);
 
   const imageMessages = useMemo(
     () => messages.filter((message) => message.mediaUrl && message.mediaType === 'image' && !message.deleted),
@@ -169,6 +171,10 @@ const ChatRoomScreen = ({ route, navigation }) => {
     const findExistingChat = async () => {
       if (chatId || !otherUserId || !currentUser) return;
       try {
+        if (await isBlockedByMe(otherUserId)) {
+          setBlocked(true);
+          return;
+        }
         const currentProfile = await getUserProfile(currentUser.uid);
         if (!currentProfile?.collegeId) return;
         const q = query(
@@ -227,6 +233,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
   };
 
   const createChatIfNeeded = async () => {
+    if (blocked) throw new Error('You have blocked this student. Unblock them from their profile to message again.');
     if (chatId) return chatId;
     if (!currentUser || !otherUserId) throw new Error('Missing chat participants');
 
