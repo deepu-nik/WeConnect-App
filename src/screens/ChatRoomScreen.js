@@ -702,8 +702,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
       >
         <FlatList
           ref={listRef}
@@ -773,12 +773,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
           style={[
             styles.composerShell,
             {
-              paddingBottom:
-                Platform.OS === 'ios'
-                  ? 7 + insets.bottom
-                  : keyboardVisible
-                    ? 6
-                    : 8 + insets.bottom,
+              paddingBottom: 8 + insets.bottom,
             },
           ]}
         >
