@@ -138,6 +138,30 @@ service cloud.firestore {
     }
 
     // -----------------------------------------------------------------------
+    // BLOCKS & REPORTS
+    // -----------------------------------------------------------------------
+    match /blocks/{blockId} {
+      allow get: if verified() && resource.data.get('blockerId', '') == request.auth.uid;
+      allow list: if false;
+      allow create: if verified() &&
+        request.resource.data.get('blockerId', '') == request.auth.uid &&
+        request.resource.data.get('blockedId', '') != request.auth.uid &&
+        request.resource.data.get('blockedId', '') != '';
+      allow update: if false;
+      allow delete: if verified() && resource.data.get('blockerId', '') == request.auth.uid;
+    }
+
+    match /reports/{reportId} {
+      allow get, list: if false;
+      allow create: if verified() &&
+        request.resource.data.get('reporterId', '') == request.auth.uid &&
+        request.resource.data.get('targetId', '') != request.auth.uid &&
+        request.resource.data.get('targetId', '') != '' &&
+        request.resource.data.get('status', '') == 'open';
+      allow update, delete: if false;
+    }
+
+    // -----------------------------------------------------------------------
     // CONNECTION REQUESTS
     // -----------------------------------------------------------------------
     match /connectionRequests/{requestId} {
