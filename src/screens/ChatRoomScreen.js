@@ -488,6 +488,17 @@ const ChatRoomScreen = ({ route, navigation }) => {
               </View>
             ) : null}
 
+            {item.storyContext ? (
+              <View style={styles.storyChatCard}>
+                {item.storyContext.mediaUrl ? <Image source={{ uri: item.storyContext.mediaUrl }} style={styles.storyChatImage} /> : null}
+                <View style={styles.storyChatMeta}>
+                  <Text style={styles.storyChatLabel}>{item.storyContext.type === 'reaction' ? 'STORY REACTION' : 'STORY REPLY'}</Text>
+                  {item.storyContext.reaction ? <Text style={styles.storyChatReaction}>{item.storyContext.reaction}</Text> : null}
+                  <Text style={styles.storyChatCaption} numberOfLines={2}>{item.storyContext.caption || 'Your story'}</Text>
+                </View>
+              </View>
+            ) : null}
+
             {item.deleted ? (
               <Text style={[styles.deletedText, isMe && styles.myDeletedText]}>This message was deleted</Text>
             ) : (
@@ -930,6 +941,12 @@ const styles = StyleSheet.create({
   quotedReplyLabelMine: { color: '#fff' },
   quotedReplyText: { marginTop: 2, fontSize: 12, color: '#707070' },
   quotedReplyTextMine: { color: 'rgba(255,255,255,0.85)' },
+  storyChatCard: { flexDirection: 'row', alignItems: 'center', minHeight: 58, marginBottom: 6, borderRadius: 12, backgroundColor: 'rgba(15,23,42,0.08)', overflow: 'hidden' },
+  storyChatImage: { width: 48, height: 58, backgroundColor: '#e2e8f0' },
+  storyChatMeta: { flex: 1, paddingHorizontal: 9, paddingVertical: 6 },
+  storyChatLabel: { fontSize: 9, fontWeight: '900', color: '#64748b', letterSpacing: 0.7 },
+  storyChatReaction: { fontSize: 19, marginTop: 1 },
+  storyChatCaption: { fontSize: 10, color: '#475569', marginTop: 2 },
   messageImage: { width: 240, height: 240, borderRadius: 15, marginBottom: 3, backgroundColor: '#E8E8E3' },
   messageVideo: { width: 240, height: 175, borderRadius: 15, backgroundColor: '#111111', alignItems: 'center', justifyContent: 'center', marginBottom: 3 },
   videoPlayCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
