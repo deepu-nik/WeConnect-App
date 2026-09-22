@@ -45,6 +45,8 @@ const ConnectScreen = ({ navigation }) => {
   const [scanned, setScanned] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
   const [locationPreview, setLocationPreview] = useState(null);
+  const [customLocationVisible, setCustomLocationVisible] = useState(false);
+  const [customLocationText, setCustomLocationText] = useState('');
   const [permission, requestPermission] = useCameraPermissions();
 
   useFocusEffect(
@@ -182,14 +184,18 @@ const ConnectScreen = ({ navigation }) => {
   };
 
   const customLocation = () => {
-    if (Platform.OS !== 'ios') {
-      Alert.alert('Custom location', 'Use one of the campus locations for now.');
+    setCustomLocationText(myLocation && !LOCATIONS.some(([name]) => name === myLocation) ? myLocation : '');
+    setCustomLocationVisible(true);
+  };
+
+  const saveCustomLocation = async () => {
+    const value = customLocationText.trim();
+    if (!value) {
+      Alert.alert('Custom location', 'Please enter a location.');
       return;
     }
-    Alert.prompt('Custom Location', 'Where are you?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Update', onPress: (text) => text?.trim() && updateLocation(text.trim(), '📍') },
-    ]);
+    await updateLocation(value, '📍');
+    setCustomLocationVisible(false);
   };
 
   const sendRequest = async (user) => {
@@ -417,6 +423,26 @@ const ConnectScreen = ({ navigation }) => {
         </View>
       ) : null}
 
+      <Modal visible={customLocationVisible} transparent animationType="fade" onRequestClose={() => setCustomLocationVisible(false)}>
+        <View style={styles.customLocationOverlay}>
+          <View style={styles.customLocationCard}>
+            <View style={styles.customLocationHeader}>
+              <View>
+                <Text style={styles.customLocationTitle}>Set custom location</Text>
+                <Text style={styles.customLocationHint}>Tell your campus where you are.</Text>
+              </View>
+              <TouchableOpacity onPress={() => setCustomLocationVisible(false)}>
+                <X size={20} color="#111111" />
+              </TouchableOpacity>
+            </View>
+            <TextInput autoFocus value={customLocationText} onChangeText={setCustomLocationText} placeholder="e.g. Block A, Room 204" placeholderTextColor="#999999" style={styles.customLocationInput} maxLength={60} returnKeyType="done" onSubmitEditing={saveCustomLocation} />
+            <TouchableOpacity style={styles.customLocationSave} onPress={saveCustomLocation}>
+              <Text style={styles.customLocationSaveText}>Save location</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.search}>
         <Search size={18} color="#888" />
         <TextInput style={styles.searchInput} placeholder="Search students..." placeholderTextColor="#888" value={searchQuery} onChangeText={setSearchQuery} />
@@ -511,6 +537,14 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 12, fontWeight: '800', color: '#999999', paddingHorizontal: 20, marginBottom: 8 },
   locationViewport: { height: 92, flexGrow: 0, flexShrink: 0, width: '100%' },
   locationRow: { paddingHorizontal: 15, alignItems: 'flex-start', height: 92, gap: 8 },
+  customLocationOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  customLocationCard: { width: '100%', borderRadius: 22, backgroundColor: '#FFFFFF', padding: 18 },
+  customLocationHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15 },
+  customLocationTitle: { fontSize: 18, fontWeight: '900', color: '#111111' },
+  customLocationHint: { marginTop: 3, fontSize: 11, color: '#777770' },
+  customLocationInput: { minHeight: 50, borderRadius: 14, borderWidth: 1, borderColor: '#E4E4DE', backgroundColor: '#F7F7F5', paddingHorizontal: 14, color: '#111111', fontSize: 14 },
+  customLocationSave: { marginTop: 12, minHeight: 48, borderRadius: 15, backgroundColor: '#FFFC00', alignItems: 'center', justifyContent: 'center' },
+  customLocationSaveText: { color: '#111111', fontSize: 13, fontWeight: '900' },
   search: { margin: 15, marginTop: 5, height: 46, borderWidth: 1, borderColor: '#E8E8E3', borderRadius: 12, backgroundColor: '#F7F7F5', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, color: '#111111', fontSize: 15 },
   tabs: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#F0F0EC', borderRadius: 12, padding: 4, marginBottom: 10 },
