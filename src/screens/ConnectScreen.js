@@ -56,6 +56,8 @@ const ConnectScreen = ({ navigation }) => {
   const [scanned, setScanned] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
   const [locationPreview, setLocationPreview] = useState(null);
+  const [customLocationVisible, setCustomLocationVisible] = useState(false);
+  const [customLocationText, setCustomLocationText] = useState('');
   const [permission, requestPermission] = useCameraPermissions();
 
   useFocusEffect(
@@ -198,14 +200,19 @@ const ConnectScreen = ({ navigation }) => {
   };
 
   const customLocation = () => {
-    if (Platform.OS !== 'ios') {
-      Alert.alert('Custom location', 'Use one of the campus locations for now.');
+    setCustomLocationText(myLocation && !LOCATIONS.some(([name]) => name === myLocation) ? myLocation : '');
+    setCustomLocationVisible(true);
+  };
+
+  const saveCustomLocation = async () => {
+    const value = customLocationText.trim();
+    if (!value) {
+      Alert.alert('Custom location', 'Please enter a location.');
       return;
     }
-    Alert.prompt('Custom Location', 'Where are you?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Update', onPress: (text) => text?.trim() && updateLocation(text.trim(), '📍') },
-    ]);
+    await updateLocation(value, '📍');
+    setCustomLocationVisible(false);
+    setCustomLocationText('');
   };
 
   const sendRequest = async (user) => {
@@ -500,6 +507,34 @@ const ConnectScreen = ({ navigation }) => {
         )}
       </View>
 
+      <Modal visible={customLocationVisible} transparent animationType="fade" onRequestClose={() => setCustomLocationVisible(false)}>
+        <View style={styles.customLocationOverlay}>
+          <View style={styles.customLocationCard}>
+            <View style={styles.customLocationHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.customLocationTitle}>Set custom location</Text>
+                <Text style={styles.customLocationSubtitle}>Tell your campus where you are.</Text>
+              </View>
+              <TouchableOpacity onPress={() => setCustomLocationVisible(false)}><X size={22} color="#111111" /></TouchableOpacity>
+            </View>
+            <TextInput
+              value={customLocationText}
+              onChangeText={setCustomLocationText}
+              placeholder="e.g. Seminar Hall, Block B"
+              placeholderTextColor="#999999"
+              style={styles.customLocationInput}
+              autoFocus
+              maxLength={60}
+              returnKeyType="done"
+              onSubmitEditing={saveCustomLocation}
+            />
+            <TouchableOpacity style={styles.customLocationSave} onPress={saveCustomLocation}>
+              <Text style={styles.customLocationSaveText}>Save location</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <FeedbackModal
         visible={feedback.visible}
         type={feedback.type}
@@ -613,6 +648,14 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 70 },
   emptyTitle: { fontSize: 18, fontWeight: '800', color: '#334155', marginTop: 12 },
   emptyText: { color: '#999999', marginTop: 5 },
+  customLocationOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.48)', justifyContent: 'center', padding: 22 },
+  customLocationCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 18 },
+  customLocationHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
+  customLocationTitle: { fontSize: 20, fontWeight: '900', color: '#111111' },
+  customLocationSubtitle: { fontSize: 12, color: '#707070', marginTop: 3 },
+  customLocationInput: { minHeight: 52, borderWidth: 1, borderColor: '#E4E4DE', borderRadius: 15, paddingHorizontal: 14, color: '#111111', fontSize: 15, backgroundColor: '#F7F7F5' },
+  customLocationSave: { marginTop: 12, minHeight: 48, borderRadius: 16, backgroundColor: '#FFFC00', alignItems: 'center', justifyContent: 'center' },
+  customLocationSaveText: { color: '#111111', fontWeight: '900', fontSize: 13 },
   locationModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'center', padding: 20 },
   locationModalBackdrop: { ...StyleSheet.absoluteFillObject },
   locationModalCard: { backgroundColor: '#fff', borderRadius: 22, overflow: 'hidden' },
