@@ -133,7 +133,7 @@ export default function ProfileScreenNew({ route, navigation }) {
         next.displayName = next.name;
         next.handle = next.handle ? (next.handle.startsWith('@') ? next.handle : '@' + next.handle) : '';
       }
-      if (modal.key === 'academic') {
+      if (modal.key === 'academic' || modal.key === 'projects') {
         next.projectsCount = Number.parseInt(next.projectsCount || '0', 10) || 0;
       }
       if (modal.key === 'contact') {
