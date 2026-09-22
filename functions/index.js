@@ -1,5 +1,5 @@
 const { onSchedule } = require('firebase-functions/v2/scheduler');
-const { onDocumentCreated, onDocumentDeleted } = require('firebase-functions/v2/firestore');
+const { onDocumentCreated, onDocumentDeleted, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { defineJsonSecret } = require('firebase-functions/params');
 const { logger } = require('firebase-functions');
 const admin = require('firebase-admin');
@@ -77,6 +77,66 @@ exports.deleteStoryMedia = onDocumentDeleted(
   async (event) => {
     await deleteCloudinaryAsset(event.data?.data());
     logger.info('Deleted Cloudinary story asset.', { storyId: event.params.storyId });
+  }
+);
+
+
+const cleanupProfileAssets = async (profile) => {
+  const assets = [
+    { cloudinaryPublicId: profile?.avatarPublicId, cloudinaryResourceType: 'image' },
+    { cloudinaryPublicId: profile?.coverPhotoPublicId, cloudinaryResourceType: 'image' },
+  ];
+  for (const asset of assets) {
+    if (!asset.cloudinaryPublicId) continue;
+    try {
+      await deleteCloudinaryAsset(asset);
+    } catch (error) {
+      logger.error('Profile Cloudinary cleanup failed.', { publicId: asset.cloudinaryPublicId, error: error.message });
+    }
+  }
+};
+
+exports.cleanupProfileMedia = onDocumentUpdated(
+  {
+    document: 'users/{userId}',
+    secrets: [cloudinaryConfig],
+    retry: true,
+    maxInstances: 10,
+  },
+  async (event) => {
+    const before = event.data?.before?.data() || {};
+    const after = event.data?.after?.data() || {};
+    const changedAssets = [
+      ['avatarPublicId', 'avatar'],
+      ['coverPhotoPublicId', 'coverPhoto'],
+    ];
+
+    for (const [publicIdField, urlField] of changedAssets) {
+      if (before[publicIdField] && before[publicIdField] !== after[publicIdField]) {
+        await deleteCloudinaryAsset({
+          cloudinaryPublicId: before[publicIdField],
+          cloudinaryResourceType: 'image',
+        });
+      } else if (before[urlField] && !after[urlField] && before[publicIdField]) {
+        await deleteCloudinaryAsset({
+          cloudinaryPublicId: before[publicIdField],
+          cloudinaryResourceType: 'image',
+        });
+      }
+    }
+  }
+);
+
+exports.deleteProfileMedia = onDocumentDeleted(
+  {
+    document: 'users/{userId}',
+    secrets: [cloudinaryConfig],
+    retry: true,
+    maxInstances: 10,
+  },
+  async (event) => {
+    await cleanupProfileAssets(event.data?.data() || {});
+    logger.info('Deleted profile Cloudinary assets.', { userId: event.params.userId });
   }
 );
 
