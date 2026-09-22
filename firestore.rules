@@ -266,6 +266,7 @@ service cloud.firestore {
       allow create: if verified() &&
         request.resource.data.userId == request.auth.uid &&
         request.resource.data.get('collegeId', '') == myCollegeId() &&
+        request.resource.data.get('audience', []).hasAny([request.auth.uid]) &&
         myCollegeId() == 'dypiu';
 
       allow update: if verified() && resource.data.get('audience', []).hasAny([request.auth.uid]) &&
