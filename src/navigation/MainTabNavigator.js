@@ -6,7 +6,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 // Import screens
 import ChatsScreen from '../screens/ChatsScreen';
 import ConnectScreen from '../screens/ConnectScreen';
-import ProfileScreen from '../screens/ProfileScreen';
+import ProfileScreenNew from '../screens/ProfileScreenNew';
 import UpdatesScreen from '../screens/UpdatesScreen';
 import VaultScreen from '../screens/VaultScreen';
 
@@ -38,7 +38,7 @@ const Tabs = () => (
     <Tab.Screen name="Vault" component={VaultScreen} options={{ title: 'Vault' }} />
     <Tab.Screen name="Updates" component={UpdatesScreen} options={{ title: 'Updates' }} />
     <Tab.Screen name="Connect" component={ConnectScreen} options={{ title: 'Connect' }} />
-    <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
+    <Tab.Screen name="Profile" component={ProfileScreenNew} options={{ title: 'Profile' }} />
   </Tab.Navigator>
 );
 
