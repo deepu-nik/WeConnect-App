@@ -216,42 +216,80 @@ service cloud.firestore {
     match /chats/{chatId} {
       allow get, list: if verified() &&
         resource.data.get('participants', []).hasAny([request.auth.uid]) &&
-        resource.data.get('participants', []).size() == 2 &&
+        resource.data.get('participants', []).size() >= 2 &&
         resource.data.get('collegeId', '') == myCollegeId() &&
         myCollegeId() == 'dypiu';
 
       allow create: if verified() &&
-        request.resource.data.get('participants', []).size() == 2 &&
+        request.resource.data.get('participants', []).size() >= 2 &&
         request.resource.data.get('participants', []).hasAny([request.auth.uid]) &&
         request.resource.data.get('collegeId', '') == myCollegeId() &&
         myCollegeId() == 'dypiu' &&
-        myUser().data.get('connections', []).hasAny(request.resource.data.get('participants', []));
+        (
+          (
+            request.resource.data.get('type', 'direct') == 'group' &&
+            request.resource.data.get('createdBy', '') == request.auth.uid &&
+            request.resource.data.get('admins', []).hasAny([request.auth.uid])
+          )
+          ||
+          (
+            request.resource.data.get('type', 'direct') != 'group' &&
+            request.resource.data.get('participants', []).size() == 2 &&
+            myUser().data.get('connections', []).hasAny(request.resource.data.get('participants', []))
+          )
+        );
 
-      // Participants may update chat state, but never participants/usersInfo.
       allow update: if verified() &&
         resource.data.get('participants', []).hasAny([request.auth.uid]) &&
-        request.resource.data.get('participants', []) == resource.data.get('participants', []) &&
         request.resource.data.get('collegeId', '') == resource.data.get('collegeId', '') &&
-        request.resource.data.get('usersInfo', {}) == resource.data.get('usersInfo', {}) &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'lastMessage', 'updatedAt', 'unreadCount', 'typing'
-        ]);
+        (
+          (
+            resource.data.get('type', 'group') == 'group' &&
+            (
+              request.resource.data.get('admins', []).hasAny([request.auth.uid]) &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'participants', 'usersInfo', 'admins', 'groupName', 'groupAvatar', 'lastMessage', 'updatedAt', 'unreadCount', 'typing'
+              ])
+              ||
+              request.resource.data.get('participants', []) == resource.data.get('participants', []) &&
+              request.resource.data.get('usersInfo', {}) == resource.data.get('usersInfo', {}) &&
+              request.resource.data.get('admins', []) == resource.data.get('admins', []) &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'lastMessage', 'updatedAt', 'unreadCount', 'typing'
+              ])
+            )
+          )
+          ||
+          (
+            resource.data.get('type', 'direct') != 'group' &&
+            request.resource.data.get('participants', []) == resource.data.get('participants', []) &&
+            request.resource.data.get('usersInfo', {}) == resource.data.get('usersInfo', {}) &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'lastMessage', 'updatedAt', 'unreadCount', 'typing'
+            ])
+          )
+        );
 
       allow delete: if false;
 
       match /messages/{messageId} {
         allow get, list: if verified() &&
-          get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []).hasAny([request.auth.uid]) &&
-          myUser().data.get('connections', []).hasAny(get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []));
+          get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []).hasAny([request.auth.uid]);
 
         allow create: if verified() &&
           get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []).hasAny([request.auth.uid]) &&
-          myUser().data.get('connections', []).hasAny(get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', [])) &&
+          (
+            get(/databases/$(database)/documents/chats/$(chatId)).data.get('type', 'direct') == 'group' ||
+            myUser().data.get('connections', []).hasAny(get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []))
+          ) &&
           request.resource.data.senderId == request.auth.uid;
 
         allow update: if verified() &&
           get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []).hasAny([request.auth.uid]) &&
-          myUser().data.get('connections', []).hasAny(get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', [])) &&
+          (
+            get(/databases/$(database)/documents/chats/$(chatId)).data.get('type', 'direct') == 'group' ||
+            myUser().data.get('connections', []).hasAny(get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []))
+          ) &&
           (
             (
               resource.data.senderId == request.auth.uid &&
