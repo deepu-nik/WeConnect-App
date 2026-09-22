@@ -547,6 +547,48 @@ describe('WeConnect Firestore expanded security rules', { concurrency: false }, 
     );
   });
 
+  test('user can create and remove their own block, but cannot edit another block', async () => {
+    const aliceDb = dbAs('alice');
+    const bobDb = dbAs('bob');
+
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'blocks', 'alice_bob'), {
+        blockerId: 'alice',
+        blockedId: 'bob',
+        createdAt: new Date(),
+      })
+    );
+
+    await assertSucceeds(getDoc(doc(aliceDb, 'blocks', 'alice_bob')));
+    await assertFails(getDoc(doc(bobDb, 'blocks', 'alice_bob')));
+    await assertFails(
+      updateDoc(doc(aliceDb, 'blocks', 'alice_bob'), { blockedId: 'charlie' })
+    );
+    await assertSucceeds(deleteDoc(doc(aliceDb, 'blocks', 'alice_bob')));
+  });
+
+  test('verified user can submit a report but reports are not readable or editable by users', async () => {
+    const aliceDb = dbAs('alice');
+    const bobDb = dbAs('bob');
+
+    await assertSucceeds(
+      setDoc(doc(aliceDb, 'reports', 'alice_report_1'), {
+        reporterId: 'alice',
+        targetId: 'bob',
+        reason: 'Spam / scam',
+        details: 'Test report',
+        status: 'open',
+        createdAt: new Date(),
+      })
+    );
+
+    await assertFails(getDoc(doc(aliceDb, 'reports', 'alice_report_1')));
+    await assertFails(getDoc(doc(bobDb, 'reports', 'alice_report_1')));
+    await assertFails(
+      updateDoc(doc(aliceDb, 'reports', 'alice_report_1'), { status: 'closed' })
+    );
+  });
+
   test('unknown collections remain denied by default', async () => {
     const db = dbAs('alice');
 
