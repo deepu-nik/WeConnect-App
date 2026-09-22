@@ -102,6 +102,11 @@ export const subscribeToGroupMessages = (groupId, onMessages, onError) => {
   return onSnapshot(q, (snapshot) => onMessages(snapshot.docs.map((item) => ({ id: item.id, ...item.data(), createdAt: item.data().createdAt?.toDate?.() || new Date() }))), onError);
 };
 
+export const markGroupRead = async (groupId, uid = auth.currentUser?.uid) => {
+  if (!groupId || !uid) return;
+  await updateDoc(doc(db, GROUPS, groupId), { ['unreadCount.' + uid]: 0 });
+};
+
 export const sendGroupMessage = async ({ groupId, text }) => {
   const uid = auth.currentUser?.uid; const clean = String(text || '').trim();
   if (!uid || !groupId || !clean) return;
