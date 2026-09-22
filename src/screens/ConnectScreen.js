@@ -500,6 +500,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15 },
   title: { fontSize: 28, fontWeight: '800', color: '#111111' },
+  qrActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   qrButton: { backgroundColor: '#F0F0EC', padding: 9, borderRadius: 12 },
   sectionLabel: { fontSize: 12, fontWeight: '800', color: '#999999', paddingHorizontal: 20, marginBottom: 8 },
   locationViewport: { height: 92, flexGrow: 0, flexShrink: 0, width: '100%' },
