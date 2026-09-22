@@ -245,7 +245,6 @@ const ChatRoomScreen = ({ route, navigation }) => {
       throw new Error('Messaging is currently limited to students from your campus.');
     }
 
-    const currentProfile = await getUserProfile(currentUser.uid);
     const chatRef = await addDoc(collection(db, 'chats'), {
       collegeId: currentProfile.collegeId,
       participants: [currentUser.uid, otherUserId],
