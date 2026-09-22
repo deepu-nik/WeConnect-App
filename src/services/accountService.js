@@ -39,6 +39,8 @@ export const deleteMyAccount = async (password) => {
   await deleteQueryDocs(query(collection(db, 'blocks'), where('blockerId', '==', uid)));
   await deleteQueryDocs(query(collection(db, 'stories'), where('userId', '==', uid)));
   await deleteQueryDocs(query(collection(db, 'buzz_posts'), where('authorId', '==', uid)));
+  await deleteQueryDocs(query(collection(db, 'vault_files'), where('uploader.uid', '==', uid)));
+  await deleteQueryDocs(query(collection(db, 'vaults'), where('createdBy', '==', uid)));
 
   await deleteDoc(doc(db, 'userPrivate', uid));
   await deleteDoc(doc(db, 'users', uid));
