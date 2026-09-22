@@ -95,3 +95,28 @@ export const subscribeToConnectionRequests = (uid, callback) => {
       .filter((item) => item.status === 'pending'));
   });
 };
+
+
+export const areConnected = async (currentUid, otherUid) => {
+  if (!currentUid || !otherUid || currentUid === otherUid) return false;
+  const [currentProfile, otherProfile] = await Promise.all([
+    getUserProfile(currentUid),
+    getUserProfile(otherUid),
+  ]);
+  return Boolean(
+    currentProfile?.collegeId &&
+    otherProfile?.collegeId &&
+    currentProfile.collegeId === otherProfile.collegeId &&
+    Array.isArray(currentProfile.connections) &&
+    currentProfile.connections.includes(otherUid) &&
+    Array.isArray(otherProfile.connections) &&
+    otherProfile.connections.includes(currentUid)
+  );
+};
+
+export const assertCanMessage = async (currentUid, otherUid) => {
+  if (!(await areConnected(currentUid, otherUid))) {
+    throw new Error('You can message this student after you connect with each other.');
+  }
+  return true;
+};
