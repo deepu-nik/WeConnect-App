@@ -18,6 +18,8 @@ import ChatRoomScreen from '../screens/ChatRoomScreen';
 import NewStoryScreen from '../screens/NewStoryScreen';
 import StoryViewerScreen from '../screens/StoryViewerScreen';
 import MainTabNavigator from './MainTabNavigator';
+import CreateGroupScreen from '../screens/CreateGroupScreen';
+import GroupChatScreen from '../screens/GroupChatScreen';
 
 const Stack = createStackNavigator();
 
@@ -60,6 +62,8 @@ const AuthenticatedStack = () => (
     <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
     <Stack.Screen name="NewStory" component={NewStoryScreen} />
     <Stack.Screen name="StoryViewer" component={StoryViewerScreen} />
+    <Stack.Screen name="CreateGroup" component={CreateGroupScreen} options={{ headerShown: false, presentation: 'card', animation: 'slide_from_right' }} />
+    <Stack.Screen name="GroupChat" component={GroupChatScreen} options={{ headerShown: false, presentation: 'card', animation: 'slide_from_right' }} />
     <Stack.Screen
       name="ChatRoom"
       component={ChatRoomScreen}
