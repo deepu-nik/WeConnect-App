@@ -5,48 +5,18 @@ const {
   assertSucceeds,
   assertFails,
 } = require('@firebase/rules-unit-testing');
-// Use the compat API returned by RulesTestContext.firestore().
-// This avoids Firestore class-identity mismatches between the test runner's
-// bundled Firebase SDK and the app's top-level firebase dependency.
-function doc(db, ...segments) {
-  return db.doc(segments.join('/'));
-}
+const {
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  collection,
+  where,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+} = require('@firebase/firestore');
 
-function collection(db, path) {
-  return db.collection(path);
-}
-
-function where(field, operator, value) {
-  return { field, operator, value };
-}
-
-function query(ref, ...constraints) {
-  return constraints.reduce(
-    (current, constraint) =>
-      current.where(constraint.field, constraint.operator, constraint.value),
-    ref
-  );
-}
-
-function getDoc(ref) {
-  return ref.get();
-}
-
-function getDocs(ref) {
-  return ref.get();
-}
-
-function setDoc(ref, data, options) {
-  return ref.set(data, options);
-}
-
-function updateDoc(ref, data) {
-  return ref.update(data);
-}
-
-function deleteDoc(ref) {
-  return ref.delete();
-}
 const fs = require('fs');
 const path = require('path');
 
