@@ -160,6 +160,23 @@ async function seed() {
     deleted: false,
   });
 
+  await seedDoc('groups/group-dypiu', {
+    collegeId: 'dypiu',
+    name: 'CSE Project Team',
+    description: 'Project chat',
+    createdBy: 'alice',
+    admins: ['alice'],
+    members: ['alice', 'bob'],
+    memberProfiles: {
+      alice: { name: 'Alice', avatar: null },
+      bob: { name: 'Bob', avatar: null },
+    },
+    unreadCount: { alice: 0, bob: 0 },
+    typing: { alice: false, bob: false },
+    lastMessage: 'hello group',
+    updatedAt: '2026-01-01',
+  });
+
   await seedDoc('buzz_posts/post-dypiu', {
     authorId: 'alice',
     collegeId: 'dypiu',
@@ -494,6 +511,62 @@ describe('WeConnect Firestore expanded security rules', { concurrency: false }, 
     await assertFails(
       updateDoc(doc(dbAs('alice'), 'chats/chat-alice-bob/messages', 'message-1'), {
         text: 'unauthorized edit',
+      })
+    );
+  });
+
+  test('group members can query only groups they belong to', async () => {
+    await assertSucceeds(getDoc(doc(dbAs('alice'), 'groups', 'group-dypiu')));
+    await assertFails(getDoc(doc(dbAs('other-college-user'), 'groups', 'group-dypiu')));
+  });
+
+  test('group member can send as themselves but cannot forge sender identity', async () => {
+    await assertSucceeds(
+      setDoc(doc(dbAs('alice'), 'groups/group-dypiu/messages', 'message-alice'), {
+        senderId: 'alice',
+        text: 'hello everyone',
+        deleted: false,
+      })
+    );
+    await assertFails(
+      setDoc(doc(dbAs('alice'), 'groups/group-dypiu/messages', 'message-forged'), {
+        senderId: 'bob',
+        text: 'forged',
+      })
+    );
+  });
+
+  test('group admin can add same-campus member but cannot add another-campus user', async () => {
+    await seedDoc('groups/group-admin-test', {
+      collegeId: 'dypiu',
+      name: 'Test Group',
+      description: '',
+      createdBy: 'alice',
+      admins: ['alice'],
+      members: ['alice'],
+      memberProfiles: { alice: { name: 'Alice' } },
+      unreadCount: { alice: 0 },
+      typing: { alice: false },
+      lastMessage: '',
+      updatedAt: '2026-01-01',
+    });
+    const aliceDb = dbAs('alice');
+    await assertSucceeds(
+      updateDoc(doc(aliceDb, 'groups', 'group-admin-test'), {
+        members: ['alice', 'bob'],
+        memberProfiles: { alice: { name: 'Alice' }, bob: { name: 'Bob' } },
+        unreadCount: { alice: 0, bob: 0 },
+        typing: { alice: false, bob: false },
+        lastMemberAdded: 'bob',
+      })
+    );
+    await assertFails(
+      updateDoc(doc(aliceDb, 'groups', 'group-admin-test'), {
+        members: ['alice', 'other-college-user'],
+        memberProfiles: { alice: { name: 'Alice' }, 'other-college-user': { name: 'Other' } },
+        unreadCount: { alice: 0, 'other-college-user': 0 },
+        typing: { alice: false, 'other-college-user': false },
+        lastMemberAdded: 'other-college-user',
       })
     );
   });
