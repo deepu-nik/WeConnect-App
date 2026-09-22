@@ -213,6 +213,14 @@ async function seed() {
     name: 'Private Vault',
   });
 
+  await seedDoc('vaults/vault-joinable', {
+    collegeId: 'dypiu',
+    createdBy: 'alice',
+    members: ['alice'],
+    admins: ['alice'],
+    name: 'Joinable Vault',
+  });
+
   await seedDoc('vault_files/file-dypiu', {
     vaultId: 'vault-dypiu',
     uploader: { uid: 'alice' },
@@ -380,7 +388,7 @@ describe('WeConnect Firestore expanded security rules', { concurrency: false }, 
 
   test('same-campus student can join a vault when given its invite code', async () => {
     await assertSucceeds(
-      updateDoc(doc(dbAs('bob'), 'vaults', 'vault-dypiu'), {
+      updateDoc(doc(dbAs('bob'), 'vaults', 'vault-joinable'), {
         members: ['alice', 'bob']
       })
     );
