@@ -35,22 +35,33 @@ export const createGroup = async ({ name, description = '', memberIds = [] }) =>
   if (!uid) throw new Error('You must be signed in.');
   const profile = await getUserProfile(uid);
   if (!profile?.collegeId) throw new Error('Your campus profile is incomplete.');
-  const uniqueIds = Array.from(new Set([uid, ...memberIds])).slice(0, 50);
-  const profiles = await Promise.all(uniqueIds.map((id) => getUserProfile(id)));
-  const validProfiles = profiles.filter((item) => item?.uid && item.collegeId === profile.collegeId);
-  if (!validProfiles.some((item) => item.uid === uid)) throw new Error('Could not load your profile.');
-  const memberProfiles = Object.fromEntries(validProfiles.map((item) => [item.uid, { name: item.name || 'Student', avatar: item.avatar || item.photoURL || null }]));
   const groupRef = doc(collection(db, GROUPS));
+  const selfProfile = { name: profile.name || 'Student', avatar: profile.avatar || profile.photoURL || null };
   await setDoc(groupRef, {
-    collegeId: profile.collegeId, name: name.trim(), description: description.trim(), avatar: null,
-    createdBy: uid, admins: [uid], members: validProfiles.map((item) => item.uid), memberProfiles,
-    createdAt: serverTimestamp(), updatedAt: serverTimestamp(), lastMessage: '',
-    unreadCount: Object.fromEntries(validProfiles.map((item) => [item.uid, 0])),
-    typing: Object.fromEntries(validProfiles.map((item) => [item.uid, false])),
+    collegeId: profile.collegeId,
+    name: name.trim(),
+    description: description.trim(),
+    avatar: null,
+    createdBy: uid,
+    admins: [uid],
+    members: [uid],
+    memberProfiles: { [uid]: selfProfile },
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    lastMessage: '',
+    unreadCount: { [uid]: 0 },
+    typing: { [uid]: false },
   });
+  const uniqueIds = Array.from(new Set(memberIds)).filter((id) => id && id !== uid).slice(0, 49);
+  if (uniqueIds.length) {
+    const profiles = await Promise.all(uniqueIds.map((id) => getUserProfile(id).catch(() => null)));
+    for (const person of profiles.filter(Boolean)) {
+      if (person.collegeId !== profile.collegeId) continue;
+      await addGroupMembers(groupRef.id, [person]);
+    }
+  }
   return groupRef.id;
 };
-
 export const updateGroup = async (groupId, patch) => { if (groupId) await updateDoc(doc(db, GROUPS, groupId), patch); };
 
 export const addGroupMembers = async (groupId, users = []) => {
@@ -59,7 +70,7 @@ export const addGroupMembers = async (groupId, users = []) => {
   const existing = new Set(group.members);
   const candidates = users.filter((user) => user?.uid && !existing.has(user.uid)).slice(0, Math.max(0, 50 - group.members.length));
   if (!candidates.length) return;
-  const patch = { members: arrayUnion(...candidates.map((user) => user.uid)), updatedAt: serverTimestamp() };
+  const patch = { members: arrayUnion(...candidates.map((user) => user.uid)), updatedAt: serverTimestamp(), lastMemberAdded: candidates[0].uid };
   candidates.forEach((user) => {
     patch['memberProfiles.' + user.uid] = { name: user.name || 'Student', avatar: user.avatar || user.photoURL || null };
     patch['unreadCount.' + user.uid] = 0;
