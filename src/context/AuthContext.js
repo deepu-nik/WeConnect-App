@@ -25,14 +25,20 @@ export const AuthProvider = ({ children }) => {
         const rawProfileSnapshot = await getDoc(doc(db, 'users', nextUser.uid));
         const rawProfile = rawProfileSnapshot.exists() ? rawProfileSnapshot.data() : null;
 
-        if (rawProfile?.email) {
+        const privatePatch = {};
+        if (rawProfile?.email) privatePatch.email = rawProfile.email;
+        if (rawProfile?.whatsapp) privatePatch.whatsapp = rawProfile.whatsapp;
+
+        if (Object.keys(privatePatch).length) {
           await setDoc(doc(db, 'userPrivate', nextUser.uid), {
-            email: rawProfile.email,
+            ...privatePatch,
             migratedAt: new Date(),
           }, { merge: true });
-          await updateDoc(doc(db, 'users', nextUser.uid), {
-            email: deleteField(),
-          });
+
+          const publicCleanup = {};
+          if (rawProfile?.email) publicCleanup.email = deleteField();
+          if (rawProfile?.whatsapp) publicCleanup.whatsapp = deleteField();
+          await updateDoc(doc(db, 'users', nextUser.uid), publicCleanup);
         }
 
         let nextProfile = await getUserProfile(nextUser.uid);
