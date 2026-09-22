@@ -18,7 +18,12 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.deepu.sharma.weconnect"
     },
     "web": {
       "output": "single",
@@ -50,8 +55,13 @@
       "expo-sharing",
       "expo-status-bar",
       "expo-web-browser",
-      "expo-video",
-      "expo-notifications"
-    ]
+      "expo-video"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "d02fb091-59a8-49aa-8df4-bcbe09252c11"
+      }
+    },
+    "owner": "deepu.sharma"
   }
 }
