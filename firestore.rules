@@ -127,7 +127,7 @@ service cloud.firestore {
           canAddSelfToConnections()
         );
 
-      allow delete: if false;
+      allow delete: if verified() && request.auth.uid == userId;
     }
 
     match /userPrivate/{userId} {
