@@ -359,7 +359,7 @@ export default function ProfileScreenNew({ route, navigation }) {
           </View>
         </Section>
 
-        <Section title="Projects & work" icon={<BriefcaseBusiness size={19} color={TEXT} />} editable={isSelf} onEdit={() => openSection('academic', 'Projects & work', academicFields, { course: user.course, year: user.year, gradYear: user.gradYear, projectsCount: String(user.projectsCount || 0) })}>
+        <Section title="Projects & work" icon={<BriefcaseBusiness size={19} color={TEXT} />} editable={isSelf} onEdit={() => openSection('projects', 'Projects & work', [{ key: 'projectsCount', label: 'Projects completed', placeholder: '0', keyboardType: 'numeric' }], { projectsCount: String(user.projectsCount || 0) })}>
           <View style={styles.projectRow}>
             <View style={styles.projectIcon}><Code2 size={22} color={TEXT} /></View>
             <View style={{ flex: 1 }}><Text style={styles.projectTitle}>{user.projectsCount || 0} projects completed</Text><Text style={styles.projectSub}>Builds, hackathons and academic work can be highlighted through your portfolio.</Text></View>
