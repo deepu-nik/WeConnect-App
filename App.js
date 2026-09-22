@@ -12,8 +12,8 @@ export default function App() {
       <SafeAreaProvider>
         <KeyboardProvider>
           <AuthProvider>
-          <StatusBar style="auto" />
-          <AppNavigator />
+            <StatusBar style="auto" />
+            <AppNavigator />
           </AuthProvider>
         </KeyboardProvider>
       </SafeAreaProvider>
