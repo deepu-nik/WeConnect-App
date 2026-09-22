@@ -14,11 +14,9 @@ import {
 import { db } from '../config/firebase';
 import { getUserProfile } from './userService';
 import { isBlockedBetween } from './safetyService';
-import { isBlockedBetween } from './safetyService';
 
 export const sendConnectionRequest = async ({ sender, receiver }) => {
   if (!sender?.uid || !receiver?.uid || sender.uid === receiver.uid) return;
-  if (await isBlockedBetween(receiver.uid)) throw new Error('You cannot connect with a blocked account.');
   if (await isBlockedBetween(receiver.uid)) throw new Error('You cannot connect with a blocked account.');
   const [senderProfile, receiverProfile] = await Promise.all([
     getUserProfile(sender.uid),
@@ -78,7 +76,6 @@ export const declineConnectionRequest = async (request) => {
 
 export const connectUsersViaQr = async (currentUid, otherUid) => {
   if (!currentUid || !otherUid || currentUid === otherUid) throw new Error('Invalid QR profile.');
-  if (await isBlockedBetween(otherUid)) throw new Error('You cannot connect with a blocked account.');
   if (await isBlockedBetween(otherUid)) throw new Error('You cannot connect with a blocked account.');
   const [currentProfile, otherProfile] = await Promise.all([
     getUserProfile(currentUid),
