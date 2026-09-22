@@ -75,6 +75,12 @@ service cloud.firestore {
         vaultRef(vaultId).data.get('members', []).hasAny([request.auth.uid]);
     }
 
+    function isCampusVault(vaultId) {
+      return verified() &&
+        vaultRef(vaultId).data.get('collegeId', '') == myCollegeId() &&
+        myCollegeId() == 'dypiu';
+    }
+
     function isVaultAdmin(vaultId) {
       return isVaultMember(vaultId) &&
         vaultRef(vaultId).data.get('admins', []).hasAny([request.auth.uid]);
@@ -356,7 +362,7 @@ service cloud.firestore {
         )
         ||
         (
-          isVaultMember(vaultId) &&
+          isCampusVault(vaultId) &&
           request.resource.data.get('collegeId', '') == resource.data.get('collegeId', '') &&
           request.resource.data.get('createdBy', '') == resource.data.get('createdBy', '') &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members']) &&
