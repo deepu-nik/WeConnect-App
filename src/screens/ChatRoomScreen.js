@@ -37,6 +37,19 @@ import { CommonActions } from '@react-navigation/native';
 import { auth, db } from '../config/firebase';
 import { createDirectChat, markChatRead } from '../services/chatService';
 import {
+  addGroupMembers,
+  deleteGroupMessage,
+  getGroup,
+  leaveGroup,
+  markGroupRead,
+  sendGroupMessage,
+  setGroupTyping,
+  subscribeToGroup,
+  subscribeToGroupMessages,
+  toggleGroupMessageReaction,
+  updateGroup,
+} from '../services/groupService';
+import {
   deleteMessage,
   loadPendingMessages,
   mergeMessages,
@@ -113,8 +126,12 @@ const ChatRoomScreen = ({ route, navigation }) => {
     uid: otherUserId,
     name: routeName = 'Student',
     avatar: routeAvatar = FALLBACK_AVATAR,
+    chatType = 'direct',
+    groupId: routeGroupId = null,
   } = route.params || {};
 
+  const isGroup = chatType === 'group' || Boolean(routeGroupId);
+  const groupId = routeGroupId;
   const currentUser = auth.currentUser;
   const listRef = useRef(null);
   const typingTimeout = useRef(null);
@@ -141,6 +158,12 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [mediaVisible, setMediaVisible] = useState(false);
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  const [group, setGroup] = useState(null);
+  const [groupAddVisible, setGroupAddVisible] = useState(false);
+  const [groupConnections, setGroupConnections] = useState([]);
+  const [selectedGroupMembers, setSelectedGroupMembers] = useState([]);
+  const [groupRenameVisible, setGroupRenameVisible] = useState(false);
+  const [groupRenameText, setGroupRenameText] = useState('');
   const returningHomeRef = useRef(false);
 
   const imageMessages = useMemo(
@@ -153,6 +176,34 @@ const ChatRoomScreen = ({ route, navigation }) => {
     if (!queryText) return [];
     return messages.filter((message) => message.text?.toLowerCase().includes(queryText));
   }, [messages, searchQuery]);
+
+  useEffect(() => {
+    if (!isGroup || !groupId || !currentUser) return undefined;
+    let active = true;
+    const unsubscribeGroup = subscribeToGroup(
+      groupId,
+      (nextGroup) => {
+        if (!active) return;
+        setGroup(nextGroup);
+        if (nextGroup?.name) setOtherUserName(nextGroup.name);
+        setOtherUserAvatar(nextGroup?.avatar || FALLBACK_AVATAR);
+      },
+      (error) => console.error('Group subscription failed:', error)
+    );
+    const unsubscribeMessages = subscribeToGroupMessages(
+      groupId,
+      (nextMessages) => {
+        if (active) setMessages(nextMessages);
+      },
+      (error) => console.error('Group message subscription failed:', error)
+    );
+    markGroupRead(groupId, currentUser.uid).catch(() => {});
+    return () => {
+      active = false;
+      unsubscribeGroup?.();
+      unsubscribeMessages?.();
+    };
+  }, [isGroup, groupId, currentUser?.uid]);
 
   useEffect(() => {
     let active = true;
@@ -194,10 +245,10 @@ const ChatRoomScreen = ({ route, navigation }) => {
       }
     };
     findExistingChat();
-  }, [chatId, otherUserId, currentUser]);
+  }, [chatId, otherUserId, currentUser, isGroup]);
 
   useEffect(() => {
-    if (!chatId || !currentUser) return;
+    if (isGroup || !chatId || !currentUser) return;
 
     markChatRead(chatId, currentUser.uid).catch((error) => console.error('Failed to mark chat read:', error));
 
@@ -227,26 +278,32 @@ const ChatRoomScreen = ({ route, navigation }) => {
       unsubscribeMessages();
       unsubscribeChat();
     };
-  }, [chatId, currentUser, otherUserId]);
+  }, [chatId, currentUser, otherUserId, isGroup]);
 
   useEffect(() => () => {
     if (typingTimeout.current) clearTimeout(typingTimeout.current);
   }, []);
 
   const setTyping = (value) => {
-    if (!chatId || !currentUser) return;
+    if (!currentUser) return;
+    if (isGroup) {
+      setGroupTyping(groupId, currentUser.uid, value).catch(() => {});
+      return;
+    }
+    if (!chatId) return;
     updateDoc(doc(db, 'chats', chatId), { ['typing.' + currentUser.uid]: value }).catch(() => {});
   };
 
   const handleTextChange = (text) => {
     setInputText(text);
-    if (!chatId || !currentUser) return;
+    if ((!chatId && !isGroup) || !currentUser) return;
     setTyping(true);
     if (typingTimeout.current) clearTimeout(typingTimeout.current);
     typingTimeout.current = setTimeout(() => setTyping(false), 1200);
   };
 
   const createChatIfNeeded = async () => {
+    if (isGroup) return groupId;
     if (blocked) throw new Error('You have blocked this student. Unblock them from their profile to message again.');
     if (chatId) return chatId;
     if (!currentUser || !otherUserId) throw new Error('Missing chat participants');
@@ -272,6 +329,22 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
     try {
       const activeChatId = await createChatIfNeeded();
+
+      if (isGroup) {
+        await sendGroupMessage({
+          groupId,
+          text: messageText,
+          mediaUrl,
+          mediaType,
+          replyTo: reply ? {
+            id: reply.id,
+            text: reply.text || (reply.mediaType === 'video' ? '🎥 Video' : '📷 Photo'),
+            senderId: reply.senderId,
+          } : null,
+        });
+        return;
+      }
+
       const messageId = Date.now().toString() + '-' + Math.random().toString(36).slice(2, 8);
 
       const localMessage = {
@@ -451,7 +524,11 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const handleDeleteMessage = async (item) => {
     setSelectedMessageId(null);
     try {
-      await deleteMessage(chatId, item.id);
+      if (isGroup) {
+        await deleteGroupMessage(groupId, item.id);
+      } else {
+        await deleteMessage(chatId, item.id);
+      }
     } catch (error) {
       Alert.alert('Could not delete', 'The message could not be deleted.');
     }
@@ -463,6 +540,11 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
   const renderMessage = ({ item }) => {
     const isMe = item.senderId === currentUser?.uid;
+    const senderProfile = isGroup
+      ? (group?.memberProfiles?.[item.senderId] || { name: 'Student', avatar: FALLBACK_AVATAR })
+      : { name: otherUserName, avatar: otherUserAvatar };
+    const senderName = senderProfile.name || 'Student';
+    const senderAvatar = senderProfile.avatar || FALLBACK_AVATAR;
     const reactions = Object.entries(item.reactions || {}).filter(([, users]) => Array.isArray(users) && users.length);
     const replyPreview = item.replyTo?.text;
 
@@ -476,18 +558,19 @@ const ChatRoomScreen = ({ route, navigation }) => {
         {!isMe && (
           <TouchableOpacity
             style={styles.avatarWrap}
-            onPress={() => setFullScreenAvatar({ name: otherUserName, uri: otherUserAvatar })}
+            onPress={() => setFullScreenAvatar({ name: senderName, uri: senderAvatar })}
           >
-            <Image source={{ uri: otherUserAvatar }} style={styles.tinyAvatar} />
+            <Image source={{ uri: senderAvatar }} style={styles.tinyAvatar />
           </TouchableOpacity>
         )}
 
         <View style={[styles.messageColumn, isMe ? styles.messageColumnMine : styles.messageColumnTheirs]}>
+          {isGroup && !isMe ? <Text style={styles.groupSenderName}>{senderName}</Text> : null}
           <View style={[styles.messageBubble, isMe ? styles.myBubble : styles.theirBubble]}>
             {replyPreview ? (
               <View style={[styles.quotedReply, isMe ? styles.quotedReplyMine : styles.quotedReplyTheirs]}>
                 <Text style={[styles.quotedReplyLabel, isMe && styles.quotedReplyLabelMine]}>
-                  {item.replyTo?.senderId === currentUser?.uid ? 'You' : otherUserName}
+                  {item.replyTo?.senderId === currentUser?.uid ? 'You' : (isGroup ? (group?.memberProfiles?.[item.replyTo?.senderId]?.name || 'Student') : otherUserName)}
                 </Text>
                 <Text style={[styles.quotedReplyText, isMe && styles.quotedReplyTextMine]} numberOfLines={2}>
                   {replyPreview}
@@ -555,7 +638,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
                 <TouchableOpacity
                   key={emoji}
                   style={styles.reactionPill}
-                  onPress={() => toggleMessageReaction(chatId, item.id, currentUser.uid, emoji)}
+                  onPress={() => isGroup ? toggleGroupMessageReaction(groupId, item.id, emoji) : toggleMessageReaction(chatId, item.id, currentUser.uid, emoji)}
                 >
                   <Text style={styles.reactionPillEmoji}>{emoji}</Text>
                   {users.length > 1 ? <Text style={styles.reactionPillCount}>{users.length}</Text> : null}
@@ -572,7 +655,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
                     key={emoji}
                     style={styles.reactionAction}
                     onPress={async () => {
-                      await toggleMessageReaction(chatId, item.id, currentUser.uid, emoji);
+                      await isGroup ? toggleGroupMessageReaction(groupId, item.id, emoji) : toggleMessageReaction(chatId, item.id, currentUser.uid, emoji);
                       setSelectedMessageId(null);
                     }}
                   >
@@ -602,6 +685,65 @@ const ChatRoomScreen = ({ route, navigation }) => {
         </View>
       </Pressable>
     );
+  };
+
+  const loadGroupConnections = async () => {
+    if (!isGroup || !group || !currentUser) return;
+    try {
+      const me = await getUserProfile(currentUser.uid);
+      const ids = Array.isArray(me?.connections)
+        ? me.connections.filter((id) => !group.members.includes(id))
+        : [];
+      const profiles = await Promise.all(ids.map((id) => getUserProfile(id).catch(() => null)));
+      setGroupConnections(profiles.filter((profile) => profile?.collegeId === group.collegeId));
+      setSelectedGroupMembers([]);
+      setGroupAddVisible(true);
+    } catch (error) {
+      Alert.alert('Could not load students', error?.message || 'Please try again.');
+    }
+  };
+
+  const submitGroupRename = async () => {
+    const value = groupRenameText.trim();
+    if (!value || !groupId) return Alert.alert('Group name required', 'Enter a group name.');
+    try {
+      await updateGroup(groupId, { name: value });
+      setGroupRenameVisible(false);
+    } catch (error) {
+      Alert.alert('Could not rename group', error?.message || 'Please try again.');
+    }
+  };
+
+  const addSelectedGroupMembers = async () => {
+    if (!groupId || !selectedGroupMembers.length) return;
+    try {
+      const users = groupConnections.filter((person) => selectedGroupMembers.includes(person.uid));
+      await addGroupMembers(groupId, users);
+      setGroupAddVisible(false);
+      setSelectedGroupMembers([]);
+    } catch (error) {
+      Alert.alert('Could not add members', error?.message || 'Please try again.');
+    }
+  };
+
+  const leaveCurrentGroup = async () => {
+    if (!groupId) return;
+    setDetailsVisible(false);
+    Alert.alert('Leave group?', 'You will stop receiving messages from this group.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Leave',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await leaveGroup(groupId);
+            returnToHomeChats();
+          } catch (error) {
+            Alert.alert('Cannot leave group', error?.message || 'Please try again.');
+          }
+        },
+      },
+    ]);
   };
 
   const returnToHomeChats = () => {
@@ -641,14 +783,18 @@ const ChatRoomScreen = ({ route, navigation }) => {
         <TouchableOpacity
           style={styles.headerProfile}
           activeOpacity={0.75}
-          onPress={() => openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar })}
+          onPress={() => isGroup ? setDetailsVisible(true) : openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar })}
         >
-          <Image source={{ uri: otherUserAvatar }} style={styles.headerAvatar} />
+          {isGroup ? (
+            <View style={styles.groupHeaderAvatar}><Text style={styles.groupHeaderGlyph}>👥</Text></View>
+          ) : (
+            <Image source={{ uri: otherUserAvatar }} style={styles.headerAvatar} />
+          )}
           <View style={styles.headerIdentity}>
-            <Text style={styles.headerName} numberOfLines={1}>{otherUserName}</Text>
+            <Text style={styles.headerName} numberOfLines={1}>{isGroup ? (group?.name || otherUserName) : otherUserName}</Text>
             <View style={styles.onlineRow}>
-              <View style={styles.onlineDot} />
-              <Text style={styles.headerStatus}>{isOtherUserTyping ? 'typing…' : 'Chat'}</Text>
+              {!isGroup ? <View style={styles.onlineDot} /> : null}
+              <Text style={styles.headerStatus}>{isGroup ? `${group?.members?.length || 0} members` : (isOtherUserTyping ? 'typing…' : 'Chat')}</Text>
             </View>
           </View>
         </TouchableOpacity>
@@ -884,64 +1030,126 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
       <Modal visible={detailsVisible} transparent animationType="fade" onRequestClose={() => setDetailsVisible(false)}>
         <Pressable style={styles.detailsOverlay} onPress={() => setDetailsVisible(false)}>
-          <Pressable style={styles.detailsCard} onPress={() => {}}>
-            <Image source={{ uri: otherUserAvatar }} style={styles.detailsAvatar} />
-            <Text style={styles.detailsName}>{otherUserName}</Text>
-            <Text style={styles.detailsMeta}>Conversation</Text>
-            <TouchableOpacity
-              style={styles.detailsAction}
-              onPress={() => {
-                setDetailsVisible(false);
-                openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar });
-              }}
-            >
-              <Text style={styles.detailsActionText}>View profile</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.detailsAction}
-              onPress={() => {
-                setDetailsVisible(false);
-                setMediaVisible(true);
-              }}
-            >
-              <Text style={styles.detailsActionText}>Shared photos</Text>
-            </TouchableOpacity>
-            <View style={styles.detailsDivider} />
-            <TouchableOpacity
-              style={styles.detailsSafetyAction}
-              onPress={async () => {
-                setDetailsVisible(false);
-                try {
-                  await blockUser(otherUserId);
-                  setBlocked(true);
-                  Alert.alert('Student blocked', 'You will no longer be able to message this student.');
-                } catch (error) {
-                  Alert.alert('Could not block', error?.message || 'Please try again.');
-                }
-              }}
-            >
-              <Text style={styles.detailsSafetyText}>Block student</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.detailsSafetyAction}
-              onPress={() => {
-                setDetailsVisible(false);
-                Alert.alert('Report student', 'Choose a reason.', [
-                  { text: 'Spam / scam', onPress: () => reportUser({ targetId: otherUserId, reason: 'Spam / scam' }).catch(() => {}) },
-                  { text: 'Harassment / abuse', onPress: () => reportUser({ targetId: otherUserId, reason: 'Harassment / abuse' }).catch(() => {}) },
-                  { text: 'Impersonation', onPress: () => reportUser({ targetId: otherUserId, reason: 'Impersonation' }).catch(() => {}) },
-                  { text: 'Cancel', style: 'cancel' },
-                ]);
-              }}
-            >
-              <Text style={styles.detailsSafetyText}>Report student</Text>
-            </TouchableOpacity>
+          <Pressable style={[styles.detailsCard, isGroup && styles.groupDetailsCard]} onPress={() => {}}>
+            <Image source={{ uri: isGroup ? (group?.avatar || FALLBACK_AVATAR) : otherUserAvatar }} style={styles.detailsAvatar} />
+            <Text style={styles.detailsName}>{isGroup ? (group?.name || 'Group') : otherUserName}</Text>
+            <Text style={styles.detailsMeta}>{isGroup ? `${group?.members?.length || 0} members` : 'Conversation'}</Text>
+            {!isGroup ? (
+              <>
+                <TouchableOpacity style={styles.detailsAction} onPress={() => { setDetailsVisible(false); openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar }); }}>
+                  <Text style={styles.detailsActionText}>View profile</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.detailsAction} onPress={() => { setDetailsVisible(false); setMediaVisible(true); }}>
+                  <Text style={styles.detailsActionText}>Shared photos</Text>
+                </TouchableOpacity>
+                <View style={styles.detailsDivider} />
+                <TouchableOpacity style={styles.detailsSafetyAction} onPress={async () => {
+                  setDetailsVisible(false);
+                  try { await blockUser(otherUserId); setBlocked(true); Alert.alert('Student blocked', 'You will no longer be able to message this student.'); }
+                  catch (error) { Alert.alert('Could not block', error?.message || 'Please try again.'); }
+                }}>
+                  <Text style={styles.detailsSafetyText}>Block student</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.detailsSafetyAction} onPress={() => {
+                  setDetailsVisible(false);
+                  Alert.alert('Report student', 'Choose a reason.', [
+                    { text: 'Spam / scam', onPress: () => reportUser({ targetId: otherUserId, reason: 'Spam / scam' }).catch(() => {}) },
+                    { text: 'Harassment / abuse', onPress: () => reportUser({ targetId: otherUserId, reason: 'Harassment / abuse' }).catch(() => {}) },
+                    { text: 'Impersonation', onPress: () => reportUser({ targetId: otherUserId, reason: 'Impersonation' }).catch(() => {}) },
+                    { text: 'Cancel', style: 'cancel' },
+                  ]);
+                }}>
+                  <Text style={styles.detailsSafetyText}>Report student</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                {group?.admins?.includes(currentUser?.uid) ? (
+                  <>
+                    <TouchableOpacity style={styles.detailsAction} onPress={() => { setDetailsVisible(false); setGroupRenameText(group?.name || ''); setGroupRenameVisible(true); }}>
+                      <Text style={styles.detailsActionText}>Rename group</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.detailsAction} onPress={() => { setDetailsVisible(false); loadGroupConnections(); }}>
+                      <Text style={styles.detailsActionText}>Add members</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : null}
+                <View style={styles.detailsDivider} />
+                <Text style={styles.groupMembersTitle}>Members</Text>
+                <View style={styles.groupMembersList}>
+                  {(group?.members || []).slice(0, 12).map((memberId) => {
+                    const person = group?.memberProfiles?.[memberId] || { name: 'Student', avatar: FALLBACK_AVATAR };
+                    return (
+                      <View key={memberId} style={styles.groupMemberRow}>
+                        <Image source={{ uri: person.avatar || FALLBACK_AVATAR }} style={styles.groupMemberAvatar} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.groupMemberName}>{person.name || 'Student'}</Text>
+                          <Text style={styles.groupMemberMeta}>{memberId === group?.createdBy ? 'Creator' : group?.admins?.includes(memberId) ? 'Admin' : 'Member'}</Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+                <TouchableOpacity style={[styles.detailsSafetyAction, styles.groupLeaveAction]} onPress={leaveCurrentGroup}>
+                  <Text style={styles.detailsSafetyText}>Leave group</Text>
+                </TouchableOpacity>
+              </>
+            )}
             <TouchableOpacity style={styles.detailsCancel} onPress={() => setDetailsVisible(false)}>
               <Text style={styles.detailsCancelText}>Close</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
       </Modal>
+      <Modal visible={groupRenameVisible} transparent animationType="fade" onRequestClose={() => setGroupRenameVisible(false)}>
+        <View style={styles.detailsOverlay}>
+          <View style={styles.groupEditCard}>
+            <Text style={styles.groupEditTitle}>Rename group</Text>
+            <TextInput value={groupRenameText} onChangeText={setGroupRenameText} placeholder="Group name" placeholderTextColor="#999999" style={styles.groupEditInput} maxLength={50} autoFocus />
+            <View style={styles.groupEditActions}>
+              <TouchableOpacity style={styles.groupEditCancel} onPress={() => setGroupRenameVisible(false)}><Text style={styles.groupEditCancelText}>Cancel</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.groupEditSave} onPress={submitGroupRename}><Text style={styles.groupEditSaveText}>Save</Text></TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={groupAddVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setGroupAddVisible(false)}>
+        <SafeAreaView style={styles.modalPage}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Add members</Text>
+            <TouchableOpacity onPress={() => setGroupAddVisible(false)}><X size={24} color="#111827" /></TouchableOpacity>
+          </View>
+          <FlatList
+            data={groupConnections}
+            keyExtractor={(item) => item.uid}
+            contentContainerStyle={{ padding: 16 }}
+            renderItem={({ item }) => {
+              const selected = selectedGroupMembers.includes(item.uid);
+              return (
+                <TouchableOpacity
+                  style={[styles.groupMemberRow, styles.groupMemberPickerRow, selected && styles.groupMemberSelected]}
+                  onPress={() => setSelectedGroupMembers((current) => selected ? current.filter((id) => id !== item.uid) : [...current, item.uid])}
+                >
+                  <Image source={{ uri: item.avatar || FALLBACK_AVATAR }} style={styles.groupMemberAvatar} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.groupMemberName}>{item.name || 'Student'}</Text>
+                    <Text style={styles.groupMemberMeta}>{item.handle || 'Connection'}</Text>
+                  </View>
+                  <View style={[styles.groupPickerCheck, selected && styles.groupPickerCheckActive]}>
+                    {selected ? <Check size={15} color="#111111" /> : null}
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
+            ListEmptyComponent={<View style={styles.modalEmpty}><Text style={styles.modalEmptyTitle}>No eligible connections</Text></View>}
+          />
+          <TouchableOpacity style={styles.groupAddSave} onPress={addSelectedGroupMembers} disabled={!selectedGroupMembers.length}>
+            <Text style={styles.groupAddSaveText}>Add {selectedGroupMembers.length || ''} members</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      </Modal>
+
     </SafeAreaView>
   );
 };
@@ -961,6 +1169,8 @@ const styles = StyleSheet.create({
   headerBack: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   headerProfile: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 3 },
   headerAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#E8E8E3' },
+  groupHeaderAvatar: { width: 42, height: 42, borderRadius: 15, backgroundColor: '#FFFC00', alignItems: 'center', justifyContent: 'center' },
+  groupHeaderGlyph: { fontSize: 20 },
   headerIdentity: { marginLeft: 10, flex: 1 },
   headerName: { fontSize: 16, fontWeight: '800', color: '#111111' },
   onlineRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
@@ -980,6 +1190,7 @@ const styles = StyleSheet.create({
   messageColumn: { maxWidth: '82%', flexDirection: 'column' },
   messageColumnMine: { alignItems: 'flex-end' },
   messageColumnTheirs: { alignItems: 'flex-start' },
+  groupSenderName: { marginLeft: 5, marginBottom: 2, fontSize: 9.5, fontWeight: '900', color: '#707070' },
   messageBubble: { paddingHorizontal: 11, paddingVertical: 8, borderRadius: 21, minWidth: 56, overflow: 'hidden' },
   myBubble: { backgroundColor: '#FFFC00', borderBottomRightRadius: 6 },
   theirBubble: { backgroundColor: '#fff', borderBottomLeftRadius: 6, borderWidth: 1, borderColor: '#e7edf4' },
@@ -1083,6 +1294,28 @@ const styles = StyleSheet.create({
   modalEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   modalEmptyTitle: { marginTop: 10, fontSize: 15, fontWeight: '800', color: '#707070' },
   detailsOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.35)', justifyContent: 'flex-end' },
+  groupDetailsCard: { paddingBottom: 18 },
+  groupMembersTitle: { width: '100%', marginTop: 8, marginBottom: 6, fontSize: 12, fontWeight: '900', color: '#111111' },
+  groupMembersList: { width: '100%', maxHeight: 210 },
+  groupMemberRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 7, borderRadius: 13, marginBottom: 5, backgroundColor: '#F8F8F4' },
+  groupMemberPickerRow: { paddingHorizontal: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E4E4DE' },
+  groupMemberSelected: { backgroundColor: '#FFFEE0', borderColor: '#111111' },
+  groupMemberAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#E8E8E3', marginRight: 9 },
+  groupMemberName: { fontSize: 12, fontWeight: '900', color: '#111111' },
+  groupMemberMeta: { fontSize: 9.5, color: '#7B7B74', marginTop: 2 },
+  groupPickerCheck: { width: 26, height: 26, borderRadius: 8, borderWidth: 1, borderColor: '#C8C8C0', alignItems: 'center', justifyContent: 'center' },
+  groupPickerCheckActive: { backgroundColor: '#FFFC00', borderColor: '#111111' },
+  groupLeaveAction: { backgroundColor: '#FFF2F2', marginTop: 6 },
+  groupEditCard: { margin: 20, backgroundColor: '#FFFFFF', borderRadius: 22, padding: 18 },
+  groupEditTitle: { fontSize: 18, fontWeight: '900', color: '#111111', marginBottom: 11 },
+  groupEditInput: { minHeight: 50, borderWidth: 1, borderColor: '#E4E4DE', borderRadius: 14, paddingHorizontal: 13, color: '#111111', backgroundColor: '#F8F8F4' },
+  groupEditActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 12 },
+  groupEditCancel: { paddingHorizontal: 14, paddingVertical: 11, borderRadius: 13, backgroundColor: '#F0F0EB' },
+  groupEditCancelText: { color: '#55554F', fontSize: 12, fontWeight: '800' },
+  groupEditSave: { paddingHorizontal: 16, paddingVertical: 11, borderRadius: 13, backgroundColor: '#FFFC00' },
+  groupEditSaveText: { color: '#111111', fontSize: 12, fontWeight: '900' },
+  groupAddSave: { margin: 16, minHeight: 48, borderRadius: 15, backgroundColor: '#FFFC00', alignItems: 'center', justifyContent: 'center' },
+  groupAddSaveText: { color: '#111111', fontSize: 12, fontWeight: '900' },
   detailsCard: { backgroundColor: '#fff', borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 22, paddingTop: 24, paddingBottom: 30, alignItems: 'center' },
   detailsAvatar: { width: 82, height: 82, borderRadius: 41 },
   detailsName: { marginTop: 12, fontSize: 19, fontWeight: '900', color: '#111111' },
