@@ -143,7 +143,6 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [mediaVisible, setMediaVisible] = useState(false);
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [blocked, setBlocked] = useState(false);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const returningHomeRef = useRef(false);
 
   const imageMessages = useMemo(
@@ -234,17 +233,6 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
   useEffect(() => () => {
     if (typingTimeout.current) clearTimeout(typingTimeout.current);
-  }, []);
-
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSubscription = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
-    const hideSubscription = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
   }, []);
 
   const setTyping = (value) => {
@@ -702,7 +690,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior="padding"
         keyboardVerticalOffset={0}
       >
         <FlatList
@@ -772,14 +760,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
         <View
           style={[
             styles.composerShell,
-            {
-              paddingBottom:
-                Platform.OS === 'ios'
-                  ? 7 + insets.bottom
-                  : keyboardVisible
-                    ? 6
-                    : 8 + insets.bottom,
-            },
+            { paddingBottom: Platform.OS === 'ios' ? 7 + insets.bottom : 8 },
           ]}
         >
           <View style={styles.composer}>
