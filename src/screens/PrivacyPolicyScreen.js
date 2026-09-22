@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft } from 'lucide-react-native';
 
-const Privacy Policy = ({ navigation }) => (
+const PrivacyPolicy = ({ navigation }) => (
   <SafeAreaView style={styles.container}>
     <View style={styles.header}>
       <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}><ArrowLeft size={22} color="#111" /></TouchableOpacity>
@@ -17,5 +17,7 @@ const Privacy Policy = ({ navigation }) => (
     </ScrollView>
   </SafeAreaView>
 );
-const styles=StyleSheet.create({container:{flex:1,backgroundColor:'#fff'},header:{height:58,flexDirection:'row',alignItems:'center',paddingHorizontal:16,borderBottomWidth:1,borderBottomColor:'#e5e7eb'},back:{width:42,height:42,alignItems:'center',justifyContent:'center'},spacer:{width:42},title:{flex:1,textAlign:'center',fontSize:18,fontWeight:'800',color:'#111'},content:{padding:20,paddingBottom:50},intro:{fontSize:15,lineHeight:23,color:'#334155',marginBottom:8},heading:{fontSize:17,fontWeight:'900',color:'#111',marginTop:22,marginBottom:8},body:{fontSize:14,lineHeight:22,color:'#475569'},note:{fontSize:12,color:'#94a3b8',marginTop:28}});
-export default Privacy Policy;
+
+const styles = StyleSheet.create({container:{flex:1,backgroundColor:'#fff'},header:{height:58,flexDirection:'row',alignItems:'center',paddingHorizontal:16,borderBottomWidth:1,borderBottomColor:'#e5e7eb'},back:{width:42,height:42,alignItems:'center',justifyContent:'center'},spacer:{width:42},title:{flex:1,textAlign:'center',fontSize:18,fontWeight:'800',color:'#111'},content:{padding:20,paddingBottom:50},intro:{fontSize:15,lineHeight:23,color:'#334155',marginBottom:8},heading:{fontSize:17,fontWeight:'900',color:'#111',marginTop:22,marginBottom:8},body:{fontSize:14,lineHeight:22,color:'#475569'},note:{fontSize:12,color:'#94a3b8',marginTop:28}});
+
+export default PrivacyPolicy;
