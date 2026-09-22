@@ -51,12 +51,14 @@ import {
   onSnapshot,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
 } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import { openProfile } from '../navigation/navigationHelpers';
 import { isBlockedByMe } from '../services/safetyService';
+import { assertCanMessage } from '../services/connectionService';
 
 const QUICK_REACTIONS = ['❤️', '😂', '👍', '🔥', '😮', '👏'];
 const COMPOSER_EMOJIS = [
@@ -244,8 +246,17 @@ const ChatRoomScreen = ({ route, navigation }) => {
     if (!currentProfile?.collegeId || !otherProfile?.collegeId || currentProfile.collegeId !== otherProfile.collegeId) {
       throw new Error('Messaging is currently limited to students from your campus.');
     }
+    await assertCanMessage(currentUser.uid, otherUserId);
 
-    const chatRef = await addDoc(collection(db, 'chats'), {
+    const deterministicChatId = [currentUser.uid, otherUserId].sort().join('_');
+    const chatRef = doc(db, 'chats', deterministicChatId);
+    const existing = await getDocs(query(collection(db, 'chats'), where('participants', 'array-contains', currentUser.uid)));
+    const existingMatch = existing.docs.find((item) => item.data()?.participants?.includes(otherUserId));
+    if (existingMatch) {
+      setChatId(existingMatch.id);
+      return existingMatch.id;
+    }
+    await setDoc(chatRef, {
       collegeId: currentProfile.collegeId,
       participants: [currentUser.uid, otherUserId],
       updatedAt: serverTimestamp(),
@@ -263,8 +274,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
         },
       },
     });
-    setChatId(chatRef.id);
-    return chatRef.id;
+    setChatId(deterministicChatId);
+    return deterministicChatId;
   };
 
   const sendMessage = async (mediaUrl = null, mediaType = null, caption = null) => {
