@@ -25,9 +25,11 @@ export const findDirectChat = async (currentUid, otherUid) => {
       where('participants', 'array-contains', currentUid)
     )
   );
-  const existing = snapshot.docs.find((item) =>
-    Array.isArray(item.data().participants) && item.data().participants.includes(otherUid)
-  );
+  const existing = snapshot.docs.find((item) => {
+    const data = item.data() || {};
+    const participants = Array.isArray(data.participants) ? data.participants : [];
+    return data.type !== 'group' && participants.length === 2 && participants.includes(otherUid);
+  });
   return existing ? { id: existing.id, ...existing.data() } : null;
 };
 
@@ -48,6 +50,7 @@ export const createDirectChat = async ({ currentUser, otherUser, otherUserId }) 
   const existing = await findDirectChat(currentUser.uid, otherUserId);
   if (existing) return existing.id;
   const chatData = {
+    type: 'direct',
     collegeId: currentProfile.collegeId,
     participants: [currentUser.uid, otherUserId],
     updatedAt: serverTimestamp(),
