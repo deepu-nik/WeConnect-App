@@ -659,7 +659,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="auto" />
 
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerBack} onPress={returnToHomeChats}>
