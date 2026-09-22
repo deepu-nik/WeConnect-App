@@ -4,8 +4,13 @@ import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import { getUserProfile } from './userService';
 import { createDirectChat } from './chatService';
 import { sendChatMessage } from './chatMessageService';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { File } from 'expo-file-system';
 
 const STORY_LIFETIME_MS = 24 * 60 * 60 * 1000;
+const MAX_STORY_VIDEO_DURATION_MS = 15 * 1000;
+const MAX_STORY_VIDEO_BYTES = 10 * 1024 * 1024;
+const MAX_STORY_IMAGE_BYTES = 3 * 1024 * 1024;
 
 export const subscribeToStories = (onStories, onError) => {
   let unsubscribe = null;
@@ -19,16 +24,12 @@ export const subscribeToStories = (onStories, onError) => {
         return;
       }
 
-      const q = query(
-        collection(db, 'stories'),
-        where('collegeId', '==', profile.collegeId)
-      );
-
+      const q = query(collection(db, 'stories'), where('collegeId', '==', profile.collegeId));
       unsubscribe = onSnapshot(q, (snapshot) => {
-        const cutoff = Date.now() - STORY_LIFETIME_MS;
+        const now = Date.now();
         const stories = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((story) => {
-          const created = story.createdAt?.toDate ? story.createdAt.toDate().getTime() : new Date(story.createdAt || 0).getTime();
-          return created >= cutoff;
+          const expires = story.expiresAt?.toDate ? story.expiresAt.toDate().getTime() : new Date(story.expiresAt || 0).getTime();
+          return expires > now;
         });
         stories.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
         onStories(stories);
@@ -45,22 +46,68 @@ export const subscribeToStories = (onStories, onError) => {
   };
 };
 
-export const createStory = async ({ uri, type = 'image', caption = '' }) => {
+const prepareStoryImage = async (uri) => {
+  const result = await ImageManipulator.manipulateAsync(
+    uri,
+    [{ resize: { width: 1080 } }],
+    { compress: 0.78, format: ImageManipulator.SaveFormat.JPEG }
+  );
+  return result.uri;
+};
+
+const validateFileSize = async (uri, maxBytes, label) => {
+  const file = new File(uri);
+  if (typeof file.size === 'number' && file.size > maxBytes) {
+    throw new Error(`${label} is too large. Please choose a smaller file.`);
+  }
+};
+
+export const createStory = async ({ uri, type = 'image', caption = '', duration = null }) => {
   if (!auth.currentUser?.uid) throw new Error('You must be signed in.');
+  if (!uri) throw new Error('Choose a photo or video first.');
+
   const profile = await getUserProfile(auth.currentUser.uid);
   if (!profile?.collegeId) throw new Error('Your campus profile is incomplete.');
-  const mediaUrl = await uploadToCloudinary(uri, type);
-  if (!mediaUrl) throw new Error('Story upload failed.');
-  return addDoc(collection(db, 'stories'), {
-    collegeId: profile.collegeId,
-    userId: auth.currentUser.uid,
-    userName: auth.currentUser.displayName || 'Student',
-    userAvatar: auth.currentUser.photoURL || null,
-    mediaUrl, mediaType: type, caption: caption.trim(),
-    createdAt: serverTimestamp(),
-    expiresAt: new Date(Date.now() + STORY_LIFETIME_MS),
-    viewers: [], reactions: {},
-  });
+
+  let uploadUri = uri;
+  if (type === 'image') {
+    uploadUri = await prepareStoryImage(uri);
+    await validateFileSize(uploadUri, MAX_STORY_IMAGE_BYTES, 'Photo');
+  } else {
+    if (duration && duration > MAX_STORY_VIDEO_DURATION_MS) {
+      throw new Error('Story videos must be 15 seconds or shorter.');
+    }
+    await validateFileSize(uri, MAX_STORY_VIDEO_BYTES, 'Video');
+  }
+
+  const media = await uploadToCloudinary(uploadUri, type, { returnMetadata: true });
+  if (!media?.secureUrl || !media.publicId) throw new Error('Story upload failed.');
+
+  try {
+    return await addDoc(collection(db, 'stories'), {
+      collegeId: profile.collegeId,
+      userId: auth.currentUser.uid,
+      userName: auth.currentUser.displayName || 'Student',
+      userAvatar: auth.currentUser.photoURL || null,
+      mediaUrl: media.secureUrl,
+      mediaType: type,
+      cloudinaryPublicId: media.publicId,
+      cloudinaryResourceType: media.resourceType,
+      cloudinaryFormat: media.format,
+      mediaBytes: media.bytes,
+      mediaDuration: media.duration || (duration ? duration / 1000 : null),
+      mediaWidth: media.width || null,
+      mediaHeight: media.height || null,
+      caption: caption.trim(),
+      createdAt: serverTimestamp(),
+      expiresAt: new Date(Date.now() + STORY_LIFETIME_MS),
+      viewers: [],
+      reactions: {},
+    });
+  } catch (error) {
+    console.error('Story metadata save failed after media upload:', error);
+    throw new Error('Story could not be published. Please try again.');
+  }
 };
 
 export const markStoryViewed = async (storyId, uid = auth.currentUser?.uid) => {
@@ -76,27 +123,23 @@ export const getActiveStories = async () => {
   const profile = await getUserProfile(auth.currentUser?.uid);
   if (!profile?.collegeId) return [];
   const snapshot = await getDocs(query(collection(db, 'stories'), where('collegeId', '==', profile.collegeId)));
-  const cutoff = Date.now() - STORY_LIFETIME_MS;
+  const now = Date.now();
   return snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((story) => {
-    const created = story.createdAt?.toDate ? story.createdAt.toDate().getTime() : new Date(story.createdAt || 0).getTime();
-    return created >= cutoff;
+    const expires = story.expiresAt?.toDate ? story.expiresAt.toDate().getTime() : new Date(story.expiresAt || 0).getTime();
+    return expires > now;
   });
 };
+
 const sendStoryInteractionToChat = async ({ story, kind, emoji, text }) => {
   const viewer = auth.currentUser;
   if (!viewer?.uid || !story?.userId || viewer.uid === story.userId) return;
   const chatId = await createDirectChat({
     currentUser: viewer,
     otherUserId: story.userId,
-    otherUser: {
-      name: story.userName || 'Student',
-      avatar: story.userAvatar || null,
-    },
+    otherUser: { name: story.userName || 'Student', avatar: story.userAvatar || null },
   });
   const id = `story-${story.id}-${kind}-${viewer.uid}-${Date.now()}`;
-  const messageText = kind === 'reaction'
-    ? `${emoji} reacted to your story`
-    : text.trim();
+  const messageText = kind === 'reaction' ? `${emoji} reacted to your story` : text.trim();
   await sendChatMessage({
     chatId,
     message: {
@@ -127,9 +170,7 @@ export const reactToStory = async (storyOrId, emoji) => {
   reactions[emoji] = users.includes(uid) ? users.filter((id) => id !== uid) : [...users, uid];
   if (!reactions[emoji].length) delete reactions[emoji];
   await updateDoc(ref, { reactions });
-  if (story && !users.includes(uid)) {
-    await sendStoryInteractionToChat({ story, kind: 'reaction', emoji });
-  }
+  if (story && !users.includes(uid)) await sendStoryInteractionToChat({ story, kind: 'reaction', emoji });
 };
 
 export const replyToStory = async (story, text) => {
@@ -142,9 +183,7 @@ export const replyToStory = async (story, text) => {
     text: text.trim(),
     createdAt: serverTimestamp(),
   });
-  if (typeof story === 'object') {
-    await sendStoryInteractionToChat({ story, kind: 'reply', text });
-  }
+  if (typeof story === 'object') await sendStoryInteractionToChat({ story, kind: 'reply', text });
   return reply;
 };
 
