@@ -9,7 +9,7 @@ import { collection, doc, getDocs, query, updateDoc, where } from 'firebase/fire
 import {
   Award, BookOpen, BriefcaseBusiness, Camera, Check, ChevronRight, Code2, Edit3,
   Github, Globe, GraduationCap, Instagram, Link as LinkIcon, Linkedin, MapPin,
-  MessageCircle, Plus, ShieldCheck, Trash2, UserRound, X, Youtube,
+  MessageCircle, Plus, Settings, ShieldCheck, Trash2, UserRound, X, Youtube,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { auth, db } from '../config/firebase';
@@ -17,6 +17,7 @@ import { getPrivateUserProfile, getUserProfile, FALLBACK_AVATAR } from '../servi
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import { areConnected, sendConnectionRequest } from '../services/connectionService';
 import { blockUser, isBlockedByMe, reportUser } from '../services/safetyService';
+import FeedbackModal from '../components/FeedbackModal';
 
 const YELLOW = '#FFFC00';
 const BG = '#F6F6F2';
@@ -89,6 +90,9 @@ export default function ProfileScreenNew({ route, navigation }) {
   const [connected, setConnected] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [pendingRequest, setPendingRequest] = useState(false);
+  const [fullCover, setFullCover] = useState(false);
+  const [feedback, setFeedback] = useState({ visible: false, type: 'success', title: '', message: '' });
 
   const loadProfile = async () => {
     if (!targetUid) return;
@@ -104,6 +108,15 @@ export default function ProfileScreenNew({ route, navigation }) {
       if (!isSelf) {
         try { setBlocked(await isBlockedByMe(targetUid)); } catch {}
         try { setConnected(await areConnected(currentUser?.uid, targetUid)); } catch {}
+        try {
+          const sentSnapshot = await getDocs(
+            query(collection(db, 'connectionRequests'), where('senderId', '==', currentUser?.uid))
+          );
+          setPendingRequest(sentSnapshot.docs.some((item) => {
+            const data = item.data() || {};
+            return data.receiverId === targetUid && data.status === 'pending';
+          }));
+        } catch {}
       }
       try {
         const vaultSnap = await getDocs(query(collection(db, 'vault_files'), where('uploader.uid', '==', targetUid)));
@@ -235,16 +248,27 @@ export default function ProfileScreenNew({ route, navigation }) {
   };
 
   const sendRequest = async () => {
-    if (!user || !currentUser || connecting) return;
+    if (!user || !currentUser || connecting || pendingRequest) return;
     setConnecting(true);
     try {
       await sendConnectionRequest({
         sender: { uid: currentUser.uid, name: currentUser.displayName, avatar: currentUser.photoURL },
         receiver: user,
       });
-      Alert.alert('Request sent', 'Connection request sent.');
+      setPendingRequest(true);
+      setFeedback({
+        visible: true,
+        type: 'success',
+        title: 'Request sent',
+        message: 'Your connection request has been sent. You will see the button update once the request is accepted or declined.',
+      });
     } catch (error) {
-      Alert.alert('Could not connect', error?.message || 'Please try again.');
+      setFeedback({
+        visible: true,
+        type: 'error',
+        title: 'Could not connect',
+        message: error?.message || 'Please try again in a moment.',
+      });
     } finally {
       setConnecting(false);
     }
@@ -311,9 +335,19 @@ export default function ProfileScreenNew({ route, navigation }) {
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={styles.page}>
         <View style={styles.hero}>
-          {user.coverPhoto ? <Image source={{ uri: user.coverPhoto }} style={styles.coverImage} /> : <View style={styles.coverFallback}><GraduationCap size={70} color="#5E5E58" /></View>}
-          <View style={styles.coverOverlay} />
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.getParent()?.navigate('Tabs', { screen: 'Chats' })}><ChevronRight size={22} color="#FFFFFF" style={{ transform: [{ rotate: '180deg' }] }} /></TouchableOpacity>
+          <TouchableOpacity style={styles.coverTouchable} activeOpacity={0.96} onPress={() => user.coverPhoto && setFullCover(true)}>
+            {user.coverPhoto ? <Image source={{ uri: user.coverPhoto }} style={styles.coverImage} /> : <View style={styles.coverFallback}><GraduationCap size={70} color="#5E5E58" /></View>}
+            <View style={styles.coverOverlay} />
+          </TouchableOpacity>
+          {isSelf ? (
+            <TouchableOpacity
+              style={styles.settingsButton}
+              onPress={() => navigation.getParent()?.getParent()?.navigate('Settings')}
+              accessibilityLabel="Open Settings"
+            >
+              <Settings size={20} color={TEXT} />
+            </TouchableOpacity>
+          ) : null}
           {isSelf ? <TouchableOpacity style={styles.coverEdit} onPress={() => pickImage('cover')}><Camera size={18} color={TEXT} /></TouchableOpacity> : null}
           {uploading ? <View style={styles.uploading}><ActivityIndicator color={TEXT} /></View> : null}
         </View>
@@ -331,9 +365,21 @@ export default function ProfileScreenNew({ route, navigation }) {
               </TouchableOpacity>
             ) : (
               <>
-                {!connected && !blocked ? <TouchableOpacity style={styles.yellowAction} onPress={sendRequest} disabled={connecting}><Plus size={16} color={TEXT} /><Text style={styles.yellowActionText}>{connecting ? 'Sending…' : 'Connect'}</Text></TouchableOpacity> : null}
+                {!connected && !blocked ? (
+                  <TouchableOpacity
+                    style={[styles.yellowAction, pendingRequest && styles.pendingAction]}
+                    onPress={sendRequest}
+                    disabled={connecting || pendingRequest}
+                  >
+                    {pendingRequest ? <Check size={16} color={TEXT} /> : <Plus size={16} color={TEXT} />}
+                    <Text style={styles.yellowActionText}>{connecting ? 'Sending…' : pendingRequest ? 'Request sent' : 'Connect'}</Text>
+                  </TouchableOpacity>
+                ) : null}
                 {connected && !blocked ? <TouchableOpacity style={styles.darkAction} onPress={() => navigation.navigate('ChatRoom', { uid: targetUid, name: user.name, avatar: user.avatar })}><MessageCircle size={16} color="#FFFFFF" /><Text style={styles.darkActionText}>Message</Text></TouchableOpacity> : null}
-                <TouchableOpacity style={styles.iconAction} onPress={handleSafety}><ShieldCheck size={17} color={TEXT} /></TouchableOpacity>
+                <TouchableOpacity style={styles.safetyAction} onPress={handleSafety} accessibilityLabel="Block or report student">
+                  <ShieldCheck size={16} color={TEXT} />
+                  <Text style={styles.safetyActionText}>Safety</Text>
+                </TouchableOpacity>
               </>
             )}
           </View>
@@ -433,12 +479,30 @@ export default function ProfileScreenNew({ route, navigation }) {
         </View>
       </ScrollView>
 
+      <Modal visible={fullCover} transparent animationType="fade" onRequestClose={() => setFullCover(false)}>
+        <TouchableOpacity style={styles.coverModal} activeOpacity={1} onPress={() => setFullCover(false)}>
+          {user.coverPhoto ? <Image source={{ uri: user.coverPhoto }} style={styles.fullCover} resizeMode="contain" /> : null}
+          <View style={styles.coverModalLabel}>
+            <Text style={styles.coverModalTitle}>{user.name || 'Student'}'s cover photo</Text>
+            <Text style={styles.coverModalHint}>Tap anywhere to close</Text>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       <Modal visible={fullAvatar} transparent animationType="fade" onRequestClose={() => setFullAvatar(false)}>
         <TouchableOpacity style={styles.avatarModal} activeOpacity={1} onPress={() => setFullAvatar(false)}>
           <Image source={{ uri: user.avatar || FALLBACK_AVATAR }} style={styles.fullAvatar} />
           <View style={styles.avatarName}><Text style={styles.avatarNameText}>{user.name}</Text><Text style={styles.avatarHint}>Tap outside to close</Text></View>
         </TouchableOpacity>
       </Modal>
+
+      <FeedbackModal
+        visible={feedback.visible}
+        type={feedback.type}
+        title={feedback.title}
+        message={feedback.message}
+        onClose={() => setFeedback((current) => ({ ...current, visible: false }))}
+      />
 
       <EditModal
         visible={!!modal}
@@ -499,7 +563,8 @@ const styles = StyleSheet.create({
   coverImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   coverFallback: { ...StyleSheet.absoluteFillObject, backgroundColor: YELLOW, alignItems: 'center', justifyContent: 'center' },
   coverOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,252,0,.18)' },
-  backButton: { position: 'absolute', left: 14, top: 10, width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(255,255,255,.8)', alignItems: 'center', justifyContent: 'center' },
+  coverTouchable: { flex: 1 },
+  settingsButton: { position: 'absolute', right: 14, top: 10, width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(255,255,255,.88)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,.08)' },
   coverEdit: { position: 'absolute', right: 14, bottom: 48, width: 40, height: 40, borderRadius: 14, backgroundColor: YELLOW, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#D9D600' },
   uploading: { position: 'absolute', right: 14, top: 10, width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(255,255,255,.82)', alignItems: 'center', justifyContent: 'center' },
   profileCard: { marginHorizontal: 12, marginTop: -34, padding: 17, paddingTop: 0, borderRadius: 24, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, shadowColor: '#000', shadowOpacity: .05, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
@@ -511,7 +576,9 @@ const styles = StyleSheet.create({
   yellowActionText: { color: TEXT, fontWeight: '900', fontSize: 11 },
   darkAction: { minHeight: 38, paddingHorizontal: 12, borderRadius: 13, backgroundColor: TEXT, flexDirection: 'row', alignItems: 'center', gap: 6 },
   darkActionText: { color: '#FFFFFF', fontWeight: '900', fontSize: 11 },
-  iconAction: { width: 38, height: 38, borderRadius: 13, backgroundColor: '#F0F0EB', alignItems: 'center', justifyContent: 'center' },
+  pendingAction: { backgroundColor: '#E8E8E3', borderColor: '#D2D2CC' },
+  safetyAction: { minHeight: 38, paddingHorizontal: 11, borderRadius: 13, backgroundColor: '#F0F0EB', flexDirection: 'row', alignItems: 'center', gap: 5 },
+  safetyActionText: { color: TEXT, fontSize: 10, fontWeight: '900' },
   name: { marginTop: 11, fontSize: 25, fontWeight: '900', color: TEXT, letterSpacing: -.6 },
   handle: { marginTop: 2, fontSize: 12, color: MUTED, fontWeight: '700' },
   course: { marginTop: 10, fontSize: 13, color: TEXT, fontWeight: '900' },
@@ -562,6 +629,11 @@ const styles = StyleSheet.create({
   avatarName: { marginTop: 16, alignItems: 'center' },
   avatarNameText: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
   avatarHint: { color: '#BDBDB7', fontSize: 10, marginTop: 3 },
+  coverModal: { flex: 1, backgroundColor: 'rgba(0,0,0,.96)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  fullCover: { width: '100%', height: '62%' },
+  coverModalLabel: { alignItems: 'center', marginTop: 14 },
+  coverModalTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '900' },
+  coverModalHint: { color: '#BDBDB7', fontSize: 10, marginTop: 3 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,.45)', justifyContent: 'flex-end' },
   editModal: { maxHeight: '86%', backgroundColor: CARD, borderTopLeftRadius: 26, borderTopRightRadius: 26, borderWidth: 1, borderColor: BORDER },
   modalHeader: { minHeight: 72, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: BORDER },
