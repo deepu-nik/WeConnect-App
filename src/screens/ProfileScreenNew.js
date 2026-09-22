@@ -313,7 +313,7 @@ export default function ProfileScreenNew({ route, navigation }) {
         <View style={styles.hero}>
           {user.coverPhoto ? <Image source={{ uri: user.coverPhoto }} style={styles.coverImage} /> : <View style={styles.coverFallback}><GraduationCap size={70} color="#5E5E58" /></View>}
           <View style={styles.coverOverlay} />
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}><ChevronRight size={22} color="#FFFFFF" style={{ transform: [{ rotate: '180deg' }] }} /></TouchableOpacity>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.getParent()?.navigate('Tabs', { screen: 'Chats' })}><ChevronRight size={22} color="#FFFFFF" style={{ transform: [{ rotate: '180deg' }] }} /></TouchableOpacity>
           {isSelf ? <TouchableOpacity style={styles.coverEdit} onPress={() => pickImage('cover')}><Camera size={18} color={TEXT} /></TouchableOpacity> : null}
           {uploading ? <View style={styles.uploading}><ActivityIndicator color={TEXT} /></View> : null}
         </View>
