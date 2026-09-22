@@ -52,7 +52,7 @@ export default function CreateGroupScreen({ navigation }) {
     setCreating(true);
     try {
       const groupId = await createGroup({ name, description, memberIds: selected });
-      navigation.replace('GroupChat', { groupId });
+      navigation.replace('ChatRoom', { chatType: 'group', groupId });
     } catch (error) {
       Alert.alert('Could not create group', error?.message || 'Please try again.');
     } finally {
