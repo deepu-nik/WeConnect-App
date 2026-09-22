@@ -223,7 +223,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
   useEffect(() => {
     const findExistingChat = async () => {
-      if (chatId || !otherUserId || !currentUser) return;
+      if (isGroup || chatId || !otherUserId || !currentUser) return;
       try {
         if (await isBlockedByMe(otherUserId)) {
           setBlocked(true);
