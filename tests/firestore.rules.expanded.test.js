@@ -36,7 +36,7 @@ const USERS = {
     collegeName: 'D Y Patil International University',
     course: 'B.Tech CSE',
     year: '2nd Year',
-    connections: [],
+    connections: ['bob'],
     createdAt: '2026-01-01',
   },
   bob: {
@@ -49,7 +49,7 @@ const USERS = {
     collegeName: 'D Y Patil International University',
     course: 'B.Tech CSE',
     year: '2nd Year',
-    connections: [],
+    connections: ['alice'],
     createdAt: '2026-01-01',
   },
   other: {
@@ -186,6 +186,7 @@ async function seed() {
     text: 'Campus story',
     viewers: [],
     reactions: {},
+    audience: ['alice', 'bob'],
   });
 
   await seedDoc('stories/story-other', {
@@ -362,6 +363,22 @@ describe('WeConnect Firestore expanded security rules', { concurrency: false }, 
     );
   });
 
+
+  test('unconnected campus user cannot create a direct chat', async () => {
+    const db = dbAs('alice');
+    await assertFails(
+      setDoc(doc(db, 'chats/chat-alice-other'), {
+        participants: ['alice', 'other-college-user'],
+        collegeId: 'dypiu',
+        usersInfo: {},
+        lastMessage: '',
+        updatedAt: '2026-01-01',
+        unreadCount: {},
+        typing: {},
+      })
+    );
+  });
+
   test('non-participant cannot update a chat', async () => {
     await assertFails(
       updateDoc(doc(dbAs('other-college-user'), 'chats', 'chat-alice-bob'), {
@@ -429,7 +446,7 @@ describe('WeConnect Firestore expanded security rules', { concurrency: false }, 
     const db = dbAs('alice');
 
     await assertSucceeds(
-      getDocs(query(collection(db, 'stories'), where('collegeId', '==', 'dypiu')))
+      getDocs(query(collection(db, 'stories'), where('audience', 'array-contains', 'alice')))
     );
     await assertFails(getDocs(query(collection(db, 'stories'))));
   });
@@ -438,7 +455,7 @@ describe('WeConnect Firestore expanded security rules', { concurrency: false }, 
     const db = dbAs('alice');
 
     await assertSucceeds(
-      updateDoc(doc(db, 'stories', 'story-dypiu'), { text: 'updated' })
+      updateDoc(doc(db, 'stories', 'story-dypiu'), { caption: 'updated' })
     );
     await assertSucceeds(deleteDoc(doc(db, 'stories', 'story-dypiu')));
   });
