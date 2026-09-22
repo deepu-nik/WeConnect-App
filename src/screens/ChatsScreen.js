@@ -229,7 +229,7 @@ const ChatsScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="auto" />
       <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); setTimeout(() => setRefreshing(false), 450); }} tintColor="#111111" />} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Text style={styles.brand}>WeConnect</Text>
