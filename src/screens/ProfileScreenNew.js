@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Modal, Platform,
   ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -79,7 +79,11 @@ export default function ProfileScreenNew({ route, navigation }) {
   const [modal, setModal] = useState(null);
   const [modalValues, setModalValues] = useState({});
   const [skillInput, setSkillInput] = useState('');
+  const [skillDraft, setSkillDraft] = useState([]);
   const [skillModal, setSkillModal] = useState(false);
+  const [skillSaving, setSkillSaving] = useState(false);
+  const scrollRef = useRef(null);
+  const projectsSectionY = useRef(0);
   const [fullAvatar, setFullAvatar] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [connected, setConnected] = useState(false);
@@ -186,26 +190,36 @@ export default function ProfileScreenNew({ route, navigation }) {
     }
   };
 
-  const addSkill = async () => {
-    const value = skillInput.trim();
-    if (!value || !isSelf || user.skills?.includes(value)) return;
-    const skills = [...(user.skills || []), value].slice(0, 30);
-    try {
-      await updateDoc(doc(db, 'users', currentUser.uid), { skills });
-      setUser((prev) => ({ ...prev, skills }));
-      setSkillInput('');
-    } catch (error) {
-      Alert.alert('Could not add skill', error?.message || 'Please try again.');
-    }
+  const openSkillEditor = () => {
+    setSkillDraft([...(user.skills || [])]);
+    setSkillInput('');
+    setSkillModal(true);
   };
 
-  const removeSkill = async (skill) => {
+  const addSkill = () => {
+    const value = skillInput.trim();
+    if (!value || !isSelf || skillDraft.includes(value)) return;
+    setSkillDraft((current) => [...current, value].slice(0, 30));
+    setSkillInput('');
+  };
+
+  const removeSkill = (skill) => {
     if (!isSelf) return;
-    const skills = (user.skills || []).filter((item) => item !== skill);
+    setSkillDraft((current) => current.filter((item) => item !== skill));
+  };
+
+  const saveSkills = async () => {
+    if (!isSelf || skillSaving) return;
+    setSkillSaving(true);
     try {
-      await updateDoc(doc(db, 'users', currentUser.uid), { skills });
-      setUser((prev) => ({ ...prev, skills }));
-    } catch {}
+      await updateDoc(doc(db, 'users', currentUser.uid), { skills: skillDraft });
+      setUser((prev) => ({ ...prev, skills: skillDraft }));
+      setSkillModal(false);
+    } catch (error) {
+      Alert.alert('Could not save skills', error?.message || 'Please try again.');
+    } finally {
+      setSkillSaving(false);
+    }
   };
 
   const openLink = async (value) => {
@@ -295,7 +309,7 @@ export default function ProfileScreenNew({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.page}>
+      <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={styles.page}>
         <View style={styles.hero}>
           {user.coverPhoto ? <Image source={{ uri: user.coverPhoto }} style={styles.coverImage} /> : <View style={styles.coverFallback}><GraduationCap size={70} color="#5E5E58" /></View>}
           <View style={styles.coverOverlay} />
@@ -335,7 +349,25 @@ export default function ProfileScreenNew({ route, navigation }) {
         </View>
 
         <View style={styles.statsCard}>
-          {stats.map(([label, value]) => <View style={styles.stat} key={label}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>)}
+          {stats.map(([label, value]) => (
+            <TouchableOpacity
+              style={styles.stat}
+              key={label}
+              activeOpacity={0.75}
+              onPress={() => {
+                if (label === 'Connections') {
+                  navigation.getParent()?.navigate('Tabs', { screen: 'Connect' });
+                } else if (label === 'Vault') {
+                  navigation.getParent()?.navigate('Tabs', { screen: 'Vault' });
+                } else if (label === 'Projects') {
+                  scrollRef.current?.scrollTo({ y: projectsSectionY.current, animated: true });
+                }
+              }}
+            >
+              <Text style={styles.statValue}>{value}</Text>
+              <Text style={styles.statLabel}>{label}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         <Section title="Academic profile" icon={<GraduationCap size={19} color={TEXT} />} editable={isSelf} onEdit={() => openSection('academic', 'Academic profile', academicFields, { course: user.course, year: user.year, gradYear: user.gradYear, projectsCount: String(user.projectsCount || 0) })}>
@@ -347,7 +379,7 @@ export default function ProfileScreenNew({ route, navigation }) {
           ]} />
         </Section>
 
-        <Section title="Currently learning" icon={<BookOpen size={19} color={TEXT} />} editable={isSelf} onEdit={() => setSkillModal(true)}>
+        <Section title="Currently learning" icon={<BookOpen size={19} color={TEXT} />} editable={isSelf} onEdit={openSkillEditor}>
           <View style={styles.skillWrap}>
             {(user.skills || []).map((skill) => (
               <View style={styles.skillPill} key={skill}>
@@ -359,13 +391,15 @@ export default function ProfileScreenNew({ route, navigation }) {
           </View>
         </Section>
 
-        <Section title="Projects & work" icon={<BriefcaseBusiness size={19} color={TEXT} />} editable={isSelf} onEdit={() => openSection('projects', 'Projects & work', [{ key: 'projectsCount', label: 'Projects completed', placeholder: '0', keyboardType: 'numeric' }], { projectsCount: String(user.projectsCount || 0) })}>
+        <View onLayout={(event) => { projectsSectionY.current = event.nativeEvent.layout.y; }}>
+          <Section title="Projects & work" icon={<BriefcaseBusiness size={19} color={TEXT} />} editable={isSelf} onEdit={() => openSection('projects', 'Projects & work', [{ key: 'projectsCount', label: 'Projects completed', placeholder: '0', keyboardType: 'numeric' }], { projectsCount: String(user.projectsCount || 0) })}>
           <View style={styles.projectRow}>
             <View style={styles.projectIcon}><Code2 size={22} color={TEXT} /></View>
             <View style={{ flex: 1 }}><Text style={styles.projectTitle}>{user.projectsCount || 0} projects completed</Text><Text style={styles.projectSub}>Builds, hackathons and academic work can be highlighted through your portfolio.</Text></View>
           </View>
           {user.resumeLink ? <TouchableOpacity style={styles.linkRow} onPress={() => openLink(user.resumeLink)}><LinkIcon size={17} color={TEXT} /><Text style={styles.linkRowText}>Open resume / portfolio</Text><ChevronRight size={17} color={MUTED} /></TouchableOpacity> : null}
-        </Section>
+          </Section>
+        </View>
 
         <Section title="Links & portfolio" icon={<Globe size={19} color={TEXT} />} editable={isSelf} onEdit={() => openSection('links', 'Links & portfolio', linkFields, { website: user.website, github: user.github, linkedin: user.linkedin, instagram: user.instagram, resumeLink: user.resumeLink })}>
           {linkItems.length ? linkItems.map(([label, value, Icon]) => (
@@ -424,8 +458,11 @@ export default function ProfileScreenNew({ route, navigation }) {
             <View style={styles.modalHeader}><View><Text style={styles.modalEyebrow}>EDIT</Text><Text style={styles.modalTitle}>Currently learning</Text></View><TouchableOpacity style={styles.modalClose} onPress={() => setSkillModal(false)}><X size={20} color={TEXT} /></TouchableOpacity></View>
             <View style={styles.skillEditor}>
               <Text style={styles.fieldLabel}>Add a skill or technology</Text>
-              <View style={styles.skillInputRow}><TextInput value={skillInput} onChangeText={setSkillInput} placeholder="e.g. React Native" placeholderTextColor="#A0A098" style={[styles.fieldInput, { flex: 1 }]} /><TouchableOpacity style={styles.addSkillButton} onPress={addSkill}><Plus size={19} color={TEXT} /></TouchableOpacity></View>
-              <View style={styles.skillWrap}>{(user.skills || []).map((skill) => <View key={skill} style={styles.skillPill}><Code2 size={13} color={TEXT} /><Text style={styles.skillText}>{skill}</Text><TouchableOpacity onPress={() => removeSkill(skill)}><Trash2 size={13} color="#777770" /></TouchableOpacity></View>)}</View>
+              <View style={styles.skillInputRow}><TextInput value={skillInput} onChangeText={setSkillInput} placeholder="e.g. React Native" placeholderTextColor="#A0A098" style={[styles.fieldInput, { flex: 1 }]} onSubmitEditing={addSkill} /><TouchableOpacity style={styles.addSkillButton} onPress={addSkill}><Plus size={19} color={TEXT} /></TouchableOpacity></View>
+              <View style={styles.skillWrap}>{skillDraft.map((skill) => <View key={skill} style={styles.skillPill}><Code2 size={13} color={TEXT} /><Text style={styles.skillText}>{skill}</Text><TouchableOpacity onPress={() => removeSkill(skill)}><Trash2 size={13} color="#777770" /></TouchableOpacity></View>)}</View>
+              <TouchableOpacity style={styles.saveButton} onPress={saveSkills} disabled={skillSaving}>
+                {skillSaving ? <ActivityIndicator color={TEXT} /> : <><Check size={18} color={TEXT} /><Text style={styles.saveButtonText}>Save changes</Text></>}
+              </TouchableOpacity>
             </View>
           </View>
         </KeyboardAvoidingView>
