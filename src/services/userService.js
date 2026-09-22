@@ -26,8 +26,13 @@ export const normalizeUser = (uid, data = {}) => ({
   instagram: data.instagram || '',
   linkedin: data.linkedin || '',
   github: data.github || '',
-  whatsapp: data.whatsapp || '',
 });
+
+export const getPrivateUserProfile = async (uid) => {
+  if (!uid) return null;
+  const snapshot = await getDoc(doc(db, 'userPrivate', uid));
+  return snapshot.exists() ? snapshot.data() : null;
+};
 
 export const getUserProfile = async (uid) => {
   if (!uid) return null;
