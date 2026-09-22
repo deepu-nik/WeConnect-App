@@ -605,11 +605,6 @@ const UpdatesScreen = ({ navigation }) => {
           <Text style={styles.headerTitle}>College Buzz</Text>
           <Zap size={24} color="#FF9500" fill="#FF9500" style={styles.headerZapIcon} />
         </View>
-        <TouchableOpacity style={styles.headerIconBtn} onPress={() => setModalVisible(true)}>
-          <View style={styles.headerPlusWrapper}>
-            <Plus size={20} color="#000" />
-          </View>
-        </TouchableOpacity>
       </View>
 
       {/* MAIN FEED */}
@@ -634,6 +629,16 @@ const UpdatesScreen = ({ navigation }) => {
         />
         </>
       )}
+
+      <TouchableOpacity
+        style={styles.createFab}
+        onPress={() => setModalVisible(true)}
+        activeOpacity={0.88}
+        accessibilityLabel="Create campus update"
+      >
+        <Plus size={19} color="#111111" strokeWidth={2.8} />
+        <Text style={styles.createFabText}>Create</Text>
+      </TouchableOpacity>
 
       {/* --- CREATE POST MODAL --- */}
       <Modal visible={isModalVisible} animationType="slide" presentationStyle="pageSheet">
@@ -884,8 +889,8 @@ const styles = StyleSheet.create({
   headerTitleRow: { flexDirection: 'row', alignItems: 'center' },
   headerTitle: { fontSize: 26, fontWeight: '800', color: '#111111', letterSpacing: -0.5 },
   headerZapIcon: { marginLeft: 6, marginTop: 2 },
-  headerIconBtn: { padding: 4 },
-  headerPlusWrapper: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  createFab: { position: 'absolute', left: 18, bottom: 18, minHeight: 50, paddingHorizontal: 18, borderRadius: 18, backgroundColor: '#FFFC00', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14, shadowRadius: 8, elevation: 6, zIndex: 20 },
+  createFabText: { color: '#111111', fontSize: 13, fontWeight: '900' },
 
   feedContent: { paddingBottom: 100, paddingTop: 10 },
   
