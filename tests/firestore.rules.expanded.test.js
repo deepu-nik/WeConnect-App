@@ -108,7 +108,10 @@ async function seedDoc(pathname, data) {
     .join('/');
   const response = await fetch(`${EMULATOR_BASE}/${encodedPath}`, {
     method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      Authorization: 'Bearer owner',
+    },
     body: JSON.stringify({
       fields: Object.fromEntries(
         Object.entries(data).map(([key, value]) => [key, toFirestoreValue(value)])
