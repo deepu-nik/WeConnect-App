@@ -17,7 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
   Camera,
@@ -33,8 +33,6 @@ import {
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { PinchGestureHandler, State } from 'react-native-gesture-handler';
-import { KeyboardChatScrollView, KeyboardGestureArea, KeyboardStickyView } from 'react-native-keyboard-controller';
-import { useSharedValue, withTiming } from 'react-native-reanimated';
 import { CommonActions } from '@react-navigation/native';
 import { auth, db } from '../config/firebase';
 import { createDirectChat, markChatRead } from '../services/chatService';
@@ -72,8 +70,6 @@ const COMPOSER_EMOJIS = [
 ];
 
 const FALLBACK_AVATAR = 'https://via.placeholder.com/150';
-const COMPOSER_MARGIN = 8;
-const COMPOSER_BASE_INPUT_HEIGHT = 40;
 
 const TypingIndicator = () => {
   const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
@@ -120,7 +116,6 @@ const ChatRoomScreen = ({ route, navigation }) => {
   } = route.params || {};
 
   const currentUser = auth.currentUser;
-  const insets = useSafeAreaInsets();
   const listRef = useRef(null);
   const typingTimeout = useRef(null);
   const viewerScale = useRef(new Animated.Value(1)).current;
@@ -147,7 +142,6 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const returningHomeRef = useRef(false);
-  const extraContentPadding = useSharedValue(0);
 
   const imageMessages = useMemo(
     () => messages.filter((message) => message.mediaUrl && message.mediaType === 'image' && !message.deleted),
@@ -238,28 +232,6 @@ const ChatRoomScreen = ({ route, navigation }) => {
   useEffect(() => () => {
     if (typingTimeout.current) clearTimeout(typingTimeout.current);
   }, []);
-
-  const handleInputLayout = useCallback((event) => {
-    const height = event.nativeEvent.layout.height;
-    extraContentPadding.value = withTiming(
-      Math.max(height - COMPOSER_BASE_INPUT_HEIGHT, 0),
-      { duration: 180 }
-    );
-  }, [extraContentPadding]);
-
-  const renderChatScrollComponent = useCallback(
-    (props) => (
-      <KeyboardChatScrollView
-        {...props}
-        automaticallyAdjustContentInsets={false}
-        contentInsetAdjustmentBehavior="never"
-        keyboardDismissMode="interactive"
-        offset={insets.bottom - COMPOSER_MARGIN}
-        extraContentPadding={extraContentPadding}
-      />
-    ),
-    [extraContentPadding, insets.bottom]
-  );
 
   const setTyping = (value) => {
     if (!chatId || !currentUser) return;
@@ -658,7 +630,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
   }, [navigation]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="auto" />
 
       <View style={styles.header}>
@@ -714,11 +686,10 @@ const ChatRoomScreen = ({ route, navigation }) => {
         </View>
       ) : null}
 
-      <KeyboardGestureArea
-        interpolator="ios"
-        offset={COMPOSER_BASE_INPUT_HEIGHT}
+      <KeyboardAvoidingView
         style={styles.keyboardAvoid}
-        textInputNativeID="chat-input"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
       >
         <FlatList
           ref={listRef}
@@ -730,7 +701,6 @@ const ChatRoomScreen = ({ route, navigation }) => {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           contentContainerStyle={styles.listContent}
-          renderScrollComponent={renderChatScrollComponent}
           ListHeaderComponent={
             isOtherUserTyping ? (
               <View style={styles.typingIndicatorRow}>
@@ -749,7 +719,6 @@ const ChatRoomScreen = ({ route, navigation }) => {
             </View>
           }
         />
-
         {replyingTo ? (
           <View style={styles.replyBar}>
             <View style={styles.replyAccent} />
@@ -759,19 +728,14 @@ const ChatRoomScreen = ({ route, navigation }) => {
                 {replyingTo.text || (replyingTo.mediaType === 'video' ? '🎥 Video' : '📷 Photo')}
               </Text>
             </View>
-            <TouchableOpacity onPress={() => setReplyingTo(null)}>
-              <X size={19} color="#707070" />
-            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setReplyingTo(null)}><X size={19} color="#707070" /></TouchableOpacity>
           </View>
         ) : null}
-
         {emojiPickerVisible ? (
           <View style={styles.emojiPanel}>
             <View style={styles.emojiPanelHeader}>
               <Text style={styles.emojiPanelTitle}>Quick emojis</Text>
-              <TouchableOpacity onPress={() => setEmojiPickerVisible(false)}>
-                <X size={16} color="#999999" />
-              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setEmojiPickerVisible(false)}><X size={16} color="#999999" /></TouchableOpacity>
             </View>
             {COMPOSER_EMOJIS.map((row, rowIndex) => (
               <View key={rowIndex} style={styles.emojiRow}>
@@ -784,63 +748,49 @@ const ChatRoomScreen = ({ route, navigation }) => {
             ))}
           </View>
         ) : null}
-
-        <KeyboardStickyView
-          offset={{ opened: insets.bottom - COMPOSER_MARGIN, closed: 0 }}
-          style={styles.composerSticky}
-        >
+        <View style={styles.composerSticky}>
           <View style={styles.composerShell}>
-          <View style={styles.composer}>
-            <TouchableOpacity style={styles.composerIcon} onPress={openCameraAndSend} disabled={isUploading}>
-              <Camera size={21} color="#475569" />
-            </TouchableOpacity>
-
-            <View style={styles.textInputShell}>
-              <TextInput
-                value={inputText}
-                onChangeText={handleTextChange}
-                placeholder="Message…"
-                placeholderTextColor="#999999"
-                multiline
-                maxLength={1000}
-                style={styles.textInput}
-                nativeID="chat-input"
-                onLayout={handleInputLayout}
-                onFocus={() => setEmojiPickerVisible(false)}
-              />
-              <TouchableOpacity
-                style={styles.emojiToggle}
-                onPress={() => {
-                  Keyboard.dismiss();
-                  setEmojiPickerVisible((value) => !value);
-                }}
-              >
-                <Smile size={20} color={emojiPickerVisible ? "#111111" : "#707070"} />
+            <View style={styles.composer}>
+              <TouchableOpacity style={styles.composerIcon} onPress={openCameraAndSend} disabled={isUploading}>
+                <Camera size={21} color="#475569" />
               </TouchableOpacity>
+              <View style={styles.textInputShell}>
+                <TextInput
+                  value={inputText}
+                  onChangeText={handleTextChange}
+                  placeholder="Message…"
+                  placeholderTextColor="#999999"
+                  multiline
+                  maxLength={1000}
+                  style={styles.textInput}
+                  onFocus={() => setEmojiPickerVisible(false)}
+                />
+                <TouchableOpacity
+                  style={styles.emojiToggle}
+                  onPress={() => { Keyboard.dismiss(); setEmojiPickerVisible((value) => !value); }}
+                >
+                  <Smile size={20} color={emojiPickerVisible ? '#111111' : '#707070'} />
+                </TouchableOpacity>
+              </View>
+              {inputText.trim() ? (
+                <TouchableOpacity style={styles.sendButton} onPress={() => sendMessage()}>
+                  <Send size={18} color="#fff" />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.sendButtonGhost} onPress={openGalleryAndSend} disabled={isUploading}>
+                  <ImageIcon size={20} color="#111111" />
+                </TouchableOpacity>
+              )}
             </View>
-
-            {inputText.trim() ? (
-              <TouchableOpacity style={styles.sendButton} onPress={() => sendMessage()}>
-                <Send size={18} color="#fff" />
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={styles.sendButtonGhost} onPress={openGalleryAndSend} disabled={isUploading}>
-                <ImageIcon size={20} color="#111111" />
-              </TouchableOpacity>
-            )}
+            {isUploading ? (
+              <View style={styles.uploadStatus}>
+                <ActivityIndicator size="small" color="#111111" />
+                <Text style={styles.uploadStatusText}>Sending {uploadProgress.current}/{uploadProgress.total}</Text>
+              </View>
+            ) : null}
           </View>
-
-          {isUploading ? (
-            <View style={styles.uploadStatus}>
-              <ActivityIndicator size="small" color="#111111" />
-              <Text style={styles.uploadStatusText}>
-                Sending {uploadProgress.current}/{uploadProgress.total}
-              </Text>
-            </View>
-          ) : null}
-          </View>
-        </KeyboardStickyView>
-      </KeyboardGestureArea>
+        </View>
+      </KeyboardAvoidingView>
 
       <Modal visible={!!fullScreenImage} transparent animationType="fade" onRequestClose={closeFullScreenImage}>
         <View style={styles.mediaViewer}>
