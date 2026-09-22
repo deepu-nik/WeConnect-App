@@ -46,6 +46,7 @@ service cloud.firestore {
       return verified() &&
         request.auth.uid == resource.data.uid &&
         immutableUserFieldsUnchanged() &&
+        !request.resource.data.keys().hasAny(['email', 'whatsapp']) &&
         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['connections']);
     }
 
