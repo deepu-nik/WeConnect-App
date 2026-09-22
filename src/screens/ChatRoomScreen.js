@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -6,7 +6,6 @@ import {
   FlatList,
   Image,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -34,6 +33,8 @@ import {
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { PinchGestureHandler, State } from 'react-native-gesture-handler';
+import { KeyboardChatScrollView, KeyboardGestureArea, KeyboardStickyView } from 'react-native-keyboard-controller';
+import { useSharedValue, withTiming } from 'react-native-reanimated';
 import { CommonActions } from '@react-navigation/native';
 import { auth, db } from '../config/firebase';
 import { createDirectChat, markChatRead } from '../services/chatService';
@@ -71,6 +72,8 @@ const COMPOSER_EMOJIS = [
 ];
 
 const FALLBACK_AVATAR = 'https://via.placeholder.com/150';
+const COMPOSER_MARGIN = 8;
+const COMPOSER_BASE_INPUT_HEIGHT = 40;
 
 const TypingIndicator = () => {
   const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
@@ -144,6 +147,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const returningHomeRef = useRef(false);
+  const extraContentPadding = useSharedValue(0);
 
   const imageMessages = useMemo(
     () => messages.filter((message) => message.mediaUrl && message.mediaType === 'image' && !message.deleted),
@@ -234,6 +238,28 @@ const ChatRoomScreen = ({ route, navigation }) => {
   useEffect(() => () => {
     if (typingTimeout.current) clearTimeout(typingTimeout.current);
   }, []);
+
+  const handleInputLayout = useCallback((event) => {
+    const height = event.nativeEvent.layout.height;
+    extraContentPadding.value = withTiming(
+      Math.max(height - COMPOSER_BASE_INPUT_HEIGHT, 0),
+      { duration: 180 }
+    );
+  }, [extraContentPadding]);
+
+  const renderChatScrollComponent = useCallback(
+    (props) => (
+      <KeyboardChatScrollView
+        {...props}
+        automaticallyAdjustContentInsets={false}
+        contentInsetAdjustmentBehavior="never"
+        keyboardDismissMode="interactive"
+        offset={insets.bottom - COMPOSER_MARGIN}
+        extraContentPadding={extraContentPadding}
+      />
+    ),
+    [extraContentPadding, insets.bottom]
+  );
 
   const setTyping = (value) => {
     if (!chatId || !currentUser) return;
@@ -632,7 +658,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
   }, [navigation]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" />
 
       <View style={styles.header}>
@@ -688,10 +714,11 @@ const ChatRoomScreen = ({ route, navigation }) => {
         </View>
       ) : null}
 
-      <KeyboardAvoidingView
+      <KeyboardGestureArea
+        interpolator="ios"
+        offset={COMPOSER_BASE_INPUT_HEIGHT}
         style={styles.keyboardAvoid}
-        behavior="padding"
-        keyboardVerticalOffset={0}
+        textInputNativeID="chat-input"
       >
         <FlatList
           ref={listRef}
@@ -701,8 +728,9 @@ const ChatRoomScreen = ({ route, navigation }) => {
           inverted
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          keyboardDismissMode="interactive"
           contentContainerStyle={styles.listContent}
+          renderScrollComponent={renderChatScrollComponent}
           ListHeaderComponent={
             isOtherUserTyping ? (
               <View style={styles.typingIndicatorRow}>
@@ -757,12 +785,11 @@ const ChatRoomScreen = ({ route, navigation }) => {
           </View>
         ) : null}
 
-        <View
-          style={[
-            styles.composerShell,
-            { paddingBottom: Platform.OS === 'ios' ? 7 + insets.bottom : 8 },
-          ]}
+        <KeyboardStickyView
+          offset={{ opened: insets.bottom - COMPOSER_MARGIN, closed: 0 }}
+          style={styles.composerSticky}
         >
+          <View style={styles.composerShell}>
           <View style={styles.composer}>
             <TouchableOpacity style={styles.composerIcon} onPress={openCameraAndSend} disabled={isUploading}>
               <Camera size={21} color="#475569" />
@@ -777,6 +804,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
                 multiline
                 maxLength={1000}
                 style={styles.textInput}
+                nativeID="chat-input"
+                onLayout={handleInputLayout}
                 onFocus={() => setEmojiPickerVisible(false)}
               />
               <TouchableOpacity
@@ -809,8 +838,9 @@ const ChatRoomScreen = ({ route, navigation }) => {
               </Text>
             </View>
           ) : null}
-        </View>
-      </KeyboardAvoidingView>
+          </View>
+        </KeyboardStickyView>
+      </KeyboardGestureArea>
 
       <Modal visible={!!fullScreenImage} transparent animationType="fade" onRequestClose={closeFullScreenImage}>
         <View style={styles.mediaViewer}>
@@ -1038,7 +1068,8 @@ const styles = StyleSheet.create({
   emojiRow: { flexDirection: 'row', justifyContent: 'space-around' },
   emojiButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   emojiButtonText: { fontSize: 24 },
-  composerShell: { paddingHorizontal: 8, paddingTop: 6, paddingBottom: Platform.OS === 'ios' ? 7 : 12, backgroundColor: '#F7F7F5' },
+  composerSticky: { backgroundColor: '#F7F7F5' },
+  composerShell: { paddingHorizontal: 8, paddingTop: 6, paddingBottom: 8, backgroundColor: '#F7F7F5' },
   composer: { minHeight: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, paddingVertical: 5, borderRadius: 27, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E8E8E3', elevation: 3, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
   composerIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19 },
   textInputShell: { flex: 1, minHeight: 40, maxHeight: 100, flexDirection: 'row', alignItems: 'center', marginHorizontal: 2, paddingLeft: 8, borderRadius: 20, backgroundColor: '#F0F0EC' },
