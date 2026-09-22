@@ -478,11 +478,11 @@ const VaultScreen = ({ navigation }) => {
       {!currentVault && (
         <View style={styles.tabContainer}>
           <TouchableOpacity style={[styles.tabBtn, activeTab === 'shared' && styles.activeTabBtn]} onPress={() => handleTabSwitch('shared')}>
-            <Users size={18} color={activeTab === 'shared' ? '#fff' : '#707070'} />
+            <Users size={18} color={activeTab === 'shared' ? '#111111' : '#707070'} />
             <Text style={[styles.tabText, activeTab === 'shared' && styles.activeTabText]}>Class Vaults</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.tabBtn, activeTab === 'private' && styles.activeTabBtn]} onPress={() => handleTabSwitch('private')}>
-            <Lock size={18} color={activeTab === 'private' ? '#fff' : '#707070'} />
+            <Lock size={18} color={activeTab === 'private' ? '#111111' : '#707070'} />
             <Text style={[styles.tabText, activeTab === 'private' && styles.activeTabText]}>My Private Vault</Text>
           </TouchableOpacity>
         </View>
