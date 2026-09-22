@@ -3,7 +3,6 @@ import { View, ActivityIndicator, Linking } from 'react-native';
 import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { AuthContext } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 
 import LoginScreen from '../screens/LoginScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
@@ -19,7 +18,6 @@ import NewStoryScreen from '../screens/NewStoryScreen';
 import StoryViewerScreen from '../screens/StoryViewerScreen';
 import MainTabNavigator from './MainTabNavigator';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
-import GroupChatScreen from '../screens/GroupChatScreen';
 
 const Stack = createStackNavigator();
 
@@ -63,7 +61,6 @@ const AuthenticatedStack = () => (
     <Stack.Screen name="NewStory" component={NewStoryScreen} />
     <Stack.Screen name="StoryViewer" component={StoryViewerScreen} />
     <Stack.Screen name="CreateGroup" component={CreateGroupScreen} options={{ headerShown: false, presentation: 'card', animation: 'slide_from_right' }} />
-    <Stack.Screen name="GroupChat" component={GroupChatScreen} options={{ headerShown: false, presentation: 'card', animation: 'slide_from_right' }} />
     <Stack.Screen
       name="ChatRoom"
       component={ChatRoomScreen}
@@ -80,7 +77,6 @@ const AuthenticatedStack = () => (
 const AppNavigator = () => {
   const { user, emailVerified, loading, refreshEmailVerification, resendVerificationEmail, logout } = useContext(AuthContext);
   const navigationRef = useRef(null);
-  const { colors } = useTheme();
 
   useEffect(() => {
     if (!emailVerified) return undefined;
@@ -101,8 +97,8 @@ const AppNavigator = () => {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.text} />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F6F6F2' }}>
+        <ActivityIndicator size="large" color={'#111111'} />
       </View>
     );
   }
@@ -114,10 +110,10 @@ const AppNavigator = () => {
         dark: false,
         colors: {
           primary: '#FFFC00',
-          background: colors.background,
-          card: colors.surface,
-          text: colors.text,
-          border: colors.border,
+          background: '#F6F6F2',
+          card: '#FFFFFF',
+          text: '#111111',
+          border: '#E4E4DE',
           notification: '#FF3B30',
         },
         fonts: DefaultTheme.fonts,
