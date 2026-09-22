@@ -143,6 +143,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [mediaVisible, setMediaVisible] = useState(false);
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const returningHomeRef = useRef(false);
 
   const imageMessages = useMemo(
@@ -233,6 +234,17 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
   useEffect(() => () => {
     if (typingTimeout.current) clearTimeout(typingTimeout.current);
+  }, []);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSubscription = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSubscription = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
   }, []);
 
   const setTyping = (value) => {
@@ -690,8 +702,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 10}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
       >
         <FlatList
           ref={listRef}
@@ -757,7 +769,19 @@ const ChatRoomScreen = ({ route, navigation }) => {
           </View>
         ) : null}
 
-        <View style={[styles.composerShell, { paddingBottom: (Platform.OS === 'ios' ? 7 : 12) + insets.bottom }]}>
+        <View
+          style={[
+            styles.composerShell,
+            {
+              paddingBottom:
+                Platform.OS === 'ios'
+                  ? 7 + insets.bottom
+                  : keyboardVisible
+                    ? 6
+                    : 8 + insets.bottom,
+            },
+          ]}
+        >
           <View style={styles.composer}>
             <TouchableOpacity style={styles.composerIcon} onPress={openCameraAndSend} disabled={isUploading}>
               <Camera size={21} color="#475569" />
