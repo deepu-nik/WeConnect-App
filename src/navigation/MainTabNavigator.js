@@ -5,6 +5,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackHandler } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useTheme } from '../context/ThemeContext';
 
 // Import screens
 import ChatsScreen from '../screens/ChatsScreen';
@@ -19,6 +20,7 @@ const Stack = createStackNavigator();
 const Tabs = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const { colors } = useTheme();
 
   useEffect(() => {
     const handleHardwareBack = () => {
@@ -53,9 +55,9 @@ const Tabs = () => {
         else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
         return <Ionicons name={iconName} size={size} color={color} />;
       },
-      tabBarActiveTintColor: '#111111',
-      tabBarInactiveTintColor: '#8A8A8A',
-      tabBarStyle: { height: 66 + insets.bottom, paddingBottom: 10 + insets.bottom, paddingTop: 6, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E8E8E3', elevation: 0 },
+      tabBarActiveTintColor: colors.text,
+      tabBarInactiveTintColor: colors.muted,
+      tabBarStyle: { height: 66 + insets.bottom, paddingBottom: 10 + insets.bottom, paddingTop: 6, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, elevation: 0 },
       tabBarLabelStyle: { fontSize: 10, fontWeight: '800' },
     })}
   >
