@@ -38,6 +38,10 @@ import { auth, db } from '../config/firebase';
 import { createDirectChat, markChatRead } from '../services/chatService';
 import {
   deleteMessage,
+  loadPendingMessages,
+  mergeMessages,
+  removePendingMessage,
+  savePendingMessage,
   sendChatMessage as sendPersistedMessage,
   subscribeToMessages,
   toggleMessageReaction,
@@ -195,9 +199,19 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
     markChatRead(chatId, currentUser.uid).catch((error) => console.error('Failed to mark chat read:', error));
 
+    loadPendingMessages(chatId)
+      .then((pending) => {
+        if (pending.length) setMessages((current) => mergeMessages(current, pending));
+      })
+      .catch(() => {});
+
     const unsubscribeMessages = subscribeToMessages(
       chatId,
-      (nextMessages) => setMessages(nextMessages),
+      (nextMessages) => {
+        loadPendingMessages(chatId)
+          .then((pending) => setMessages(mergeMessages(nextMessages, pending)))
+          .catch(() => setMessages(nextMessages));
+      },
       (error) => console.error('Message subscription failed:', error)
     );
 
@@ -258,22 +272,37 @@ const ChatRoomScreen = ({ route, navigation }) => {
       const activeChatId = await createChatIfNeeded();
       const messageId = Date.now().toString() + '-' + Math.random().toString(36).slice(2, 8);
 
-      await sendPersistedMessage({
-        chatId: activeChatId,
-        message: {
-          id: messageId,
-          text: messageText,
-          mediaUrl,
-          mediaType,
-          replyTo: reply
-            ? {
-                id: reply.id,
-                text: reply.text || (reply.mediaType === 'video' ? '🎥 Video' : '📷 Photo'),
-                senderId: reply.senderId,
-              }
-            : null,
-        },
-      });
+      const localMessage = {
+        id: messageId,
+        text: messageText,
+        senderId: currentUser.uid,
+        mediaUrl,
+        mediaType,
+        replyTo: reply
+          ? {
+              id: reply.id,
+              text: reply.text || (reply.mediaType === 'video' ? '🎥 Video' : '📷 Photo'),
+              senderId: reply.senderId,
+            }
+          : null,
+        createdAt: new Date(),
+        status: 'sending',
+      };
+      await savePendingMessage(activeChatId, localMessage);
+      setMessages((current) => mergeMessages([localMessage], current));
+
+      try {
+        await sendPersistedMessage({
+          chatId: activeChatId,
+          message: localMessage,
+        });
+        await removePendingMessage(activeChatId, messageId);
+      } catch (error) {
+        const failedMessage = { ...localMessage, status: 'failed' };
+        await savePendingMessage(activeChatId, failedMessage);
+        setMessages((current) => mergeMessages([failedMessage], current));
+        throw error;
+      }
     } catch (error) {
       setInputText(messageText);
       setReplyingTo(reply);
