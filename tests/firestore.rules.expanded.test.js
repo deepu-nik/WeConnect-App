@@ -312,6 +312,20 @@ describe('WeConnect Firestore expanded security rules', { concurrency: false }, 
     );
   });
 
+  test('connection request participants can delete their own request during account cleanup', async () => {
+    await seedDoc('connectionRequests/req-delete', {
+      senderId: 'alice',
+      receiverId: 'bob',
+      status: 'pending',
+      sender: { uid: 'alice' },
+      receiver: { uid: 'bob' },
+    });
+
+    await assertSucceeds(
+      deleteDoc(doc(dbAs('alice'), 'connectionRequests', 'req-delete'))
+    );
+  });
+
   test('only the receiver can accept or decline a pending connection request', async () => {
     await seedDoc('connectionRequests/req-1', {
       senderId: 'alice',
@@ -363,6 +377,26 @@ describe('WeConnect Firestore expanded security rules', { concurrency: false }, 
     );
   });
 
+
+  test('campus constrained story and vault queries are allowed', async () => {
+    const alice = dbAs('alice');
+
+    await assertSucceeds(
+      getDocs(query(
+        collection(alice, 'stories'),
+        where('collegeId', '==', 'dypiu'),
+        where('audience', 'array-contains', 'alice')
+      ))
+    );
+
+    await assertSucceeds(
+      getDocs(query(
+        collection(alice, 'vaults'),
+        where('collegeId', '==', 'dypiu'),
+        where('members', 'array-contains', 'alice')
+      ))
+    );
+  });
 
   test('unconnected campus user cannot create a direct chat', async () => {
     const db = dbAs('alice');
