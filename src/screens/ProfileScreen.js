@@ -7,13 +7,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { updateProfile } from 'firebase/auth';
 import { doc, getDocs, collection, query, where, updateDoc } from 'firebase/firestore';
 import {
-  Camera, CheckCircle, Code, Github, Globe, Instagram, Link as LinkIcon,
+  Camera, CheckCircle, Code, Ellipsis, Github, Globe, Instagram, Link as LinkIcon,
   Linkedin, MapPin, Plus, Settings, Trash2, Twitter, UserRound, X, Youtube,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { auth, db } from '../config/firebase';
 import { getUserProfile, FALLBACK_AVATAR } from '../services/userService';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
+import { blockUser, isBlockedByMe, reportUser } from '../services/safetyService';
 
 const SKILL_COLORS = ['#007AFF', '#34C759', '#AF52DE', '#FF9500', '#FF3B30', '#5856D6'];
 
@@ -31,11 +32,15 @@ const ProfileScreen = ({ route, navigation }) => {
   const [form, setForm] = useState(null);
   const [newSkill, setNewSkill] = useState('');
   const [fullScreenAvatar, setFullScreenAvatar] = useState(null);
+  const [blocked, setBlocked] = useState(false);
   useEffect(() => {
     let active = true;
     (async () => {
       try {
         const profile = await getUserProfile(targetUid);
+        if (!isSelf) {
+          try { if (await isBlockedByMe(targetUid)) setBlocked(true); } catch {}
+        }
         if (!active) return;
         setUser(profile || {
           uid: targetUid,
@@ -65,6 +70,60 @@ const ProfileScreen = ({ route, navigation }) => {
     })();
     return () => { active = false; };
   }, [targetUid, route?.params]);
+
+  const handleBlock = () => {
+    Alert.alert(
+      'Block this student?',
+      'They will no longer be able to start or continue interactions with you from this account.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await blockUser(targetUid);
+              setBlocked(true);
+              Alert.alert('Student blocked', 'You will no longer interact with this account.');
+            } catch (error) {
+              Alert.alert('Could not block', error?.message || 'Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleReport = () => {
+    Alert.alert('Report student', 'Choose a reason.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Harassment / abuse',
+        onPress: () => submitReport('Harassment / abuse'),
+      },
+      {
+        text: 'Spam / scam',
+        onPress: () => submitReport('Spam / scam'),
+      },
+      {
+        text: 'Impersonation',
+        onPress: () => submitReport('Impersonation'),
+      },
+      {
+        text: 'Other',
+        onPress: () => submitReport('Other'),
+      },
+    ]);
+  };
+
+  const submitReport = async (reason) => {
+    try {
+      await reportUser({ targetId: targetUid, reason });
+      Alert.alert('Report submitted', 'Thanks. Your report has been recorded for review.');
+    } catch (error) {
+      Alert.alert('Could not report', error?.message || 'Please try again.');
+    }
+  };
 
   const openEdit = () => {
     setForm({
@@ -226,10 +285,33 @@ const ProfileScreen = ({ route, navigation }) => {
             {isSelf ? (
               <TouchableOpacity style={styles.editButton} onPress={openEdit}><Text style={styles.editText}>Edit Profile</Text></TouchableOpacity>
             ) : (
-              <TouchableOpacity style={styles.messageButton} onPress={() => navigation.navigate('ChatRoom', { uid: user.uid, name: user.name, avatar: user.avatar })}>
-                <Text style={styles.messageText}>Message</Text>
-              </TouchableOpacity>
-            )}
+              <>
+                <TouchableOpacity
+                  style={[styles.messageButton, blocked && { opacity: 0.5 }]}
+                  disabled={blocked}
+                  onPress={() => navigation.navigate('ChatRoom', { uid: user.uid, name: user.name, avatar: user.avatar })}
+                >
+                  <Text style={styles.messageText}>{blocked ? 'Blocked' : 'Message'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.circleAction} onPress={() => Alert.alert(user.name, 'Choose an action.', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: blocked ? 'Unblock' : 'Block', style: 'destructive', onPress: async () => {
+                    try {
+                      if (blocked) {
+                        const { unblockUser } = await import('../services/safetyService');
+                        await unblockUser(targetUid);
+                        setBlocked(false);
+                      } else {
+                        await blockUser(targetUid);
+                        setBlocked(true);
+                      }
+                    } catch (error) {
+                      Alert.alert('Action failed', error?.message || 'Please try again.');
+                    }
+                  }},
+                  { text: 'Report', onPress: handleReport },
+                ])}><Ellipsis size={22} color="#111" /></TouchableOpacity>
+              </>)}
           </View>
 
           <Text style={styles.name}>{user.name}</Text>
@@ -341,6 +423,7 @@ const styles = StyleSheet.create({
   fullScreenAvatarClose: { position: 'absolute', top: 48, right: 18, zIndex: 10, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
   uploadOverlay: { ...StyleSheet.absoluteFillObject, borderRadius: 50, backgroundColor: 'rgba(0,0,0,.45)', alignItems: 'center', justifyContent: 'center' },
   actionRow: { alignItems: 'flex-end', marginTop: -32, marginBottom: 18 },
+  circleAction: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, borderColor: '#d1d5db', alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
   editButton: { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20, borderWidth: 1, borderColor: '#dbe1e8' },
   editText: { fontWeight: '800', color: '#0f172a' },
   messageButton: { paddingHorizontal: 20, paddingVertical: 9, borderRadius: 20, backgroundColor: '#007AFF' },
