@@ -10,7 +10,7 @@ const { width, height } = Dimensions.get('window');
 const IMAGE_DURATION_MS = 5000;
 
 function StoryMedia({ story, paused, muted, onVideoProgress, onVideoEnd }) {
-  const player = useVideoPlayer(story?.mediaUrl || null, (instance) => {
+  const player = useVideoPlayer(story?.mediaType === 'video' ? story.mediaUrl : null, (instance) => {
     instance.loop = false;
     instance.muted = muted;
     instance.timeUpdateEventInterval = 0.1;
@@ -61,11 +61,14 @@ export default function StoryViewerScreen({ route, navigation }) {
   const story = stories[index];
   const displayedStory = liveStory || story;
 
-  const goNext = () => {
+  const goNext = useCallback(() => {
     if (index < stories.length - 1) setIndex((value) => value + 1);
     else navigation.goBack();
-  };
-  const goPrevious = () => setIndex((value) => Math.max(0, value - 1));
+  }, [index, stories.length, navigation]);
+
+  const goPrevious = useCallback(() => {
+    setIndex((value) => Math.max(0, value - 1));
+  }, []);
 
   useEffect(() => {
     if (!story) return undefined;
