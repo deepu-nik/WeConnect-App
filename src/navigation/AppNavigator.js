@@ -3,6 +3,7 @@ import { View, ActivityIndicator, Linking } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { AuthContext } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 import LoginScreen from '../screens/LoginScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
@@ -75,6 +76,7 @@ const AuthenticatedStack = () => (
 const AppNavigator = () => {
   const { user, emailVerified, loading, refreshEmailVerification, resendVerificationEmail, logout } = useContext(AuthContext);
   const navigationRef = useRef(null);
+  const { colors, isDark } = useTheme();
 
   useEffect(() => {
     if (!emailVerified) return undefined;
@@ -95,14 +97,27 @@ const AppNavigator = () => {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#007AFF" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.text} />
       </View>
     );
   }
 
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer
+      ref={navigationRef}
+      theme={{
+        dark: isDark,
+        colors: {
+          primary: '#FFFC00',
+          background: colors.background,
+          card: colors.surface,
+          text: colors.text,
+          border: colors.border,
+          notification: '#FF3B30',
+        },
+      }}
+    >
       {!user ? (
         <AuthStack />
       ) : !emailVerified ? (
