@@ -12,6 +12,26 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const refreshEmailVerification = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return false;
+    await reload(currentUser);
+    setUser(auth.currentUser);
+    return Boolean(auth.currentUser?.emailVerified);
+  };
+
+  const resendVerificationEmail = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) throw new Error('No signed-in account found.');
+    if (currentUser.emailVerified) return true;
+    await sendEmailVerification(currentUser);
+    return true;
+  };
+
+  const logout = async () => {
+    await signOut(auth);
+  };
+
   useEffect(() => {
     return onAuthStateChanged(auth, async (nextUser) => {
       setUser(nextUser);
@@ -64,7 +84,14 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading }}>
+    <AuthContext.Provider value={{
+      user,
+      profile,
+      loading,
+      refreshEmailVerification,
+      resendVerificationEmail,
+      logout,
+    }}>
       {children}
     </AuthContext.Provider>
   );
