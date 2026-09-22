@@ -8,7 +8,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test:rules": "node --test tests/firestore.rules.test.js tests/firestore.rules.expanded.test.js"
+    "test:rules": "node --test tests/firestore.rules.expanded.test.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
