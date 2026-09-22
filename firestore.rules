@@ -136,8 +136,16 @@ service cloud.firestore {
 
     match /userPrivate/{userId} {
       allow get: if signedIn() && request.auth.uid == userId;
-      allow create: if signedIn() && request.auth.uid == userId;
-      allow update: if signedIn() && request.auth.uid == userId;
+
+      allow create: if signedIn() &&
+        request.auth.uid == userId &&
+        request.resource.data.get('email', '') == request.auth.token.email;
+
+      allow update: if signedIn() &&
+        request.auth.uid == userId &&
+        request.resource.data.get('email', '') == resource.data.get('email', '') &&
+        request.resource.data.get('email', '') == request.auth.token.email;
+
       allow delete: if signedIn() && request.auth.uid == userId;
     }
 
