@@ -4,6 +4,7 @@ import { deleteField, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
 import { auth, db } from '../config/firebase';
 import { getUserProfile } from '../services/userService';
 import { COLLEGES, DEFAULT_COLLEGE_ID } from '../config/collegeConfig';
+import { registerForPushNotifications } from '../services/notificationService';
 
 export const AuthContext = createContext(null);
 
@@ -77,6 +78,7 @@ export const AuthProvider = ({ children }) => {
           nextProfile = await getUserProfile(nextUser.uid);
         }
         setProfile(nextProfile);
+        if (nextUser.emailVerified) registerForPushNotifications().catch(() => {});
       } catch (error) {
         console.error('Failed to load user profile:', error);
         setProfile(null);
