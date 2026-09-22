@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Trash2 } from 'lucide-react-native';
 import { deleteMyAccount } from '../services/accountService';
@@ -46,7 +46,8 @@ const DeleteAccountScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
             <ArrowLeft size={22} color="#111" />
@@ -81,6 +82,7 @@ const DeleteAccountScreen = ({ navigation }) => {
             For account-security reasons, WeConnect asks you to re-enter your password before deletion.
           </Text>
         </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -93,6 +95,7 @@ const styles = StyleSheet.create({
   back: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   spacer: { width: 42 },
   title: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: '#111' },
+  scrollContent: { paddingBottom: 40 },
   content: { padding: 24 },
   icon: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FDECEC', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginTop: 30 },
   heading: { fontSize: 24, fontWeight: '900', color: '#111', textAlign: 'center', marginTop: 22 },
