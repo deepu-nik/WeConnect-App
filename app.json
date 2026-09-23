@@ -53,7 +53,12 @@
       "expo-status-bar",
       "expo-web-browser",
       "expo-video",
-      "expo-notifications"
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "messages"
+        }
+      ]
     ],
     "extra": {
       "eas": {
