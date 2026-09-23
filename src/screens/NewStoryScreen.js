@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, Touchable
 import * as ImagePicker from 'expo-image-picker';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Camera, Image as ImageIcon, Volume2, VolumeX } from 'lucide-react-native';
+import { ArrowLeft, Camera, Image as ImageIcon, Volume2, VolumeX, Type, Sparkles, Palette, AlignCenter, Smile, Crop } from 'lucide-react-native';
 import { createStory } from '../services/storyService';
 
 function VideoPreview({ uri }) {
@@ -32,6 +32,15 @@ export default function NewStoryScreen({ navigation }) {
   const [asset, setAsset] = useState(null);
   const [caption, setCaption] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [editor, setEditor] = useState({
+    text: '',
+    textColor: '#FFFFFF',
+    textSize: 26,
+    textAlign: 'center',
+    textPosition: 'middle',
+    sticker: '',
+    filter: 'none',
+  });
 
   const pick = async (camera) => {
     const permission = camera
@@ -77,6 +86,7 @@ export default function NewStoryScreen({ navigation }) {
         type: asset.type === 'video' ? 'video' : 'image',
         caption,
         duration: asset.duration || null,
+        editor,
       });
       navigation.goBack();
     } catch (error) {
@@ -100,15 +110,68 @@ export default function NewStoryScreen({ navigation }) {
 
       <View style={styles.body}>
         {asset ? (
-          asset.type === 'video'
-            ? <VideoPreview uri={asset.uri} />
-            : <Image source={{ uri: asset.uri }} style={styles.preview} />
+          <View style={styles.previewWrap}>
+            {asset.type === 'video'
+              ? <VideoPreview uri={asset.uri} />
+              : <Image source={{ uri: asset.uri }} style={styles.preview} />}
+            {editor.filter !== 'none' ? <View pointerEvents="none" style={[styles.filterOverlay, editor.filter === 'warm' ? styles.filterWarm : editor.filter === 'mono' ? styles.filterMono : styles.filterCool]} /> : null}
+            {editor.sticker ? <Text style={styles.stickerOverlay}>{editor.sticker}</Text> : null}
+            {editor.text ? (
+              <TextInput
+                value={editor.text}
+                onChangeText={(text) => setEditor((prev) => ({ ...prev, text }))}
+                multiline
+                placeholder="Type something…"
+                placeholderTextColor="rgba(255,255,255,.72)"
+                style={[
+                  styles.storyTextOverlay,
+                  { color: editor.textColor, fontSize: editor.textSize, textAlign: editor.textAlign },
+                  editor.textPosition === 'top' ? styles.textTop : editor.textPosition === 'bottom' ? styles.textBottom : styles.textMiddle,
+                ]}
+              />
+            ) : null}
+          </View>
         ) : (
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>Create your story</Text>
             <Text style={styles.emptyText}>Share a photo or video with your campus.</Text>
           </View>
         )}
+
+        {asset ? (
+          <View style={styles.editorPanel}>
+            <View style={styles.editorHeader}>
+              <Text style={styles.editorTitle}>Edit your story</Text>
+              <Text style={styles.editorHint}>Tap tools to customise</Text>
+            </View>
+            <View style={styles.toolRow}>
+              <TouchableOpacity style={styles.tool} onPress={() => setEditor((prev) => ({ ...prev, text: prev.text || 'Your story', textPosition: 'middle' }))}>
+                <Type size={18} color="#111" /><Text style={styles.toolText}>Text</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.tool} onPress={() => setEditor((prev) => ({ ...prev, sticker: prev.sticker === '🔥' ? '✨' : '🔥' }))}>
+                <Smile size={18} color="#111" /><Text style={styles.toolText}>Sticker</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.tool} onPress={() => setEditor((prev) => ({ ...prev, filter: prev.filter === 'none' ? 'warm' : prev.filter === 'warm' ? 'mono' : prev.filter === 'mono' ? 'cool' : 'none' }))}>
+                <Sparkles size={18} color="#111" /><Text style={styles.toolText}>Filter</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.tool} onPress={() => setEditor((prev) => ({ ...prev, textAlign: prev.textAlign === 'center' ? 'left' : prev.textAlign === 'left' ? 'right' : 'center' }))}>
+                <AlignCenter size={18} color="#111" /><Text style={styles.toolText}>Align</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.tool} onPress={() => setEditor((prev) => ({ ...prev, textPosition: prev.textPosition === 'top' ? 'middle' : prev.textPosition === 'middle' ? 'bottom' : 'top' }))}>
+                <Crop size={18} color="#111" /><Text style={styles.toolText}>Position</Text>
+              </TouchableOpacity>
+            </View>
+            {editor.text ? (
+              <View style={styles.editorSubRow}>
+                <Palette size={16} color="#64748b" />
+                {['#FFFFFF', '#FFFC00', '#FF3B30', '#34C759', '#5E5CE6'].map((color) => (
+                  <TouchableOpacity key={color} onPress={() => setEditor((prev) => ({ ...prev, textColor: color }))} style={[styles.colorDot, { backgroundColor: color }, editor.textColor === color && styles.colorDotActive]} />
+                ))}
+                <TouchableOpacity style={styles.sizeButton} onPress={() => setEditor((prev) => ({ ...prev, textSize: prev.textSize >= 40 ? 22 : prev.textSize + 4 }))}><Text style={styles.sizeButtonText}>A</Text></TouchableOpacity>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
         <View style={styles.actions}>
           <TouchableOpacity style={styles.action} onPress={() => pick(true)}>
@@ -148,6 +211,27 @@ const styles = StyleSheet.create({
   publish: { fontSize: 16, fontWeight: '800', color: '#007AFF' },
   disabled: { color: '#cbd5e1' },
   body: { flex: 1, padding: 16 },
+  editorPanel: { marginTop: 12, borderRadius: 18, padding: 12, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
+  editorHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  editorTitle: { fontSize: 14, fontWeight: '900', color: '#111827' },
+  editorHint: { fontSize: 10, color: '#64748B' },
+  toolRow: { flexDirection: 'row', gap: 7 },
+  tool: { flex: 1, minHeight: 52, borderRadius: 13, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', gap: 4, borderWidth: 1, borderColor: '#E2E8F0' },
+  toolText: { fontSize: 9, fontWeight: '800', color: '#111' },
+  editorSubRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 10 },
+  colorDot: { width: 24, height: 24, borderRadius: 12, borderWidth: 1, borderColor: '#CBD5E1' },
+  colorDotActive: { borderWidth: 3, borderColor: '#111827' },
+  sizeButton: { marginLeft: 'auto', width: 28, height: 28, borderRadius: 9, backgroundColor: '#111827', alignItems: 'center', justifyContent: 'center' },
+  sizeButtonText: { color: '#fff', fontWeight: '900' },
+  filterOverlay: { ...StyleSheet.absoluteFillObject },
+  filterWarm: { backgroundColor: 'rgba(255,180,60,.16)' },
+  filterMono: { backgroundColor: 'rgba(40,40,40,.25)' },
+  filterCool: { backgroundColor: 'rgba(50,130,255,.13)' },
+  stickerOverlay: { position: 'absolute', top: '43%', alignSelf: 'center', fontSize: 48 },
+  storyTextOverlay: { position: 'absolute', left: 18, right: 18, fontWeight: '900', textShadowColor: 'rgba(0,0,0,.65)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 5, paddingVertical: 8 },
+  textTop: { top: '12%' },
+  textMiddle: { top: '42%' },
+  textBottom: { bottom: '14%' },
   previewWrap: { width: '100%', aspectRatio: 9 / 14, borderRadius: 18, overflow: 'hidden', backgroundColor: '#000' },
   preview: { width: '100%', height: '100%', backgroundColor: '#0f172a' },
   mute: { position: 'absolute', right: 14, bottom: 14, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,.55)', alignItems: 'center', justifyContent: 'center' },
