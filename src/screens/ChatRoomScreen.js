@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -6,9 +6,7 @@ import {
   FlatList,
   Image,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   Share,
   StatusBar,
@@ -19,6 +17,12 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  KeyboardChatScrollView,
+  KeyboardGestureArea,
+  KeyboardStickyView,
+} from 'react-native-keyboard-controller';
+import { useSharedValue, withTiming } from 'react-native-reanimated';
 import {
   ArrowLeft,
   Camera,
@@ -72,6 +76,8 @@ const COMPOSER_EMOJIS = [
 ];
 
 const FALLBACK_AVATAR = 'https://via.placeholder.com/150';
+const COMPOSER_MARGIN = 0;
+const COMPOSER_BASE_INPUT_HEIGHT = 40;
 
 const TypingIndicator = () => {
   const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
@@ -87,7 +93,29 @@ const TypingIndicator = () => {
       )
     );
     animations.forEach((animation) => animation.start());
-    return () => animations.forEach((animation) => animation.stop());
+    const handleInputLayout = useCallback((event) => {
+    const height = event.nativeEvent.layout.height;
+    extraContentPadding.value = withTiming(
+      Math.max(height - COMPOSER_BASE_INPUT_HEIGHT, 0),
+      { duration: 180 }
+    );
+  }, [extraContentPadding]);
+
+  const renderChatScrollComponent = useCallback(
+    (props) => (
+      <KeyboardChatScrollView
+        {...props}
+        automaticallyAdjustContentInsets={false}
+        contentInsetAdjustmentBehavior="never"
+        keyboardDismissMode="interactive"
+        offset={insets.bottom - COMPOSER_MARGIN}
+        extraContentPadding={extraContentPadding}
+      />
+    ),
+    [extraContentPadding, insets.bottom]
+  );
+
+  return () => animations.forEach((animation) => animation.stop());
   }, []);
 
   return (
@@ -152,6 +180,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [groupAddVisible, setGroupAddVisible] = useState(false);
   const [groupAddCandidates, setGroupAddCandidates] = useState([]);
   const [selectedGroupAddIds, setSelectedGroupAddIds] = useState([]);
+  const extraContentPadding = useSharedValue(0);
+
   const returningHomeRef = useRef(false);
 
   const imageMessages = useMemo(
@@ -761,10 +791,11 @@ const ChatRoomScreen = ({ route, navigation }) => {
         </View>
       ) : null}
 
-      <KeyboardAvoidingView
+            <KeyboardGestureArea
+        interpolator="ios"
+        offset={COMPOSER_BASE_INPUT_HEIGHT}
         style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
+        textInputNativeID="chat-input"
       >
         <FlatList
           ref={listRef}
@@ -774,7 +805,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
           inverted
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          keyboardDismissMode="interactive"
+          renderScrollComponent={renderChatScrollComponent}
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={
             isOtherUserTyping ? (
@@ -795,6 +827,12 @@ const ChatRoomScreen = ({ route, navigation }) => {
           }
         />
 
+        <KeyboardStickyView
+          offset={{
+            opened: insets.bottom - COMPOSER_MARGIN,
+            closed: 0,
+          }}
+        >
         {replyingTo ? (
           <View style={styles.replyBar}>
             <View style={styles.replyAccent} />
@@ -834,7 +872,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
           style={[
             styles.composerShell,
             {
-              paddingBottom: 7 + insets.bottom,
+              paddingBottom: 7,
             },
           ]}
         >
@@ -845,6 +883,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
             <View style={styles.textInputShell}>
               <TextInput
+                nativeID="chat-input"
+                onLayout={handleInputLayout}
                 value={inputText}
                 onChangeText={handleTextChange}
                 placeholder="Message…"
@@ -885,7 +925,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
             </View>
           ) : null}
         </View>
-      </KeyboardAvoidingView>
+        </KeyboardStickyView>
+      </KeyboardGestureArea>
 
       <Modal visible={!!fullScreenImage} transparent animationType="fade" onRequestClose={closeFullScreenImage}>
         <View style={styles.mediaViewer}>
