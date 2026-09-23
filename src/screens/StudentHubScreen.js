@@ -27,6 +27,8 @@ import {
   ListTodo,
   Plus,
   StickyNote,
+  ClipboardList,
+  GraduationCap,
   Trash2,
   X,
 } from 'lucide-react-native';
@@ -41,6 +43,8 @@ const DEFAULT_DATA = {
   notes: [],
   classes: [],
   expenses: [],
+  attendance: [],
+  assignments: [],
 };
 
 const moduleMeta = {
@@ -48,6 +52,8 @@ const moduleMeta = {
   tasks: { title: 'Tasks', icon: ListTodo, description: 'Track assignments, projects and small tasks.' },
   notes: { title: 'Notes', icon: StickyNote, description: 'Save quick study notes without leaving WeConnect.' },
   expenses: { title: 'Split Expenses', icon: IndianRupee, description: 'Calculate a simple per-person split.' },
+  attendance: { title: 'Attendance', icon: GraduationCap, description: 'Track subject attendance and stay aware of your percentage.' },
+  assignments: { title: 'Assignments', icon: ClipboardList, description: 'Keep upcoming college submissions visible and organized.' },
 };
 
 const safeJson = (value, fallback) => {
@@ -67,6 +73,8 @@ const StudentHubScreen = ({ navigation }) => {
   const [noteInput, setNoteInput] = useState({ title: '', body: '' });
   const [classInput, setClassInput] = useState({ subject: '', time: '', room: '' });
   const [expenseInput, setExpenseInput] = useState({ amount: '', people: '2' });
+  const [attendanceInput, setAttendanceInput] = useState({ subject: '' });
+  const [assignmentInput, setAssignmentInput] = useState({ title: '', due: '' });
 
   useEffect(() => {
     let mounted = true;
@@ -133,6 +141,67 @@ const StudentHubScreen = ({ navigation }) => {
   const removeItem = (key, id) => {
     setData((current) => ({ ...current, [key]: current[key].filter((item) => item.id !== id) }));
   };
+
+  const addAttendanceSubject = () => {
+    const subject = attendanceInput.subject.trim();
+    if (!subject) return;
+    setData((current) => ({
+      ...current,
+      attendance: [
+        ...current.attendance,
+        { id: String(Date.now()), subject, present: 0, total: 0 },
+      ],
+    }));
+    setAttendanceInput({ subject: '' });
+  };
+
+  const updateAttendance = (id, present) => {
+    setData((current) => ({
+      ...current,
+      attendance: current.attendance.map((item) => {
+        if (item.id !== id) return item;
+        return {
+          ...item,
+          present: item.present + (present ? 1 : 0),
+          total: item.total + 1,
+        };
+      }),
+    }));
+  };
+
+  const addAssignment = () => {
+    const title = assignmentInput.title.trim();
+    if (!title) return;
+    setData((current) => ({
+      ...current,
+      assignments: [
+        { id: String(Date.now()), title, due: assignmentInput.due.trim(), done: false },
+        ...current.assignments,
+      ],
+    }));
+    setAssignmentInput({ title: '', due: '' });
+  };
+
+  const toggleAssignment = (id) => {
+    setData((current) => ({
+      ...current,
+      assignments: current.assignments.map((item) => item.id === id ? { ...item, done: !item.done } : item),
+    }));
+  };
+
+  const attendancePercentage = (item) => (
+    item.total > 0 ? Math.round((item.present / item.total) * 100) : 0
+  );
+
+  const trackedAttendance = data.attendance.filter((item) => item.total > 0);
+  const overallAttendance = trackedAttendance.length
+    ? Math.round(
+      (trackedAttendance.reduce((sum, item) => sum + item.present, 0) /
+        trackedAttendance.reduce((sum, item) => sum + item.total, 0)) * 100
+    )
+    : null;
+
+  const pendingAssignments = data.assignments.filter((item) => !item.done);
 
   const splitAmount = Number(expenseInput.amount);
   const splitPeople = Math.max(1, Number(expenseInput.people) || 1);
@@ -239,6 +308,106 @@ const StudentHubScreen = ({ navigation }) => {
       );
     }
 
+    if (activeModule === 'attendance') {
+      return (
+        <View style={styles.modalContent}>
+          <Text style={styles.modalEyebrow}>ATTENDANCE</Text>
+          <Text style={styles.modalTitle}>Know where you stand.</Text>
+          <View style={styles.inputRow}>
+            <TextInput
+              value={attendanceInput.subject}
+              onChangeText={(subject) => setAttendanceInput({ subject })}
+              placeholder="e.g. Discrete Mathematics"
+              placeholderTextColor="#999990"
+              style={styles.input}
+              onSubmitEditing={addAttendanceSubject}
+              returnKeyType="done"
+            />
+            <TouchableOpacity style={styles.addButton} onPress={addAttendanceSubject}>
+              <Plus size={20} color="#111111" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.modalList} contentContainerStyle={styles.modalListContent}>
+            {data.attendance.map((item) => {
+              const percentage = attendancePercentage(item);
+              return (
+                <View key={item.id} style={styles.attendanceRow}>
+                  <View style={styles.attendanceCopy}>
+                    <Text style={styles.listText}>{item.subject}</Text>
+                    <Text style={styles.listMeta}>
+                      {item.present}/{item.total} classes attended • {item.total ? percentage + '%' : 'No classes logged'}
+                    </Text>
+                    <View style={styles.progressTrack}>
+                      <View style={[styles.progressFill, { width: percentage + '%' }]} />
+                    </View>
+                  </View>
+                  <View style={styles.attendanceActions}>
+                    <TouchableOpacity style={styles.attendanceButton} onPress={() => updateAttendance(item.id, true)}>
+                      <Check size={16} color="#111111" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.absentButton} onPress={() => updateAttendance(item.id, false)}>
+                      <X size={16} color="#111111" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => removeItem('attendance', item.id)}>
+                      <Trash2 size={16} color="#999990" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+            {!data.attendance.length ? <EmptyState text="Add subjects to start tracking attendance." /> : null}
+          </ScrollView>
+        </View>
+      );
+    }
+
+    if (activeModule === 'assignments') {
+      return (
+        <View style={styles.modalContent}>
+          <Text style={styles.modalEyebrow}>ASSIGNMENTS</Text>
+          <Text style={styles.modalTitle}>Never lose a submission.</Text>
+          <TextInput
+            value={assignmentInput.title}
+            onChangeText={(title) => setAssignmentInput((current) => ({ ...current, title }))}
+            placeholder="Assignment or project name"
+            placeholderTextColor="#999990"
+            style={styles.inputFull}
+            onSubmitEditing={addAssignment}
+            returnKeyType="done"
+          />
+          <View style={styles.inputRow}>
+            <TextInput
+              value={assignmentInput.due}
+              onChangeText={(due) => setAssignmentInput((current) => ({ ...current, due }))}
+              placeholder="Due date / time"
+              placeholderTextColor="#999990"
+              style={styles.input}
+            />
+            <TouchableOpacity style={styles.addButton} onPress={addAssignment}>
+              <Plus size={20} color="#111111" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.modalList} contentContainerStyle={styles.modalListContent}>
+            {data.assignments.map((item) => (
+              <View key={item.id} style={styles.listRow}>
+                <TouchableOpacity style={styles.checkButton} onPress={() => toggleAssignment(item.id)}>
+                  {item.done ? <CheckCircle2 size={22} color="#111111" /> : <Circle size={22} color="#B8B8B0" />}
+                </TouchableOpacity>
+                <View style={styles.listTextWrap}>
+                  <Text style={[styles.listText, item.done && styles.listTextDone]}>{item.title}</Text>
+                  <Text style={styles.listMeta}>{item.due || 'Due date not set'}</Text>
+                </View>
+                <TouchableOpacity onPress={() => removeItem('assignments', item.id)}>
+                  <Trash2 size={17} color="#999990" />
+                </TouchableOpacity>
+              </View>
+            ))}
+            {!data.assignments.length ? <EmptyState text="No assignments added yet." /> : null}
+          </ScrollView>
+        </View>
+      );
+    }
+
     if (activeModule === 'expenses') {
       return (
         <View style={styles.modalContent}>
@@ -288,8 +457,8 @@ const StudentHubScreen = ({ navigation }) => {
 
         <View style={styles.statsRow}>
           <View style={styles.statCard}><Text style={styles.statValue}>{pendingTasks.length}</Text><Text style={styles.statLabel}>Pending tasks</Text></View>
-          <View style={styles.statCard}><Text style={styles.statValue}>{data.classes.length}</Text><Text style={styles.statLabel}>Classes added</Text></View>
-          <View style={styles.statCard}><Text style={styles.statValue}>{data.notes.length}</Text><Text style={styles.statLabel}>Saved notes</Text></View>
+          <View style={styles.statCard}><Text style={styles.statValue}>{pendingAssignments.length}</Text><Text style={styles.statLabel}>Assignments</Text></View>
+          <View style={styles.statCard}><Text style={styles.statValue}>{overallAttendance === null ? '—' : overallAttendance + '%'}</Text><Text style={styles.statLabel}>Attendance</Text></View>
         </View>
 
         <Text style={styles.sectionTitle}>Student tools</Text>
@@ -317,6 +486,11 @@ const StudentHubScreen = ({ navigation }) => {
           <View style={styles.glanceRow}>
             <View style={styles.glanceIcon}><ListTodo size={18} color="#111111" /></View>
             <View style={styles.glanceCopy}><Text style={styles.glanceLabel}>Priority</Text><Text style={styles.glanceValue}>{pendingTasks[0]?.title || 'You are all caught up'}</Text><Text style={styles.glanceMeta}>{pendingTasks.length ? pendingTasks.length + ' task' + (pendingTasks.length === 1 ? '' : 's') + ' pending' : 'Nice work. Keep the momentum going.'}</Text></View>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.glanceRow}>
+            <View style={styles.glanceIcon}><ClipboardList size={18} color="#111111" /></View>
+            <View style={styles.glanceCopy}><Text style={styles.glanceLabel}>Next assignment</Text><Text style={styles.glanceValue}>{pendingAssignments[0]?.title || 'No pending assignments'}</Text><Text style={styles.glanceMeta}>{pendingAssignments[0]?.due || 'Add an assignment to keep submissions visible.'}</Text></View>
           </View>
           <View style={styles.divider} />
           <View style={styles.glanceRow}>
@@ -429,6 +603,13 @@ const styles = StyleSheet.create({
   resultAmount: { fontSize: 38, fontWeight: '900', color: '#FFFFFF', marginTop: 3 },
   resultMeta: { fontSize: 11, color: '#D2D2CC', marginTop: 4 },
   emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 35, gap: 7 },
+  attendanceRow: { borderRadius: 16, padding: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5DF', marginBottom: 8 },
+  attendanceCopy: { flex: 1 },
+  progressTrack: { height: 6, borderRadius: 3, backgroundColor: '#EEEEEA', overflow: 'hidden', marginTop: 8 },
+  progressFill: { height: '100%', borderRadius: 3, backgroundColor: '#111111' },
+  attendanceActions: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 10 },
+  attendanceButton: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#FFFC00', alignItems: 'center', justifyContent: 'center' },
+  absentButton: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#F0F0EB', alignItems: 'center', justifyContent: 'center' },
   emptyText: { fontSize: 11, color: '#999990' },
 });
 
