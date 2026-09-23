@@ -379,7 +379,6 @@ const ConnectScreen = ({ navigation }) => {
           </View>
           <View style={styles.scannerHintPill} pointerEvents="none">
             <Text style={styles.scannerHintTitle}>Scan a WeConnect QR</Text>
-            <Text style={styles.scannerHintText}>Keep the code inside the frame</Text>
           </View>
         </SafeAreaView>
       </View>
