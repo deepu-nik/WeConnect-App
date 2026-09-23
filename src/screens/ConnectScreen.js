@@ -346,7 +346,7 @@ const ConnectScreen = ({ navigation }) => {
     return (
       <View style={styles.scannerScreen}>
         <CameraView
-          style={StyleSheet.absoluteFillObject}
+          style={styles.scannerCamera}
           facing="back"
           mode="picture"
           barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
@@ -629,7 +629,8 @@ const styles = StyleSheet.create({
   locationModalImage: { width: '100%', height: 300, backgroundColor: '#F0F0EC' },
   locationModalEmpty: { height: 260, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F7F7F5' },
   locationModalEmptyText: { color: '#707070', marginTop: 10 },
-  scannerScreen: { flex: 1, backgroundColor: '#000' },
+  scannerScreen: { flex: 1, backgroundColor: '#000', position: 'relative' },
+  scannerCamera: { flex: 1 },
   scannerHeader: { height: 64, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff' },
   scannerTitle: { fontSize: 18, fontWeight: '900', color: '#111111' },
   scannerCameraWrap: { flex: 1, position: 'relative', overflow: 'hidden', backgroundColor: '#000' },
