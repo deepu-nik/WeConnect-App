@@ -10,6 +10,7 @@ import {
   Platform,
   Pressable,
   Share,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
