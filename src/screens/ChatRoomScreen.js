@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  InteractionManager,
   Animated,
   FlatList,
   Image,
@@ -24,7 +25,7 @@ import {
   KeyboardGestureArea,
   KeyboardStickyView,
 } from 'react-native-keyboard-controller';
-import { useSharedValue, withTiming } from 'react-native-reanimated';
+import { useSharedValue } from 'react-native-reanimated';
 import {
   ArrowLeft,
   Camera,
@@ -164,10 +165,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
   const handleInputLayout = useCallback((event) => {
     const height = event.nativeEvent.layout.height;
-    extraContentPadding.value = withTiming(
-      Math.max(height - COMPOSER_BASE_INPUT_HEIGHT, 0),
-      { duration: 180 }
-    );
+    extraContentPadding.value = Math.max(height - COMPOSER_BASE_INPUT_HEIGHT, 0);
   }, [extraContentPadding]);
 
   const renderChatScrollComponent = useCallback(
@@ -242,13 +240,17 @@ const ChatRoomScreen = ({ route, navigation }) => {
   useEffect(() => {
     if (!chatId || !currentUser) return;
 
-    markChatRead(chatId, currentUser.uid).catch((error) => console.error('Failed to mark chat read:', error));
-
-    loadPendingMessages(chatId)
-      .then((pending) => {
-        if (pending.length) setMessages((current) => mergeMessages(current, pending));
-      })
-      .catch(() => {});
+    // Keep the first paint focused on rendering the chat. Read receipts and
+    // local pending-message hydration are non-critical and can run after the
+    // navigation transition has settled.
+    const interaction = InteractionManager.runAfterInteractions(() => {
+      markChatRead(chatId, currentUser.uid).catch((error) => console.error('Failed to mark chat read:', error));
+      loadPendingMessages(chatId)
+        .then((pending) => {
+          if (pending.length) setMessages((current) => mergeMessages(current, pending));
+        })
+        .catch(() => {});
+    });
 
     const unsubscribeMessages = subscribeToMessages(
       chatId,
@@ -278,6 +280,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
     });
 
     return () => {
+      interaction.cancel();
       unsubscribeMessages();
       unsubscribeChat();
     };
