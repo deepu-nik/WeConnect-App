@@ -40,6 +40,9 @@ export const AuthProvider = ({ children }) => {
       setEmailVerified(Boolean(nextUser?.emailVerified));
       if (!nextUser) {
         setProfile(null);
+        import('../services/notificationService')
+          .then(({ unsubscribeFromPushTokenChanges }) => unsubscribeFromPushTokenChanges())
+          .catch(() => {});
         setLoading(false);
         return;
       }
@@ -81,7 +84,7 @@ export const AuthProvider = ({ children }) => {
           import('../services/notificationService')
             .then(({ registerForPushNotifications, subscribeToPushTokenChanges }) => {
               registerForPushNotifications();
-              return subscribeToPushTokenChanges();
+              subscribeToPushTokenChanges();
             })
             .catch((error) => {
               console.warn('Notification setup failed:', error);
