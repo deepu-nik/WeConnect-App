@@ -342,6 +342,48 @@ const ConnectScreen = ({ navigation }) => {
       </View>
     );
   };
+  if (scannerVisible) {
+    return (
+      <View style={styles.scannerScreen}>
+        <CameraView
+          style={StyleSheet.absoluteFillObject}
+          facing="back"
+          mode="picture"
+          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+          onCameraReady={() => console.log('QR camera preview ready')}
+          onMountError={(error) => {
+            console.error('QR camera mount failed:', error);
+            Alert.alert('Camera unavailable', error?.message || 'Could not start the camera preview.');
+          }}
+          onBarcodeScanned={scanned ? undefined : handleScan}
+        />
+        <SafeAreaView style={styles.scannerOverlay} pointerEvents="box-none">
+          <View style={styles.scannerHeaderOverlay}>
+            <TouchableOpacity
+              onPress={() => {
+                setScannerVisible(false);
+                setScanned(false);
+                setScanSuccess(false);
+              }}
+              accessibilityLabel="Close QR scanner"
+              style={styles.scannerCloseButton}
+            >
+              <X size={28} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={styles.scannerTitleOverlay}>Scan QR Code</Text>
+            <View style={{ width: 44 }} />
+          </View>
+          <View style={styles.scannerGuide} pointerEvents="none">
+            <View style={styles.scannerGuideCorner} />
+          </View>
+          <View style={styles.scannerHintPill} pointerEvents="none">
+            <Text style={styles.scannerHintText}>Point your camera at a WeConnect QR code</Text>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
@@ -483,47 +525,7 @@ const ConnectScreen = ({ navigation }) => {
         </View>
       </Modal>
 
-      <Modal
-        visible={scannerVisible}
-        animationType="slide"
-        onRequestClose={() => {
-          setScannerVisible(false);
-          setScanned(false);
-          setScanSuccess(false);
-        }}
-      >
-        <SafeAreaView style={styles.scannerScreen} edges={['top', 'bottom']}>
-          <View style={styles.scannerHeader}>
-            <TouchableOpacity onPress={() => setScannerVisible(false)} accessibilityLabel="Close QR scanner">
-              <X size={28} color="#111111" />
-            </TouchableOpacity>
-            <Text style={styles.scannerTitle}>Scan QR Code</Text>
-            <View style={{ width: 28 }} />
-          </View>
-          <View style={styles.scannerCameraWrap}>
-            <CameraView
-              style={StyleSheet.absoluteFillObject}
-              facing="back"
-              ratio="16:9"
-              mode="picture"
-              autofocus="on"
-              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-              onCameraReady={() => console.log('QR camera preview ready')}
-              onMountError={(error) => {
-                console.error('QR camera mount failed:', error);
-                Alert.alert('Camera unavailable', error?.message || 'Could not start the camera preview.');
-              }}
-              onBarcodeScanned={scanned ? undefined : handleScan}
-            />
-            <View pointerEvents="none" style={styles.scannerFrame}>
-              <View style={styles.scannerCorner} />
-            </View>
-            <View pointerEvents="none" style={styles.scannerHintPill}>
-              <Text style={styles.scannerHintText}>Point your camera at a WeConnect QR code</Text>
-            </View>
-          </View>
-        </SafeAreaView>
-      </Modal>
+
 
       <Modal
         visible={qrVisible}
