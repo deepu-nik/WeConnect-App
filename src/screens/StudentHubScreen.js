@@ -73,7 +73,14 @@ const StudentHubScreen = ({ navigation }) => {
   const [noteInput, setNoteInput] = useState({ title: '', body: '' });
   const [classInput, setClassInput] = useState({ subject: '', time: '', room: '' });
   const [expenseInput, setExpenseInput] = useState({ amount: '', people: '2' });
-  const [attendanceInput, setAttendanceInput] = useState({ subject: '' });
+  const [attendanceInput, setAttendanceInput] = useState({
+    subject: '',
+    semesterTotal: '',
+    conducted: '',
+    attended: '',
+    percentage: '',
+    mode: 'classes',
+  });
   const [assignmentInput, setAssignmentInput] = useState({ title: '', due: '' });
 
   useEffect(() => {
@@ -142,17 +149,79 @@ const StudentHubScreen = ({ navigation }) => {
     setData((current) => ({ ...current, [key]: current[key].filter((item) => item.id !== id) }));
   };
 
+  const resetAttendanceInput = () => setAttendanceInput({
+    subject: '',
+    semesterTotal: '',
+    conducted: '',
+    attended: '',
+    percentage: '',
+    mode: 'classes',
+  });
+
   const addAttendanceSubject = () => {
     const subject = attendanceInput.subject.trim();
-    if (!subject) return;
+    const semesterTotal = Math.max(0, Number(attendanceInput.semesterTotal) || 0);
+
+    if (!subject) {
+      Alert.alert('Subject required', 'Enter a subject name first.');
+      return;
+    }
+
+    if (attendanceInput.mode === 'percentage') {
+      const percentage = Number(attendanceInput.percentage);
+      if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
+        Alert.alert('Invalid percentage', 'Enter an attendance percentage between 0 and 100.');
+        return;
+      }
+
+      setData((current) => ({
+        ...current,
+        attendance: [
+          ...current.attendance,
+          {
+            id: String(Date.now()),
+            subject,
+            semesterTotal,
+            present: 0,
+            total: 0,
+            percentage,
+            manualPercentage: true,
+          },
+        ],
+      }));
+      resetAttendanceInput();
+      return;
+    }
+
+    const conducted = Math.max(0, Number(attendanceInput.conducted) || 0);
+    const attended = Math.max(0, Number(attendanceInput.attended) || 0);
+
+    if (!conducted || attended > conducted) {
+      Alert.alert('Check attendance', 'Classes conducted must be greater than 0, and attended classes cannot exceed conducted classes.');
+      return;
+    }
+
+    if (semesterTotal && conducted > semesterTotal) {
+      Alert.alert('Check semester total', 'Classes conducted so far cannot be greater than the semester total.');
+      return;
+    }
+
     setData((current) => ({
       ...current,
       attendance: [
         ...current.attendance,
-        { id: String(Date.now()), subject, present: 0, total: 0 },
+        {
+          id: String(Date.now()),
+          subject,
+          semesterTotal,
+          present: attended,
+          total: conducted,
+          percentage: Math.round((attended / conducted) * 100),
+          manualPercentage: false,
+        },
       ],
     }));
-    setAttendanceInput({ subject: '' });
+    resetAttendanceInput();
   };
 
   const updateAttendance = (id, present) => {
@@ -160,10 +229,16 @@ const StudentHubScreen = ({ navigation }) => {
       ...current,
       attendance: current.attendance.map((item) => {
         if (item.id !== id) return item;
+        if (item.manualPercentage) {
+          return item;
+        }
+        const nextPresent = item.present + (present ? 1 : 0);
+        const nextTotal = item.total + 1;
         return {
           ...item,
-          present: item.present + (present ? 1 : 0),
-          total: item.total + 1,
+          present: nextPresent,
+          total: nextTotal,
+          percentage: Math.round((nextPresent / nextTotal) * 100),
         };
       }),
     }));
@@ -190,8 +265,29 @@ const StudentHubScreen = ({ navigation }) => {
   };
 
   const attendancePercentage = (item) => (
-    item.total > 0 ? Math.round((item.present / item.total) * 100) : 0
+    item.manualPercentage
+      ? Number(item.percentage) || 0
+      : item.total > 0
+        ? Math.round((item.present / item.total) * 100)
+        : 0
   );
+
+  const attendanceInsights = (item) => {
+    const percentage = attendancePercentage(item);
+    const semesterTotal = Number(item.semesterTotal) || 0;
+    if (item.manualPercentage) {
+      return {
+        remaining: semesterTotal > item.total ? semesterTotal - item.total : null,
+        neededFor75: null,
+        canMiss: null,
+      };
+    }
+
+    const remaining = semesterTotal > item.total ? semesterTotal - item.total : 0;
+    const neededFor75 = Math.max(0, Math.ceil((0.75 * item.total - item.present) / 0.25));
+    const canMiss = percentage >= 75 ? Math.max(0, Math.floor((item.present / 0.75) - item.total)) : 0;
+    return { remaining, neededFor75, canMiss };
+  };
 
   const trackedAttendance = data.attendance.filter((item) => item.total > 0);
   const overallAttendance = trackedAttendance.length
@@ -309,53 +405,138 @@ const StudentHubScreen = ({ navigation }) => {
     }
 
     if (activeModule === 'attendance') {
+      const manualMode = attendanceInput.mode === 'percentage';
       return (
         <View style={styles.modalContent}>
           <Text style={styles.modalEyebrow}>ATTENDANCE</Text>
-          <Text style={styles.modalTitle}>Know where you stand.</Text>
-          <View style={styles.inputRow}>
-            <TextInput
-              value={attendanceInput.subject}
-              onChangeText={(subject) => setAttendanceInput({ subject })}
-              placeholder="e.g. Discrete Mathematics"
-              placeholderTextColor="#999990"
-              style={styles.input}
-              onSubmitEditing={addAttendanceSubject}
-              returnKeyType="done"
-            />
-            <TouchableOpacity style={styles.addButton} onPress={addAttendanceSubject}>
-              <Plus size={20} color="#111111" />
+          <Text style={styles.modalTitle}>Know exactly where you stand.</Text>
+          <Text style={styles.attendanceHelper}>
+            Add a subject using classes attended, or enter the percentage shown by your college portal.
+          </Text>
+
+          <View style={styles.attendanceModeRow}>
+            <TouchableOpacity
+              style={[styles.modeButton, !manualMode && styles.modeButtonActive]}
+              onPress={() => setAttendanceInput((current) => ({ ...current, mode: 'classes' }))}
+            >
+              <Text style={[styles.modeButtonText, !manualMode && styles.modeButtonTextActive]}>Class count</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeButton, manualMode && styles.modeButtonActive]}
+              onPress={() => setAttendanceInput((current) => ({ ...current, mode: 'percentage' }))}
+            >
+              <Text style={[styles.modeButtonText, manualMode && styles.modeButtonTextActive]}>Manual %</Text>
             </TouchableOpacity>
           </View>
+
+          <TextInput
+            value={attendanceInput.subject}
+            onChangeText={(subject) => setAttendanceInput((current) => ({ ...current, subject }))}
+            placeholder="Subject name"
+            placeholderTextColor="#999990"
+            style={styles.inputFull}
+          />
+
+          <View style={styles.twoInputs}>
+            <TextInput
+              value={attendanceInput.semesterTotal}
+              onChangeText={(semesterTotal) => setAttendanceInput((current) => ({ ...current, semesterTotal }))}
+              placeholder="Semester classes"
+              placeholderTextColor="#999990"
+              style={[styles.inputFull, styles.halfInput]}
+              keyboardType="number-pad"
+            />
+            <TextInput
+              value={manualMode ? attendanceInput.percentage : attendanceInput.attended}
+              onChangeText={(value) => setAttendanceInput((current) => ({
+                ...current,
+                ...(manualMode ? { percentage: value } : { attended: value }),
+              }))}
+              placeholder={manualMode ? "Attendance %" : "Attended so far"}
+              placeholderTextColor="#999990"
+              style={[styles.inputFull, styles.halfInput]}
+              keyboardType="decimal-pad"
+            />
+          </View>
+
+          {!manualMode ? (
+            <TextInput
+              value={attendanceInput.conducted}
+              onChangeText={(conducted) => setAttendanceInput((current) => ({ ...current, conducted }))}
+              placeholder="Classes conducted so far"
+              placeholderTextColor="#999990"
+              style={styles.inputFull}
+              keyboardType="number-pad"
+            />
+          ) : null}
+
+          <TouchableOpacity style={styles.primaryButton} onPress={addAttendanceSubject}>
+            <Plus size={18} color="#111111" />
+            <Text style={styles.primaryButtonText}>Add attendance</Text>
+          </TouchableOpacity>
+
           <ScrollView style={styles.modalList} contentContainerStyle={styles.modalListContent}>
             {data.attendance.map((item) => {
               const percentage = attendancePercentage(item);
+              const insight = attendanceInsights(item);
               return (
                 <View key={item.id} style={styles.attendanceRow}>
-                  <View style={styles.attendanceCopy}>
-                    <Text style={styles.listText}>{item.subject}</Text>
-                    <Text style={styles.listMeta}>
-                      {item.present}/{item.total} classes attended • {item.total ? percentage + '%' : 'No classes logged'}
-                    </Text>
-                    <View style={styles.progressTrack}>
-                      <View style={[styles.progressFill, { width: percentage + '%' }]} />
+                  <View style={styles.attendanceTopRow}>
+                    <View style={styles.attendanceCopy}>
+                      <Text style={styles.listText}>{item.subject}</Text>
+                      <Text style={styles.listMeta}>
+                        {item.manualPercentage
+                          ? `Manual attendance • ${percentage}%`
+                          : `${item.present}/${item.total} classes attended • ${percentage}%`}
+                      </Text>
                     </View>
+                    <Text style={styles.attendancePercent}>{percentage}%</Text>
                   </View>
+
+                  <View style={styles.progressTrack}>
+                    <View style={[styles.progressFill, { width: `${Math.min(100, percentage)}%` }]} />
+                  </View>
+
+                  {insight.remaining !== null ? (
+                    <View style={styles.attendanceInsightBox}>
+                      <Text style={styles.insightText}>
+                        {insight.remaining} class{insight.remaining === 1 ? '' : 'es'} remaining this semester
+                      </Text>
+                      {!item.manualPercentage ? (
+                        <>
+                          <Text style={styles.insightText}>
+                            {percentage >= 75
+                              ? `You can miss about ${insight.canMiss} more class${insight.canMiss === 1 ? '' : 'es'} and stay at 75%+`
+                              : `Attend the next ${insight.neededFor75} class${insight.neededFor75 === 1 ? '' : 'es'} consecutively to reach 75%`}
+                          </Text>
+                        </>
+                      ) : null}
+                    </View>
+                  ) : null}
+
                   <View style={styles.attendanceActions}>
-                    <TouchableOpacity style={styles.attendanceButton} onPress={() => updateAttendance(item.id, true)}>
-                      <Check size={16} color="#111111" />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.absentButton} onPress={() => updateAttendance(item.id, false)}>
-                      <X size={16} color="#111111" />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => removeItem('attendance', item.id)}>
+                    {!item.manualPercentage ? (
+                      <>
+                        <TouchableOpacity style={styles.attendanceButton} onPress={() => updateAttendance(item.id, true)}>
+                          <Check size={16} color="#111111" />
+                          <Text style={styles.attendanceActionText}>Present</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.absentButton} onPress={() => updateAttendance(item.id, false)}>
+                          <X size={16} color="#111111" />
+                          <Text style={styles.attendanceActionText}>Absent</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : null}
+                    <TouchableOpacity onPress={() => removeItem('attendance', item.id)} style={styles.deleteButton}>
                       <Trash2 size={16} color="#999990" />
                     </TouchableOpacity>
                   </View>
                 </View>
               );
             })}
-            {!data.attendance.length ? <EmptyState text="Add subjects to start tracking attendance." /> : null}
+            {!data.attendance.length ? (
+              <EmptyState text="Add each subject with your semester total and current attendance." />
+            ) : null}
           </ScrollView>
         </View>
       );
@@ -605,6 +786,18 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 35, gap: 7 },
   attendanceRow: { borderRadius: 16, padding: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5DF', marginBottom: 8 },
   attendanceCopy: { flex: 1 },
+  attendanceTopRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  attendancePercent: { fontSize: 18, fontWeight: '900', color: '#111111' },
+  attendanceHelper: { fontSize: 11, lineHeight: 16, color: '#777770', marginBottom: 12 },
+  attendanceModeRow: { flexDirection: 'row', backgroundColor: '#ECECE7', borderRadius: 14, padding: 3, marginBottom: 10 },
+  modeButton: { flex: 1, minHeight: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  modeButtonActive: { backgroundColor: '#FFFC00' },
+  modeButtonText: { fontSize: 11, fontWeight: '800', color: '#777770' },
+  modeButtonTextActive: { color: '#111111' },
+  attendanceInsightBox: { marginTop: 10, padding: 10, borderRadius: 12, backgroundColor: '#F7F7F2' },
+  insightText: { fontSize: 10.5, lineHeight: 15, color: '#66665F' },
+  attendanceActionText: { fontSize: 10, fontWeight: '900', color: '#111111', marginLeft: 4 },
+  deleteButton: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   progressTrack: { height: 6, borderRadius: 3, backgroundColor: '#EEEEEA', overflow: 'hidden', marginTop: 8 },
   progressFill: { height: '100%', borderRadius: 3, backgroundColor: '#111111' },
   attendanceActions: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 10 },
