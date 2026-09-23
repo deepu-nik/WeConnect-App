@@ -12,7 +12,7 @@ import {
   Folder, UploadCloud, Link as LinkIcon, ChevronLeft, 
   X, Edit2, Trash2, FolderPlus, Key, ThumbsUp, CheckCircle 
 } from 'lucide-react-native';
-import * as DocumentPicker from 'expo-document-picker';
+import { File } from 'expo-file-system';
 
 // Using the legacy import to prevent Expo SDK 54 deprecation crashes
 import * as FileSystem from 'expo-file-system/legacy'; 
@@ -281,13 +281,17 @@ const VaultScreen = ({ navigation }) => {
   const handleUploadFile = async () => {
     if (!currentVault) return;
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: false, multiple: false });
-      if (result.canceled || !result.assets || result.assets.length === 0) return;
+      const result = await File.pickFileAsync({
+        multipleFiles: false,
+        mimeTypes: ['*/*'],
+      });
+      if (result.canceled || !result.result) return;
 
-      const file = result.assets[0];
+      const file = Array.isArray(result.result) ? result.result[0] : result.result;
+      if (!file) return;
       setIsUploading(true);
 
-      const secureUrl = await uploadToCloudinary(file.uri, 'auto'); 
+      const secureUrl = await uploadToCloudinary(file, 'auto'); 
       
       if (!secureUrl) {
         setIsUploading(false);
