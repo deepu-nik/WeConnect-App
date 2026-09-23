@@ -378,9 +378,7 @@ const ConnectScreen = ({ navigation }) => {
             <View style={styles.scannerGuideCorner} />
             <View style={styles.scannerGuideInner} />
           </View>
-          <View style={styles.scannerHintPill} pointerEvents="none">
-            <Text style={styles.scannerHintTitle}>Scan a WeConnect QR</Text>
-          </View>
+
         </SafeAreaView>
       </View>
     );
