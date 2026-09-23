@@ -1,4 +1,5 @@
-import * as FileSystem from 'expo-file-system/legacy';
+import { fetch as expoFetch } from 'expo/fetch';
+import { File } from 'expo-file-system';
 
 const CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
@@ -22,57 +23,52 @@ const getMimeType = (extension, type) => {
   return map[extension] || (type === 'audio' ? 'audio/mp4' : 'application/octet-stream');
 };
 
-export const uploadToCloudinary = async (fileUri, type = 'auto', options = {}) => {
-  if (!fileUri || !CLOUD_NAME || !UPLOAD_PRESET) {
+export const uploadToCloudinary = async (fileInput, type = 'auto', options = {}) => {
+  if (!fileInput || !CLOUD_NAME || !UPLOAD_PRESET) {
     console.error('Cloudinary configuration is missing.');
     return null;
   }
 
   try {
-    const extension = getExtension(fileUri);
+    const file = typeof fileInput === 'string' ? new File(fileInput) : fileInput;
+    const extension = getExtension(file?.name || file?.uri || '');
     const resourceType = type === 'image'
       ? 'image'
       : type === 'audio' || type === 'video'
         ? 'video'
         : 'auto';
-    const filename = 'upload_' + Date.now() + (extension ? '.' + extension : '');
-    const mimeType = getMimeType(extension, type);
+    const filename = file?.name || ('upload_' + Date.now() + (extension ? '.' + extension : ''));
+    const mimeType = file?.type || getMimeType(extension, type);
 
-    const result = await FileSystem.uploadAsync(
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', UPLOAD_PRESET);
+    formData.append(
+      'folder',
+      options.folder || (type === 'video'
+        ? 'weconnect/stories/video'
+        : type === 'image'
+          ? 'weconnect/stories/image'
+          : 'weconnect/uploads')
+    );
+    formData.append(
+      'tags',
+      options.tags || (type === 'video' || type === 'image'
+        ? 'weconnect_story'
+        : 'weconnect_media')
+    );
+
+    const response = await expoFetch(
       `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/${resourceType}/upload`,
-      fileUri,
       {
-        httpMethod: 'POST',
-        uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-        fieldName: 'file',
-        mimeType,
-        parameters: {
-          upload_preset: UPLOAD_PRESET,
-          folder: options.folder || (type === 'video'
-            ? 'weconnect/stories/video'
-            : type === 'image'
-              ? 'weconnect/stories/image'
-              : 'weconnect/uploads'),
-          tags: options.tags || (type === 'video' || type === 'image'
-            ? 'weconnect_story'
-            : 'weconnect_media'),
-        },
-        headers: {
-          'X-File-Name': filename,
-          'X-File-Type': mimeType,
-        },
+        method: 'POST',
+        body: formData,
       }
     );
 
-    let data = {};
-    try {
-      data = result.body ? JSON.parse(result.body) : {};
-    } catch {
-      console.error('Cloudinary returned a non-JSON response:', result.body);
-    }
-
-    if (result.status < 200 || result.status >= 300 || !data.secure_url) {
-      console.error('Cloudinary upload failed:', data || result.body);
+    const data = await response.json();
+    if (!response.ok || !data.secure_url) {
+      console.error('Cloudinary upload failed:', data);
       return null;
     }
 
