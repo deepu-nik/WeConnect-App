@@ -281,7 +281,7 @@ const VaultScreen = ({ navigation }) => {
   const handleUploadFile = async () => {
     if (!currentVault) return;
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true, multiple: false });
+      const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: false, multiple: false });
       if (result.canceled || !result.assets || result.assets.length === 0) return;
 
       const file = result.assets[0];
