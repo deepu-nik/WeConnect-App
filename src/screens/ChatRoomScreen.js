@@ -7,6 +7,7 @@ import {
   Image,
   Keyboard,
   Modal,
+  Platform,
   Pressable,
   Share,
   StatusBar,
