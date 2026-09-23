@@ -7,7 +7,6 @@ import { getUserProfile } from '../services/userService';
 import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { createDirectChat, markChatRead } from '../services/chatService';
 import { createGroupChat } from '../services/groupService';
-import Dashboard from '../components/Dashboard';
 
 const FALLBACK_AVATAR = 'https://via.placeholder.com/150';
 
@@ -48,7 +47,6 @@ const ChatsScreen = ({ navigation }) => {
   const [searchingStudents, setSearchingStudents] = useState(false);
   const [filter, setFilter] = useState('all');
   const [avatarPreview, setAvatarPreview] = useState(null);
-  const [dashboardVisible, setDashboardVisible] = useState(false);
   const [composerVisible, setComposerVisible] = useState(false);
   const [groupVisible, setGroupVisible] = useState(false);
   const [groupName, setGroupName] = useState('');
@@ -307,7 +305,7 @@ const ChatsScreen = ({ navigation }) => {
       <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); setTimeout(() => setRefreshing(false), 450); }} tintColor="#111111" />} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Text style={styles.brand}>WeConnect</Text>
-          <TouchableOpacity style={styles.studentHubButton} onPress={() => setDashboardVisible(true)} accessibilityLabel="Open Student Hub">
+          <TouchableOpacity style={styles.studentHubButton} onPress={() => navigation.navigate('StudentHub')} accessibilityLabel="Open Student Hub">
             <Sparkles size={17} color="#111111" />
             <Text style={styles.studentHubButtonText}>Student Hub</Text>
           </TouchableOpacity>
@@ -410,15 +408,6 @@ const ChatsScreen = ({ navigation }) => {
         </TouchableOpacity>
       </Modal>
 
-      <Modal visible={dashboardVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setDashboardVisible(false)}>
-        <SafeAreaView style={styles.dashboardModal}>
-          <View style={styles.dashboardModalHeader}>
-            <View><Text style={styles.dashboardModalEyebrow}>STUDENT HUB</Text><Text style={styles.dashboardModalTitle}>Everything in one place.</Text></View>
-            <TouchableOpacity style={styles.dashboardClose} onPress={() => setDashboardVisible(false)}><X size={20} color="#111111" /></TouchableOpacity>
-          </View>
-          <View style={styles.dashboardBody}><Dashboard onClose={() => setDashboardVisible(false)} /></View>
-        </SafeAreaView>
-      </Modal>
     </SafeAreaView>
   );
 };
@@ -510,12 +499,6 @@ const styles = StyleSheet.create({
   avatarModalImage: { width: 280, height: 280, backgroundColor: '#E7E7E1' },
   avatarModalName: { marginTop: 14, fontSize: 17, fontWeight: '900', color: '#111111' },
   avatarModalHint: { marginTop: 4, fontSize: 11, color: '#898981' },
-  dashboardModal: { flex: 1, backgroundColor: '#F6F6F2' },
-  dashboardModalHeader: { minHeight: 76, paddingHorizontal: 18, paddingVertical: 13, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E5E5DF', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  dashboardModalEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1.2, color: '#8B8B84' },
-  dashboardModalTitle: { fontSize: 17, fontWeight: '900', color: '#111111', marginTop: 2 },
-  dashboardClose: { width: 38, height: 38, borderRadius: 13, backgroundColor: '#F0F0EB', alignItems: 'center', justifyContent: 'center' },
-  dashboardBody: { flex: 1, paddingTop: 5 },
 });
 
 export default ChatsScreen;

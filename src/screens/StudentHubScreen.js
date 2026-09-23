@@ -1,0 +1,809 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  ArrowLeft,
+  BookOpen,
+  CalendarDays,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  Circle,
+  IndianRupee,
+  ListTodo,
+  Plus,
+  StickyNote,
+  ClipboardList,
+  GraduationCap,
+  Trash2,
+  X,
+} from 'lucide-react-native';
+
+const STORAGE_KEY = '@weconnect/student_hub_v1';
+
+const DEFAULT_DATA = {
+  tasks: [
+    { id: 'task-1', title: 'Plan this week', done: false },
+    { id: 'task-2', title: 'Review pending college work', done: false },
+  ],
+  notes: [],
+  classes: [],
+  expenses: [],
+  attendance: [],
+  assignments: [],
+};
+
+const moduleMeta = {
+  schedule: { title: 'Class Schedule', icon: CalendarDays, description: 'Keep your classes and rooms in one place.' },
+  tasks: { title: 'Tasks', icon: ListTodo, description: 'Track assignments, projects and small tasks.' },
+  notes: { title: 'Notes', icon: StickyNote, description: 'Save quick study notes without leaving WeConnect.' },
+  expenses: { title: 'Split Expenses', icon: IndianRupee, description: 'Calculate a simple per-person split.' },
+  attendance: { title: 'Attendance', icon: GraduationCap, description: 'Track subject attendance and stay aware of your percentage.' },
+  assignments: { title: 'Assignments', icon: ClipboardList, description: 'Keep upcoming college submissions visible and organized.' },
+};
+
+const safeJson = (value, fallback) => {
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' ? { ...fallback, ...parsed } : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const StudentHubScreen = ({ navigation }) => {
+  const [data, setData] = useState(DEFAULT_DATA);
+  const [loading, setLoading] = useState(true);
+  const [activeModule, setActiveModule] = useState(null);
+  const [taskInput, setTaskInput] = useState('');
+  const [noteInput, setNoteInput] = useState({ title: '', body: '' });
+  const [classInput, setClassInput] = useState({ subject: '', time: '', room: '' });
+  const [expenseInput, setExpenseInput] = useState({ amount: '', people: '2' });
+  const [attendanceInput, setAttendanceInput] = useState({
+    subject: '',
+    semesterTotal: '',
+    conducted: '',
+    attended: '',
+    percentage: '',
+    mode: 'classes',
+  });
+  const [assignmentInput, setAssignmentInput] = useState({ title: '', due: '' });
+
+  useEffect(() => {
+    let mounted = true;
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((stored) => {
+        if (mounted && stored) setData(safeJson(stored, DEFAULT_DATA));
+      })
+      .catch((error) => console.error('Student Hub load failed:', error))
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data)).catch((error) => {
+      console.error('Student Hub save failed:', error);
+    });
+  }, [data, loading]);
+
+  const pendingTasks = useMemo(() => data.tasks.filter((task) => !task.done), [data.tasks]);
+  const nextClass = data.classes[0];
+  const latestNote = data.notes[0];
+
+  const addTask = () => {
+    const title = taskInput.trim();
+    if (!title) return;
+    setData((current) => ({
+      ...current,
+      tasks: [{ id: String(Date.now()), title, done: false }, ...current.tasks],
+    }));
+    setTaskInput('');
+  };
+
+  const addNote = () => {
+    const title = noteInput.title.trim();
+    const body = noteInput.body.trim();
+    if (!title && !body) return;
+    setData((current) => ({
+      ...current,
+      notes: [{ id: String(Date.now()), title: title || 'Untitled note', body }, ...current.notes],
+    }));
+    setNoteInput({ title: '', body: '' });
+  };
+
+  const addClass = () => {
+    const subject = classInput.subject.trim();
+    if (!subject) return;
+    setData((current) => ({
+      ...current,
+      classes: [...current.classes, { id: String(Date.now()), ...classInput, subject }],
+    }));
+    setClassInput({ subject: '', time: '', room: '' });
+  };
+
+  const toggleTask = (id) => {
+    setData((current) => ({
+      ...current,
+      tasks: current.tasks.map((task) => task.id === id ? { ...task, done: !task.done } : task),
+    }));
+  };
+
+  const removeItem = (key, id) => {
+    setData((current) => ({ ...current, [key]: current[key].filter((item) => item.id !== id) }));
+  };
+
+  const resetAttendanceInput = () => setAttendanceInput({
+    subject: '',
+    semesterTotal: '',
+    conducted: '',
+    attended: '',
+    percentage: '',
+    mode: 'classes',
+  });
+
+  const addAttendanceSubject = () => {
+    const subject = attendanceInput.subject.trim();
+    const semesterTotal = Math.max(0, Number(attendanceInput.semesterTotal) || 0);
+
+    if (!subject) {
+      Alert.alert('Subject required', 'Enter a subject name first.');
+      return;
+    }
+
+    if (attendanceInput.mode === 'percentage') {
+      const percentage = Number(attendanceInput.percentage);
+      if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
+        Alert.alert('Invalid percentage', 'Enter an attendance percentage between 0 and 100.');
+        return;
+      }
+
+      setData((current) => ({
+        ...current,
+        attendance: [
+          ...current.attendance,
+          {
+            id: String(Date.now()),
+            subject,
+            semesterTotal,
+            present: 0,
+            total: 0,
+            percentage,
+            manualPercentage: true,
+          },
+        ],
+      }));
+      resetAttendanceInput();
+      return;
+    }
+
+    const conducted = Math.max(0, Number(attendanceInput.conducted) || 0);
+    const attended = Math.max(0, Number(attendanceInput.attended) || 0);
+
+    if (!conducted || attended > conducted) {
+      Alert.alert('Check attendance', 'Classes conducted must be greater than 0, and attended classes cannot exceed conducted classes.');
+      return;
+    }
+
+    if (semesterTotal && conducted > semesterTotal) {
+      Alert.alert('Check semester total', 'Classes conducted so far cannot be greater than the semester total.');
+      return;
+    }
+
+    setData((current) => ({
+      ...current,
+      attendance: [
+        ...current.attendance,
+        {
+          id: String(Date.now()),
+          subject,
+          semesterTotal,
+          present: attended,
+          total: conducted,
+          percentage: Math.round((attended / conducted) * 100),
+          manualPercentage: false,
+        },
+      ],
+    }));
+    resetAttendanceInput();
+  };
+
+  const updateAttendance = (id, present) => {
+    setData((current) => ({
+      ...current,
+      attendance: current.attendance.map((item) => {
+        if (item.id !== id) return item;
+        if (item.manualPercentage) {
+          return item;
+        }
+        const nextPresent = item.present + (present ? 1 : 0);
+        const nextTotal = item.total + 1;
+        return {
+          ...item,
+          present: nextPresent,
+          total: nextTotal,
+          percentage: Math.round((nextPresent / nextTotal) * 100),
+        };
+      }),
+    }));
+  };
+
+  const addAssignment = () => {
+    const title = assignmentInput.title.trim();
+    if (!title) return;
+    setData((current) => ({
+      ...current,
+      assignments: [
+        { id: String(Date.now()), title, due: assignmentInput.due.trim(), done: false },
+        ...current.assignments,
+      ],
+    }));
+    setAssignmentInput({ title: '', due: '' });
+  };
+
+  const toggleAssignment = (id) => {
+    setData((current) => ({
+      ...current,
+      assignments: current.assignments.map((item) => item.id === id ? { ...item, done: !item.done } : item),
+    }));
+  };
+
+  const attendancePercentage = (item) => (
+    item.manualPercentage
+      ? Number(item.percentage) || 0
+      : item.total > 0
+        ? Math.round((item.present / item.total) * 100)
+        : 0
+  );
+
+  const attendanceInsights = (item) => {
+    const percentage = attendancePercentage(item);
+    const semesterTotal = Number(item.semesterTotal) || 0;
+    if (item.manualPercentage) {
+      return {
+        remaining: semesterTotal > item.total ? semesterTotal - item.total : null,
+        neededFor75: null,
+        canMiss: null,
+      };
+    }
+
+    const remaining = semesterTotal > item.total ? semesterTotal - item.total : 0;
+    const neededFor75 = Math.max(0, Math.ceil((0.75 * item.total - item.present) / 0.25));
+    const canMiss = percentage >= 75 ? Math.max(0, Math.floor((item.present / 0.75) - item.total)) : 0;
+    return { remaining, neededFor75, canMiss };
+  };
+
+  const trackedAttendance = data.attendance.filter((item) => item.total > 0);
+  const overallAttendance = trackedAttendance.length
+    ? Math.round(
+      (trackedAttendance.reduce((sum, item) => sum + item.present, 0) /
+        trackedAttendance.reduce((sum, item) => sum + item.total, 0)) * 100
+    )
+    : null;
+
+  const pendingAssignments = data.assignments.filter((item) => !item.done);
+
+  const splitAmount = Number(expenseInput.amount);
+  const splitPeople = Math.max(1, Number(expenseInput.people) || 1);
+  const perPerson = Number.isFinite(splitAmount) && splitAmount > 0 ? splitAmount / splitPeople : 0;
+
+  const renderModuleContent = () => {
+    if (activeModule === 'tasks') {
+      return (
+        <View style={styles.modalContent}>
+          <Text style={styles.modalEyebrow}>TASKS</Text>
+          <Text style={styles.modalTitle}>What needs to get done?</Text>
+          <View style={styles.inputRow}>
+            <TextInput
+              value={taskInput}
+              onChangeText={setTaskInput}
+              placeholder="e.g. Finish DBMS assignment"
+              placeholderTextColor="#999990"
+              style={styles.input}
+              returnKeyType="done"
+              onSubmitEditing={addTask}
+            />
+            <TouchableOpacity style={styles.addButton} onPress={addTask}>
+              <Plus size={20} color="#111111" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.modalList} contentContainerStyle={styles.modalListContent} keyboardShouldPersistTaps="handled">
+            {data.tasks.map((task) => (
+              <View key={task.id} style={styles.listRow}>
+                <TouchableOpacity onPress={() => toggleTask(task.id)} style={styles.checkButton}>
+                  {task.done ? <CheckCircle2 size={22} color="#111111" /> : <Circle size={22} color="#B8B8B0" />}
+                </TouchableOpacity>
+                <Text style={[styles.listText, task.done && styles.listTextDone]}>{task.title}</Text>
+                <TouchableOpacity onPress={() => removeItem('tasks', task.id)}>
+                  <Trash2 size={17} color="#999990" />
+                </TouchableOpacity>
+              </View>
+            ))}
+            {!data.tasks.length ? <EmptyState text="No tasks yet." /> : null}
+          </ScrollView>
+        </View>
+      );
+    }
+
+    if (activeModule === 'notes') {
+      return (
+        <KeyboardAvoidingView style={styles.modalContent} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <Text style={styles.modalEyebrow}>NOTES</Text>
+          <Text style={styles.modalTitle}>Capture something useful.</Text>
+          <TextInput value={noteInput.title} onChangeText={(title) => setNoteInput((current) => ({ ...current, title }))} placeholder="Note title" placeholderTextColor="#999990" style={styles.inputFull} />
+          <TextInput value={noteInput.body} onChangeText={(body) => setNoteInput((current) => ({ ...current, body }))} placeholder="Write your note..." placeholderTextColor="#999990" style={[styles.inputFull, styles.noteInput]} multiline textAlignVertical="top" />
+          <TouchableOpacity style={styles.primaryButton} onPress={addNote}>
+            <Plus size={18} color="#111111" />
+            <Text style={styles.primaryButtonText}>Save note</Text>
+          </TouchableOpacity>
+          <ScrollView style={styles.modalList} contentContainerStyle={styles.modalListContent}>
+            {data.notes.map((note) => (
+              <View key={note.id} style={styles.noteRow}>
+                <View style={styles.noteCopy}>
+                  <Text style={styles.noteTitle}>{note.title}</Text>
+                  <Text style={styles.noteBody} numberOfLines={3}>{note.body || 'No content'}</Text>
+                </View>
+                <TouchableOpacity onPress={() => removeItem('notes', note.id)}>
+                  <Trash2 size={17} color="#999990" />
+                </TouchableOpacity>
+              </View>
+            ))}
+            {!data.notes.length ? <EmptyState text="Your saved notes will appear here." /> : null}
+          </ScrollView>
+        </KeyboardAvoidingView>
+      );
+    }
+
+    if (activeModule === 'schedule') {
+      return (
+        <View style={styles.modalContent}>
+          <Text style={styles.modalEyebrow}>SCHEDULE</Text>
+          <Text style={styles.modalTitle}>Plan your classes.</Text>
+          <View style={styles.inputRow}>
+            <TextInput value={classInput.subject} onChangeText={(subject) => setClassInput((current) => ({ ...current, subject }))} placeholder="Subject" placeholderTextColor="#999990" style={styles.input} />
+            <TouchableOpacity style={styles.addButton} onPress={addClass}>
+              <Plus size={20} color="#111111" />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.twoInputs}>
+            <TextInput value={classInput.time} onChangeText={(time) => setClassInput((current) => ({ ...current, time }))} placeholder="Time" placeholderTextColor="#999990" style={[styles.inputFull, styles.halfInput]} />
+            <TextInput value={classInput.room} onChangeText={(room) => setClassInput((current) => ({ ...current, room }))} placeholder="Room" placeholderTextColor="#999990" style={[styles.inputFull, styles.halfInput]} />
+          </View>
+          <ScrollView style={styles.modalList} contentContainerStyle={styles.modalListContent}>
+            {data.classes.map((item) => (
+              <View key={item.id} style={styles.listRow}>
+                <View style={styles.scheduleIcon}><CalendarDays size={18} color="#111111" /></View>
+                <View style={styles.listTextWrap}>
+                  <Text style={styles.listText}>{item.subject}</Text>
+                  <Text style={styles.listMeta}>{item.time || 'Time not set'}{item.room ? ' • ' + item.room : ''}</Text>
+                </View>
+                <TouchableOpacity onPress={() => removeItem('classes', item.id)}>
+                  <Trash2 size={17} color="#999990" />
+                </TouchableOpacity>
+              </View>
+            ))}
+            {!data.classes.length ? <EmptyState text="No classes added yet." /> : null}
+          </ScrollView>
+        </View>
+      );
+    }
+
+    if (activeModule === 'attendance') {
+      const manualMode = attendanceInput.mode === 'percentage';
+      return (
+        <View style={styles.modalContent}>
+          <Text style={styles.modalEyebrow}>ATTENDANCE</Text>
+          <Text style={styles.modalTitle}>Know exactly where you stand.</Text>
+          <Text style={styles.attendanceHelper}>
+            Add a subject using classes attended, or enter the percentage shown by your college portal.
+          </Text>
+
+          <View style={styles.attendanceModeRow}>
+            <TouchableOpacity
+              style={[styles.modeButton, !manualMode && styles.modeButtonActive]}
+              onPress={() => setAttendanceInput((current) => ({ ...current, mode: 'classes' }))}
+            >
+              <Text style={[styles.modeButtonText, !manualMode && styles.modeButtonTextActive]}>Class count</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeButton, manualMode && styles.modeButtonActive]}
+              onPress={() => setAttendanceInput((current) => ({ ...current, mode: 'percentage' }))}
+            >
+              <Text style={[styles.modeButtonText, manualMode && styles.modeButtonTextActive]}>Manual %</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TextInput
+            value={attendanceInput.subject}
+            onChangeText={(subject) => setAttendanceInput((current) => ({ ...current, subject }))}
+            placeholder="Subject name"
+            placeholderTextColor="#999990"
+            style={styles.inputFull}
+          />
+
+          <View style={styles.twoInputs}>
+            <TextInput
+              value={attendanceInput.semesterTotal}
+              onChangeText={(semesterTotal) => setAttendanceInput((current) => ({ ...current, semesterTotal }))}
+              placeholder="Semester classes"
+              placeholderTextColor="#999990"
+              style={[styles.inputFull, styles.halfInput]}
+              keyboardType="number-pad"
+            />
+            <TextInput
+              value={manualMode ? attendanceInput.percentage : attendanceInput.attended}
+              onChangeText={(value) => setAttendanceInput((current) => ({
+                ...current,
+                ...(manualMode ? { percentage: value } : { attended: value }),
+              }))}
+              placeholder={manualMode ? "Attendance %" : "Attended so far"}
+              placeholderTextColor="#999990"
+              style={[styles.inputFull, styles.halfInput]}
+              keyboardType="decimal-pad"
+            />
+          </View>
+
+          {!manualMode ? (
+            <TextInput
+              value={attendanceInput.conducted}
+              onChangeText={(conducted) => setAttendanceInput((current) => ({ ...current, conducted }))}
+              placeholder="Classes conducted so far"
+              placeholderTextColor="#999990"
+              style={styles.inputFull}
+              keyboardType="number-pad"
+            />
+          ) : null}
+
+          <TouchableOpacity style={styles.primaryButton} onPress={addAttendanceSubject}>
+            <Plus size={18} color="#111111" />
+            <Text style={styles.primaryButtonText}>Add attendance</Text>
+          </TouchableOpacity>
+
+          <ScrollView style={styles.modalList} contentContainerStyle={styles.modalListContent}>
+            {data.attendance.map((item) => {
+              const percentage = attendancePercentage(item);
+              const insight = attendanceInsights(item);
+              return (
+                <View key={item.id} style={styles.attendanceRow}>
+                  <View style={styles.attendanceTopRow}>
+                    <View style={styles.attendanceCopy}>
+                      <Text style={styles.listText}>{item.subject}</Text>
+                      <Text style={styles.listMeta}>
+                        {item.manualPercentage
+                          ? `Manual attendance • ${percentage}%`
+                          : `${item.present}/${item.total} classes attended • ${percentage}%`}
+                      </Text>
+                    </View>
+                    <Text style={styles.attendancePercent}>{percentage}%</Text>
+                  </View>
+
+                  <View style={styles.progressTrack}>
+                    <View style={[styles.progressFill, { width: `${Math.min(100, percentage)}%` }]} />
+                  </View>
+
+                  {insight.remaining !== null ? (
+                    <View style={styles.attendanceInsightBox}>
+                      <Text style={styles.insightText}>
+                        {insight.remaining} class{insight.remaining === 1 ? '' : 'es'} remaining this semester
+                      </Text>
+                      {!item.manualPercentage ? (
+                        <>
+                          <Text style={styles.insightText}>
+                            {percentage >= 75
+                              ? `You can miss about ${insight.canMiss} more class${insight.canMiss === 1 ? '' : 'es'} and stay at 75%+`
+                              : `Attend the next ${insight.neededFor75} class${insight.neededFor75 === 1 ? '' : 'es'} consecutively to reach 75%`}
+                          </Text>
+                        </>
+                      ) : null}
+                    </View>
+                  ) : null}
+
+                  <View style={styles.attendanceActions}>
+                    {!item.manualPercentage ? (
+                      <>
+                        <TouchableOpacity style={styles.attendanceButton} onPress={() => updateAttendance(item.id, true)}>
+                          <Check size={16} color="#111111" />
+                          <Text style={styles.attendanceActionText}>Present</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.absentButton} onPress={() => updateAttendance(item.id, false)}>
+                          <X size={16} color="#111111" />
+                          <Text style={styles.attendanceActionText}>Absent</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : null}
+                    <TouchableOpacity onPress={() => removeItem('attendance', item.id)} style={styles.deleteButton}>
+                      <Trash2 size={16} color="#999990" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+            {!data.attendance.length ? (
+              <EmptyState text="Add each subject with your semester total and current attendance." />
+            ) : null}
+          </ScrollView>
+        </View>
+      );
+    }
+
+    if (activeModule === 'assignments') {
+      return (
+        <View style={styles.modalContent}>
+          <Text style={styles.modalEyebrow}>ASSIGNMENTS</Text>
+          <Text style={styles.modalTitle}>Never lose a submission.</Text>
+          <TextInput
+            value={assignmentInput.title}
+            onChangeText={(title) => setAssignmentInput((current) => ({ ...current, title }))}
+            placeholder="Assignment or project name"
+            placeholderTextColor="#999990"
+            style={styles.inputFull}
+            onSubmitEditing={addAssignment}
+            returnKeyType="done"
+          />
+          <View style={styles.inputRow}>
+            <TextInput
+              value={assignmentInput.due}
+              onChangeText={(due) => setAssignmentInput((current) => ({ ...current, due }))}
+              placeholder="Due date / time"
+              placeholderTextColor="#999990"
+              style={styles.input}
+            />
+            <TouchableOpacity style={styles.addButton} onPress={addAssignment}>
+              <Plus size={20} color="#111111" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.modalList} contentContainerStyle={styles.modalListContent}>
+            {data.assignments.map((item) => (
+              <View key={item.id} style={styles.listRow}>
+                <TouchableOpacity style={styles.checkButton} onPress={() => toggleAssignment(item.id)}>
+                  {item.done ? <CheckCircle2 size={22} color="#111111" /> : <Circle size={22} color="#B8B8B0" />}
+                </TouchableOpacity>
+                <View style={styles.listTextWrap}>
+                  <Text style={[styles.listText, item.done && styles.listTextDone]}>{item.title}</Text>
+                  <Text style={styles.listMeta}>{item.due || 'Due date not set'}</Text>
+                </View>
+                <TouchableOpacity onPress={() => removeItem('assignments', item.id)}>
+                  <Trash2 size={17} color="#999990" />
+                </TouchableOpacity>
+              </View>
+            ))}
+            {!data.assignments.length ? <EmptyState text="No assignments added yet." /> : null}
+          </ScrollView>
+        </View>
+      );
+    }
+
+    if (activeModule === 'expenses') {
+      return (
+        <View style={styles.modalContent}>
+          <Text style={styles.modalEyebrow}>SPLIT EXPENSES</Text>
+          <Text style={styles.modalTitle}>How much does everyone owe?</Text>
+          <TextInput value={expenseInput.amount} onChangeText={(amount) => setExpenseInput((current) => ({ ...current, amount }))} placeholder="Total amount (₹)" placeholderTextColor="#999990" style={styles.inputFull} keyboardType="decimal-pad" />
+          <TextInput value={expenseInput.people} onChangeText={(people) => setExpenseInput((current) => ({ ...current, people }))} placeholder="Number of people" placeholderTextColor="#999990" style={styles.inputFull} keyboardType="number-pad" />
+          <View style={styles.expenseResult}>
+            <Text style={styles.resultLabel}>EACH PERSON</Text>
+            <Text style={styles.resultAmount}>₹{perPerson.toFixed(2)}</Text>
+            <Text style={styles.resultMeta}>{splitPeople} people • equal split</Text>
+          </View>
+        </View>
+      );
+    }
+
+    return null;
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loading}><ActivityIndicator size="small" color="#111111" /><Text style={styles.loadingText}>Loading Student Hub…</Text></View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.iconButton} onPress={() => navigation.goBack()} accessibilityLabel="Back">
+          <ArrowLeft size={20} color="#111111" />
+        </TouchableOpacity>
+        <View style={styles.headerCopy}>
+          <Text style={styles.eyebrow}>WECONNECT</Text>
+          <Text style={styles.headerTitle}>Student Hub</Text>
+        </View>
+        <View style={styles.headerBadge}><BookOpen size={17} color="#111111" /></View>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
+        <View style={styles.hero}>
+          <View style={styles.heroBadge}><Text style={styles.heroBadgeText}>YOUR CAMPUS COMMAND CENTER</Text></View>
+          <Text style={styles.heroTitle}>Stay on top of college.</Text>
+          <Text style={styles.heroSubtitle}>A lightweight space for classes, tasks, notes and everyday student utilities.</Text>
+        </View>
+
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}><Text style={styles.statValue}>{pendingTasks.length}</Text><Text style={styles.statLabel}>Pending tasks</Text></View>
+          <View style={styles.statCard}><Text style={styles.statValue}>{pendingAssignments.length}</Text><Text style={styles.statLabel}>Assignments</Text></View>
+          <View style={styles.statCard}><Text style={styles.statValue}>{overallAttendance === null ? '—' : overallAttendance + '%'}</Text><Text style={styles.statLabel}>Attendance</Text></View>
+        </View>
+
+        <Text style={styles.sectionTitle}>Student tools</Text>
+        <View style={styles.grid}>
+          {Object.entries(moduleMeta).map(([id, meta]) => {
+            const Icon = meta.icon;
+            return (
+              <TouchableOpacity key={id} style={styles.moduleCard} activeOpacity={0.84} onPress={() => setActiveModule(id)}>
+                <View style={styles.moduleIcon}><Icon size={21} color="#111111" /></View>
+                <Text style={styles.moduleTitle}>{meta.title}</Text>
+                <Text style={styles.moduleDescription}>{meta.description}</Text>
+                <View style={styles.moduleFooter}><Text style={styles.openText}>Open</Text><ChevronRight size={16} color="#111111" /></View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Text style={styles.sectionTitle}>At a glance</Text>
+        <View style={styles.glanceCard}>
+          <View style={styles.glanceRow}>
+            <View style={styles.glanceIcon}><CalendarDays size={18} color="#111111" /></View>
+            <View style={styles.glanceCopy}><Text style={styles.glanceLabel}>Next class</Text><Text style={styles.glanceValue}>{nextClass?.subject || 'Nothing scheduled yet'}</Text><Text style={styles.glanceMeta}>{nextClass ? [nextClass.time, nextClass.room].filter(Boolean).join(' • ') : 'Add your classes to see them here.'}</Text></View>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.glanceRow}>
+            <View style={styles.glanceIcon}><ListTodo size={18} color="#111111" /></View>
+            <View style={styles.glanceCopy}><Text style={styles.glanceLabel}>Priority</Text><Text style={styles.glanceValue}>{pendingTasks[0]?.title || 'You are all caught up'}</Text><Text style={styles.glanceMeta}>{pendingTasks.length ? pendingTasks.length + ' task' + (pendingTasks.length === 1 ? '' : 's') + ' pending' : 'Nice work. Keep the momentum going.'}</Text></View>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.glanceRow}>
+            <View style={styles.glanceIcon}><ClipboardList size={18} color="#111111" /></View>
+            <View style={styles.glanceCopy}><Text style={styles.glanceLabel}>Next assignment</Text><Text style={styles.glanceValue}>{pendingAssignments[0]?.title || 'No pending assignments'}</Text><Text style={styles.glanceMeta}>{pendingAssignments[0]?.due || 'Add an assignment to keep submissions visible.'}</Text></View>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.glanceRow}>
+            <View style={styles.glanceIcon}><StickyNote size={18} color="#111111" /></View>
+            <View style={styles.glanceCopy}><Text style={styles.glanceLabel}>Latest note</Text><Text style={styles.glanceValue}>{latestNote?.title || 'No notes yet'}</Text><Text style={styles.glanceMeta}>{latestNote?.body || 'Save a quick study note from the Notes tool.'}</Text></View>
+          </View>
+        </View>
+
+        <View style={styles.futureCard}>
+          <Text style={styles.futureEyebrow}>COMING NEXT</Text>
+          <Text style={styles.futureTitle}>More campus-native tools.</Text>
+          <Text style={styles.futureText}>The Student Hub foundation is now ready for deeper features such as attendance, assignments, events, resources and campus announcements.</Text>
+        </View>
+        <View style={{ height: 35 }} />
+      </ScrollView>
+
+      <Modal visible={Boolean(activeModule)} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setActiveModule(null)}>
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <View style={{ flex: 1 }} />
+            <Text style={styles.modalHeaderTitle}>{activeModule ? moduleMeta[activeModule].title : ''}</Text>
+            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+              <TouchableOpacity style={styles.modalClose} onPress={() => setActiveModule(null)}>
+                <X size={19} color="#111111" />
+              </TouchableOpacity>
+            </View>
+          </View>
+          {renderModuleContent()}
+        </SafeAreaView>
+      </Modal>
+    </SafeAreaView>
+  );
+};
+
+const EmptyState = ({ text }) => (
+  <View style={styles.emptyState}><Check size={18} color="#999990" /><Text style={styles.emptyText}>{text}</Text></View>
+);
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F6F6F2' },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  loadingText: { color: '#777770', fontSize: 12 },
+  header: { minHeight: 68, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E5E5DF' },
+  iconButton: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#F0F0EB', alignItems: 'center', justifyContent: 'center' },
+  headerCopy: { flex: 1, paddingHorizontal: 12 },
+  eyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1.1, color: '#8B8B84' },
+  headerTitle: { fontSize: 20, fontWeight: '900', color: '#111111', marginTop: 1 },
+  headerBadge: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#FFFC00', alignItems: 'center', justifyContent: 'center' },
+  page: { padding: 16 },
+  hero: { backgroundColor: '#111111', borderRadius: 24, padding: 20, marginBottom: 12 },
+  heroBadge: { alignSelf: 'flex-start', paddingHorizontal: 9, paddingVertical: 6, borderRadius: 10, backgroundColor: '#FFFC00', marginBottom: 13 },
+  heroBadgeText: { fontSize: 8, fontWeight: '900', letterSpacing: 0.9, color: '#111111' },
+  heroTitle: { fontSize: 28, lineHeight: 32, fontWeight: '900', color: '#FFFFFF', letterSpacing: -0.8 },
+  heroSubtitle: { fontSize: 12.5, lineHeight: 19, color: '#D2D2CC', marginTop: 8, maxWidth: 330 },
+  statsRow: { flexDirection: 'row', gap: 8, marginBottom: 25 },
+  statCard: { flex: 1, minHeight: 76, borderRadius: 18, padding: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5DF' },
+  statValue: { fontSize: 22, fontWeight: '900', color: '#111111' },
+  statLabel: { fontSize: 10, color: '#777770', marginTop: 4, lineHeight: 13 },
+  sectionTitle: { fontSize: 17, fontWeight: '900', color: '#111111', marginBottom: 10, marginTop: 2 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginBottom: 24 },
+  moduleCard: { width: '48.5%', minHeight: 176, borderRadius: 20, padding: 14, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5DF' },
+  moduleIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#FFFC00', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  moduleTitle: { fontSize: 14, fontWeight: '900', color: '#111111' },
+  moduleDescription: { fontSize: 10.5, lineHeight: 15, color: '#777770', marginTop: 5 },
+  moduleFooter: { marginTop: 'auto', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  openText: { fontSize: 10, fontWeight: '900', color: '#111111' },
+  glanceCard: { backgroundColor: '#FFFFFF', borderRadius: 20, borderWidth: 1, borderColor: '#E5E5DF', paddingHorizontal: 14, marginBottom: 12 },
+  glanceRow: { flexDirection: 'row', paddingVertical: 15, alignItems: 'center' },
+  glanceIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#F0F0EB', alignItems: 'center', justifyContent: 'center', marginRight: 11 },
+  glanceCopy: { flex: 1, minWidth: 0 },
+  glanceLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 0.9, color: '#999990' },
+  glanceValue: { fontSize: 13, fontWeight: '900', color: '#22221F', marginTop: 2 },
+  glanceMeta: { fontSize: 10.5, color: '#777770', marginTop: 2 },
+  divider: { height: 1, backgroundColor: '#EEEEEA' },
+  futureCard: { backgroundColor: '#FFFEE6', borderRadius: 20, borderWidth: 1, borderColor: '#E8E5A8', padding: 16 },
+  futureEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1, color: '#8A8725' },
+  futureTitle: { fontSize: 15, fontWeight: '900', color: '#111111', marginTop: 4 },
+  futureText: { fontSize: 11, lineHeight: 17, color: '#666550', marginTop: 5 },
+  modalContainer: { flex: 1, backgroundColor: '#F6F6F2' },
+  modalHeader: { minHeight: 62, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E5E5DF' },
+  modalHeaderTitle: { fontSize: 16, fontWeight: '900', color: '#111111' },
+  modalClose: { width: 38, height: 38, borderRadius: 13, backgroundColor: '#F0F0EB', alignItems: 'center', justifyContent: 'center' },
+  modalContent: { flex: 1, padding: 16 },
+  modalEyebrow: { fontSize: 9, fontWeight: '900', letterSpacing: 1.1, color: '#8B8B84', marginTop: 4 },
+  modalTitle: { fontSize: 22, lineHeight: 27, fontWeight: '900', color: '#111111', marginTop: 4, marginBottom: 15 },
+  inputRow: { flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 9 },
+  input: { flex: 1, minHeight: 48, borderRadius: 15, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E4E4DE', paddingHorizontal: 13, color: '#111111', fontSize: 13 },
+  inputFull: { minHeight: 48, borderRadius: 15, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E4E4DE', paddingHorizontal: 13, color: '#111111', fontSize: 13, marginBottom: 9 },
+  addButton: { width: 48, height: 48, borderRadius: 15, backgroundColor: '#FFFC00', alignItems: 'center', justifyContent: 'center' },
+  modalList: { flex: 1, marginTop: 8 },
+  modalListContent: { paddingBottom: 25 },
+  listRow: { minHeight: 60, borderRadius: 16, paddingHorizontal: 11, paddingVertical: 9, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5DF', flexDirection: 'row', alignItems: 'center', marginBottom: 7 },
+  checkButton: { width: 32, alignItems: 'center' },
+  listTextWrap: { flex: 1, minWidth: 0, paddingHorizontal: 9 },
+  listText: { flex: 1, fontSize: 13, fontWeight: '800', color: '#22221F', paddingHorizontal: 8 },
+  listTextDone: { textDecorationLine: 'line-through', color: '#999990' },
+  listMeta: { fontSize: 10.5, color: '#777770', marginTop: 3 },
+  scheduleIcon: { width: 35, height: 35, borderRadius: 11, backgroundColor: '#F0F0EB', alignItems: 'center', justifyContent: 'center' },
+  noteRow: { borderRadius: 16, padding: 13, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5DF', flexDirection: 'row', marginBottom: 8 },
+  noteCopy: { flex: 1, paddingRight: 8 },
+  noteTitle: { fontSize: 13, fontWeight: '900', color: '#22221F' },
+  noteBody: { fontSize: 11, lineHeight: 16, color: '#777770', marginTop: 4 },
+  noteInput: { minHeight: 110, paddingTop: 12 },
+  primaryButton: { minHeight: 48, borderRadius: 15, backgroundColor: '#FFFC00', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginBottom: 5 },
+  primaryButtonText: { fontSize: 13, fontWeight: '900', color: '#111111' },
+  twoInputs: { flexDirection: 'row', gap: 8 },
+  halfInput: { flex: 1 },
+  expenseResult: { marginTop: 10, borderRadius: 20, padding: 22, backgroundColor: '#111111', alignItems: 'center' },
+  resultLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 1.1, color: '#BEBEB7' },
+  resultAmount: { fontSize: 38, fontWeight: '900', color: '#FFFFFF', marginTop: 3 },
+  resultMeta: { fontSize: 11, color: '#D2D2CC', marginTop: 4 },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 35, gap: 7 },
+  attendanceRow: { borderRadius: 16, padding: 12, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5DF', marginBottom: 8 },
+  attendanceCopy: { flex: 1 },
+  attendanceTopRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  attendancePercent: { fontSize: 18, fontWeight: '900', color: '#111111' },
+  attendanceHelper: { fontSize: 11, lineHeight: 16, color: '#777770', marginBottom: 12 },
+  attendanceModeRow: { flexDirection: 'row', backgroundColor: '#ECECE7', borderRadius: 14, padding: 3, marginBottom: 10 },
+  modeButton: { flex: 1, minHeight: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  modeButtonActive: { backgroundColor: '#FFFC00' },
+  modeButtonText: { fontSize: 11, fontWeight: '800', color: '#777770' },
+  modeButtonTextActive: { color: '#111111' },
+  attendanceInsightBox: { marginTop: 10, padding: 10, borderRadius: 12, backgroundColor: '#F7F7F2' },
+  insightText: { fontSize: 10.5, lineHeight: 15, color: '#66665F' },
+  attendanceActionText: { fontSize: 10, fontWeight: '900', color: '#111111', marginLeft: 4 },
+  deleteButton: { width: 34, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  progressTrack: { height: 6, borderRadius: 3, backgroundColor: '#EEEEEA', overflow: 'hidden', marginTop: 8 },
+  progressFill: { height: '100%', borderRadius: 3, backgroundColor: '#111111' },
+  attendanceActions: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 10 },
+  attendanceButton: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#FFFC00', alignItems: 'center', justifyContent: 'center' },
+  absentButton: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#F0F0EB', alignItems: 'center', justifyContent: 'center' },
+  emptyText: { fontSize: 11, color: '#999990' },
+});
+
+export default StudentHubScreen;
