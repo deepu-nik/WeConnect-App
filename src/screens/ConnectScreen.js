@@ -13,7 +13,7 @@ import {
 import QRCode from 'react-native-qrcode-svg';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, query, where } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { acceptConnectionRequest, connectUsersViaQr, declineConnectionRequest, sendConnectionRequest, subscribeToConnectionRequests } from '../services/connectionService';
 import { getUserProfile, normalizeUser } from '../services/userService';
@@ -44,12 +44,21 @@ const ConnectScreen = ({ navigation }) => {
   const [qrMode, setQrMode] = useState('my_code');
   const [scanned, setScanned] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
+  const [scannerVisible, setScannerVisible] = useState(false);
   const [locationPreview, setLocationPreview] = useState(null);
+  const [customLocationVisible, setCustomLocationVisible] = useState(false);
+  const [customLocationText, setCustomLocationText] = useState('');
   const [permission, requestPermission] = useCameraPermissions();
 
   useFocusEffect(
     useCallback(() => {
       const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (scannerVisible) {
+          setScannerVisible(false);
+          setScanned(false);
+          setScanSuccess(false);
+          return true;
+        }
         if (qrVisible) {
           setQrVisible(false);
           return true;
@@ -57,26 +66,48 @@ const ConnectScreen = ({ navigation }) => {
         return false;
       });
       return () => subscription.remove();
-    }, [qrVisible])
+    }, [qrVisible, scannerVisible])
   );
 
   useEffect(() => {
     if (!currentUser) return undefined;
-    const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
-      const next = snapshot.docs
-        .filter((item) => item.id !== currentUser.uid)
-        .map((item) => normalizeUser(item.id, item.data()));
-      const me = snapshot.docs.find((item) => item.id === currentUser.uid);
-      if (me?.data()?.location) setMyLocation(me.data().location);
-      if (me?.data()?.locationIcon) setMyLocationIcon(me.data().locationIcon);
-      if (me?.data()?.locationPhoto) setMyLocationPhoto(me.data().locationPhoto);
-      setUsers(next);
-      setLoading(false);
-    }, (error) => {
-      console.error('Users subscription failed:', error);
-      setLoading(false);
-    });
-    return unsubscribe;
+    let unsubscribe = null;
+    let active = true;
+
+    const subscribeToCampusUsers = async () => {
+      try {
+        const meProfile = await getUserProfile(currentUser.uid);
+        if (!meProfile?.collegeId) {
+          if (active) setLoading(false);
+          return;
+        }
+
+        const usersQuery = query(collection(db, 'users'), where('collegeId', '==', meProfile.collegeId));
+        unsubscribe = onSnapshot(usersQuery, (snapshot) => {
+          const next = snapshot.docs
+            .filter((item) => item.id !== currentUser.uid)
+            .map((item) => normalizeUser(item.id, item.data()));
+          const me = snapshot.docs.find((item) => item.id === currentUser.uid);
+          if (me?.data()?.location) setMyLocation(me.data().location);
+          if (me?.data()?.locationIcon) setMyLocationIcon(me.data().locationIcon);
+          if (me?.data()?.locationPhoto) setMyLocationPhoto(me.data().locationPhoto);
+          setUsers(next);
+          setLoading(false);
+        }, (error) => {
+          console.error('Campus users subscription failed:', error);
+          setLoading(false);
+        });
+      } catch (error) {
+        console.error('Could not load campus profile:', error);
+        if (active) setLoading(false);
+      }
+    };
+
+    subscribeToCampusUsers();
+    return () => {
+      active = false;
+      if (unsubscribe) unsubscribe();
+    };
   }, [currentUser]);
 
   useEffect(() => {
@@ -160,14 +191,18 @@ const ConnectScreen = ({ navigation }) => {
   };
 
   const customLocation = () => {
-    if (Platform.OS !== 'ios') {
-      Alert.alert('Custom location', 'Use one of the campus locations for now.');
+    setCustomLocationText(myLocation && !LOCATIONS.some(([name]) => name === myLocation) ? myLocation : '');
+    setCustomLocationVisible(true);
+  };
+
+  const saveCustomLocation = async () => {
+    const value = customLocationText.trim();
+    if (!value) {
+      Alert.alert('Custom location', 'Please enter a location.');
       return;
     }
-    Alert.prompt('Custom Location', 'Where are you?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Update', onPress: (text) => text?.trim() && updateLocation(text.trim(), '📍') },
-    ]);
+    await updateLocation(value, '📍');
+    setCustomLocationVisible(false);
   };
 
   const sendRequest = async (user) => {
@@ -212,21 +247,8 @@ const ConnectScreen = ({ navigation }) => {
 
     setScanned(false);
     setScanSuccess(false);
-
-    try {
-      await CameraView.launchScanner({
-        barcodeTypes: ['qr'],
-        isGuidanceEnabled: true,
-        isHighlightingEnabled: true,
-        isPinchToZoomEnabled: true,
-      });
-    } catch (error) {
-      console.error('Native QR scanner failed:', error);
-      Alert.alert(
-        'Scanner unavailable',
-        error?.message || 'The device QR scanner could not be opened. Please make sure Camera access is enabled for WeConnect.'
-      );
-    }
+    setQrVisible(false);
+    setScannerVisible(true);
   };
 
   const handleScan = useCallback(async ({ data }) => {
@@ -241,7 +263,7 @@ const ConnectScreen = ({ navigation }) => {
       if (profile.uid === currentUser?.uid) throw new Error('You cannot connect with yourself.');
       await connectUsersViaQr(currentUser.uid, profile.uid);
 
-      await CameraView.dismissScanner().catch(() => {});
+      setScannerVisible(false);
       setScanned(false);
       setScanSuccess(false);
       openProfile(navigation, { uid: profile.uid, name: profile.name, avatar: profile.avatar });
@@ -251,14 +273,6 @@ const ConnectScreen = ({ navigation }) => {
       Alert.alert('Scan failed', error?.message === 'User not found' ? 'That QR code does not belong to a WeConnect profile.' : (error?.message || 'Could not connect this profile.'));
     }
   }, [scanned, scanSuccess, currentUser, navigation]);
-
-  useEffect(() => {
-    const subscription = CameraView.onModernBarcodeScanned(({ data }) => {
-      if (!data || scanned || scanSuccess) return;
-      handleScan({ data });
-    });
-    return () => subscription.remove();
-  }, [scanned, scanSuccess, handleScan]);
 
   const shareQr = async () => {
     try {
@@ -329,13 +343,59 @@ const ConnectScreen = ({ navigation }) => {
       </View>
     );
   };
+  if (scannerVisible) {
+    return (
+      <View style={styles.scannerScreen}>
+        <CameraView
+          style={styles.scannerCamera}
+          facing="back"
+          mode="picture"
+          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+          onCameraReady={() => console.log('QR camera preview ready')}
+          onMountError={(error) => {
+            console.error('QR camera mount failed:', error);
+            Alert.alert('Camera unavailable', error?.message || 'Could not start the camera preview.');
+          }}
+          onBarcodeScanned={scanned ? undefined : handleScan}
+        />
+        <SafeAreaView style={styles.scannerOverlay} pointerEvents="box-none">
+          <View style={styles.scannerHeaderOverlay}>
+            <TouchableOpacity
+              onPress={() => {
+                setScannerVisible(false);
+                setScanned(false);
+                setScanSuccess(false);
+              }}
+              accessibilityLabel="Close QR scanner"
+              style={styles.scannerCloseButton}
+            >
+              <X size={28} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={styles.scannerTitleOverlay}>Scan QR Code</Text>
+            <View style={{ width: 44 }} />
+          </View>
+          <View style={styles.scannerGuide} pointerEvents="none">
+            <View style={styles.scannerGuideCorner} />
+            <View style={styles.scannerGuideInner} />
+          </View>
+
+        </SafeAreaView>
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Text style={styles.title}>Connect</Text>
-        <TouchableOpacity style={styles.qrButton} onPress={openScanner}>
-          <ScanLine size={22} color="#111111" />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.qrButton} onPress={openQr} accessibilityLabel="Show my QR code">
+            <QrIcon size={22} color="#111111" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.qrButton} onPress={openScanner} accessibilityLabel="Scan QR code">
+            <ScanLine size={22} color="#111111" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <Text style={styles.sectionLabel}>WHERE ARE YOU?</Text>
@@ -389,6 +449,26 @@ const ConnectScreen = ({ navigation }) => {
           </View>
         </View>
       ) : null}
+
+      <Modal visible={customLocationVisible} transparent animationType="fade" onRequestClose={() => setCustomLocationVisible(false)}>
+        <View style={styles.customLocationOverlay}>
+          <View style={styles.customLocationCard}>
+            <View style={styles.customLocationHeader}>
+              <View>
+                <Text style={styles.customLocationTitle}>Set custom location</Text>
+                <Text style={styles.customLocationHint}>Tell your campus where you are.</Text>
+              </View>
+              <TouchableOpacity onPress={() => setCustomLocationVisible(false)}>
+                <X size={20} color="#111111" />
+              </TouchableOpacity>
+            </View>
+            <TextInput autoFocus value={customLocationText} onChangeText={setCustomLocationText} placeholder="e.g. Block A, Room 204" placeholderTextColor="#999999" style={styles.customLocationInput} maxLength={60} returnKeyType="done" onSubmitEditing={saveCustomLocation} />
+            <TouchableOpacity style={styles.customLocationSave} onPress={saveCustomLocation}>
+              <Text style={styles.customLocationSaveText}>Save location</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <View style={styles.search}>
         <Search size={18} color="#888" />
@@ -445,6 +525,8 @@ const ConnectScreen = ({ navigation }) => {
         </View>
       </Modal>
 
+
+
       <Modal
         visible={qrVisible}
         animationType="slide"
@@ -461,7 +543,7 @@ const ConnectScreen = ({ navigation }) => {
           <View style={styles.qrCard}>
             <Image source={{ uri: currentUser?.photoURL || 'https://via.placeholder.com/150' }} style={styles.qrAvatar} />
             <Text style={styles.qrName}>{currentUser?.displayName || 'Student'}</Text>
-            <QRCode value={currentUser?.uid || 'weconnect'} size={190} />
+            <QRCode value={currentUser?.uid ? 'weconnect://profile/' + currentUser.uid : 'weconnect'} size={190} backgroundColor="#FFFFFF" color="#111111" />
             <Text style={styles.qrHint}>Let a classmate scan this code to open your profile.</Text>
             <TouchableOpacity style={styles.nativeScannerButton} onPress={openScanner} activeOpacity={0.85}>
               <ScanLine size={19} color="#111111" />
@@ -477,11 +559,21 @@ const ConnectScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 10, paddingBottom: 15 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: { fontSize: 28, fontWeight: '800', color: '#111111' },
+  qrActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   qrButton: { backgroundColor: '#F0F0EC', padding: 9, borderRadius: 12 },
   sectionLabel: { fontSize: 12, fontWeight: '800', color: '#999999', paddingHorizontal: 20, marginBottom: 8 },
   locationViewport: { height: 92, flexGrow: 0, flexShrink: 0, width: '100%' },
   locationRow: { paddingHorizontal: 15, alignItems: 'flex-start', height: 92, gap: 8 },
+  customLocationOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  customLocationCard: { width: '100%', borderRadius: 22, backgroundColor: '#FFFFFF', padding: 18 },
+  customLocationHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15 },
+  customLocationTitle: { fontSize: 18, fontWeight: '900', color: '#111111' },
+  customLocationHint: { marginTop: 3, fontSize: 11, color: '#777770' },
+  customLocationInput: { minHeight: 50, borderRadius: 14, borderWidth: 1, borderColor: '#E4E4DE', backgroundColor: '#F7F7F5', paddingHorizontal: 14, color: '#111111', fontSize: 14 },
+  customLocationSave: { marginTop: 12, minHeight: 48, borderRadius: 15, backgroundColor: '#FFFC00', alignItems: 'center', justifyContent: 'center' },
+  customLocationSaveText: { color: '#111111', fontSize: 13, fontWeight: '900' },
   search: { margin: 15, marginTop: 5, height: 46, borderWidth: 1, borderColor: '#E8E8E3', borderRadius: 12, backgroundColor: '#F7F7F5', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, color: '#111111', fontSize: 15 },
   tabs: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: '#F0F0EC', borderRadius: 12, padding: 4, marginBottom: 10 },
@@ -537,6 +629,77 @@ const styles = StyleSheet.create({
   locationModalImage: { width: '100%', height: 300, backgroundColor: '#F0F0EC' },
   locationModalEmpty: { height: 260, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F7F7F5' },
   locationModalEmptyText: { color: '#707070', marginTop: 10 },
+  scannerScreen: { flex: 1, backgroundColor: '#000', position: 'relative' },
+  scannerCamera: { flex: 1 },
+  scannerOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'space-between' },
+  scannerHeaderOverlay: {
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 18,
+    minHeight: 92,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0,0,0,0.42)',
+  },
+  scannerCloseButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.42)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  scannerTitleOverlay: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  scannerGuide: {
+    position: 'absolute',
+    width: 270,
+    height: 270,
+    alignSelf: 'center',
+    top: '50%',
+    marginTop: -145,
+    borderRadius: 28,
+  },
+  scannerGuideCorner: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 2,
+    borderColor: '#FFFC00',
+    borderRadius: 28,
+  },
+  scannerGuideInner: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 27,
+    margin: 10,
+  },
+  scannerHeader: { height: 64, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff' },
+  scannerTitle: { fontSize: 18, fontWeight: '900', color: '#111111' },
+  scannerCameraWrap: { flex: 1, position: 'relative', overflow: 'hidden', backgroundColor: '#000' },
+  scannerFrame: { position: 'absolute', left: '15%', right: '15%', top: '28%', aspectRatio: 1, borderWidth: 2, borderColor: '#FFFC00', borderRadius: 24 },
+  scannerCorner: { position: 'absolute', width: 28, height: 28, borderLeftWidth: 4, borderTopWidth: 4, borderColor: '#FFFC00', top: -2, left: -2, borderTopLeftRadius: 12 },
+  scannerHintPill: {
+    position: 'absolute',
+    bottom: 34,
+    left: 28,
+    right: 28,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.68)',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  scannerHintTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '800', marginBottom: 3 },
+  scannerHintText: { color: 'rgba(255,255,255,0.78)', fontSize: 11, fontWeight: '600', textAlign: 'center' },
   qrModal: { flex: 1, backgroundColor: '#F7F7F5' },
   qrHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18, backgroundColor: '#fff' },
   qrTitle: { fontSize: 18, fontWeight: '800', color: '#111111' },

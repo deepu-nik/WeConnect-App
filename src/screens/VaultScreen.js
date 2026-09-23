@@ -12,7 +12,7 @@ import {
   Folder, UploadCloud, Link as LinkIcon, ChevronLeft, 
   X, Edit2, Trash2, FolderPlus, Key, ThumbsUp, CheckCircle 
 } from 'lucide-react-native';
-import * as DocumentPicker from 'expo-document-picker';
+import { File } from 'expo-file-system';
 
 // Using the legacy import to prevent Expo SDK 54 deprecation crashes
 import * as FileSystem from 'expo-file-system/legacy'; 
@@ -22,6 +22,7 @@ import * as Sharing from 'expo-sharing';
 import { auth, db } from '../config/firebase';
 import { collection, query, where, addDoc, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
+import { getUserProfile } from '../services/userService';
 
 const VaultScreen = ({ navigation }) => {
   const currentUser = auth.currentUser;
@@ -75,16 +76,38 @@ const VaultScreen = ({ navigation }) => {
   useEffect(() => {
     if (!currentUser) return;
     
-    const q = query(collection(db, 'vaults'), where('members', 'array-contains', currentUser.uid));
+    const loadVaults = async () => {
+      const profile = await getUserProfile(currentUser.uid);
+      if (!profile?.collegeId) {
+        setVaults([]);
+        setLoading(false);
+        return;
+      }
+
+      const q = query(
+        collection(db, 'vaults'),
+        where('collegeId', '==', profile.collegeId),
+        where('members', 'array-contains', currentUser.uid)
+      );
     
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedVaults = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       fetchedVaults.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
       setVaults(fetchedVaults);
       setLoading(false);
     });
 
-    return () => unsubscribe();
+      return unsubscribe;
+    };
+
+    let unsubscribe;
+    loadVaults().then((cleanup) => { unsubscribe = cleanup; }).catch((error) => {
+      console.error('Vault subscription failed:', error);
+      setVaults([]);
+      setLoading(false);
+    });
+
+    return () => { if (unsubscribe) unsubscribe(); };
   }, [currentUser]);
 
   // --- 2. FETCH FILES WHEN INSIDE A VAULT ---
@@ -127,7 +150,10 @@ const VaultScreen = ({ navigation }) => {
   const createVault = async () => {
     if (!newVaultName.trim()) return;
     try {
+      const profile = await getUserProfile(currentUser.uid);
+      if (!profile?.collegeId) throw new Error('Your campus profile is incomplete.');
       await addDoc(collection(db, 'vaults'), {
+        collegeId: profile.collegeId,
         name: newVaultName.trim(),
         description: newVaultDesc.trim() || (activeTab === 'shared' ? 'Shared Study Material' : 'Private Storage'),
         type: activeTab,
@@ -255,13 +281,17 @@ const VaultScreen = ({ navigation }) => {
   const handleUploadFile = async () => {
     if (!currentVault) return;
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: '*/*' });
-      if (result.canceled || !result.assets || result.assets.length === 0) return;
+      const result = await File.pickFileAsync({
+        multipleFiles: false,
+        mimeTypes: ['*/*'],
+      });
+      if (result.canceled || !result.result) return;
 
-      const file = result.assets[0];
+      const file = Array.isArray(result.result) ? result.result[0] : result.result;
+      if (!file) return;
       setIsUploading(true);
 
-      const secureUrl = await uploadToCloudinary(file.uri, 'auto'); 
+      const secureUrl = await uploadToCloudinary(file, 'auto'); 
       
       if (!secureUrl) {
         setIsUploading(false);
@@ -336,7 +366,7 @@ const VaultScreen = ({ navigation }) => {
     return (
       <TouchableOpacity style={styles.listItem} activeOpacity={0.7} onPress={() => openVault(item)}>
         <View style={[styles.iconBox, { backgroundColor: item.type === 'shared' ? '#E6F4FE' : '#F4E8FA' }]}>
-          {item.type === 'shared' ? <Users size={24} color="#111111" /> : <Lock size={24} color="#AF52DE" />}
+          {item.type === 'shared' ? <Users size={24} color="#111111" /> : <Lock size={24} color="#111111" />}
         </View>
         <View style={styles.itemDetails}>
           <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
@@ -452,11 +482,11 @@ const VaultScreen = ({ navigation }) => {
       {!currentVault && (
         <View style={styles.tabContainer}>
           <TouchableOpacity style={[styles.tabBtn, activeTab === 'shared' && styles.activeTabBtn]} onPress={() => handleTabSwitch('shared')}>
-            <Users size={18} color={activeTab === 'shared' ? '#fff' : '#707070'} />
+            <Users size={18} color="#111111" />
             <Text style={[styles.tabText, activeTab === 'shared' && styles.activeTabText]}>Class Vaults</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.tabBtn, activeTab === 'private' && styles.activeTabBtn]} onPress={() => handleTabSwitch('private')}>
-            <Lock size={18} color={activeTab === 'private' ? '#fff' : '#707070'} />
+            <Lock size={18} color="#111111" />
             <Text style={[styles.tabText, activeTab === 'private' && styles.activeTabText]}>My Private Vault</Text>
           </TouchableOpacity>
         </View>
@@ -488,7 +518,7 @@ const VaultScreen = ({ navigation }) => {
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
               <View style={styles.emptyState}>
-                <FileText size={48} color="#cbd5e1" />
+                <FileText size={48} color="#111111" />
                 <Text style={styles.emptyStateText}>No files uploaded yet</Text>
                 <Text style={styles.emptyStateSub}>Tap + to upload material</Text>
               </View>
@@ -502,7 +532,7 @@ const VaultScreen = ({ navigation }) => {
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
               <View style={styles.emptyState}>
-                <Folder size={48} color="#cbd5e1" />
+                <Folder size={48} color="#111111" />
                 <Text style={styles.emptyStateText}>No {activeTab} vaults found</Text>
                 <Text style={styles.emptyStateSub}>Create one or join via invite code!</Text>
               </View>

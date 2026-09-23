@@ -1,7 +1,9 @@
 import {
   addDoc,
+  setDoc,
   collection,
   doc,
+  getDoc,
   getDocs,
   query,
   serverTimestamp,
@@ -9,23 +11,47 @@ import {
   where,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { getUserProfile } from './userService';
+import { assertCanMessage } from './connectionService';
 
 export const findDirectChat = async (currentUid, otherUid) => {
   if (!currentUid || !otherUid) return null;
+  const currentProfile = await getUserProfile(currentUid);
+  if (!currentProfile?.collegeId) return null;
   const snapshot = await getDocs(
-    query(collection(db, 'chats'), where('participants', 'array-contains', currentUid))
+    query(
+      collection(db, 'chats'),
+      where('collegeId', '==', currentProfile.collegeId),
+      where('participants', 'array-contains', currentUid)
+    )
   );
-  const existing = snapshot.docs.find((item) =>
-    Array.isArray(item.data().participants) && item.data().participants.includes(otherUid)
-  );
+  const existing = snapshot.docs.find((item) => {
+    const data = item.data() || {};
+    const participants = Array.isArray(data.participants) ? data.participants : [];
+    return data.type !== 'group' && participants.length === 2 && participants.includes(otherUid);
+  });
   return existing ? { id: existing.id, ...existing.data() } : null;
 };
 
 export const createDirectChat = async ({ currentUser, otherUser, otherUserId }) => {
+  const [currentProfile, otherProfile] = await Promise.all([
+    getUserProfile(currentUser.uid),
+    getUserProfile(otherUserId),
+  ]);
+  if (!currentProfile?.collegeId || !otherProfile?.collegeId || currentProfile.collegeId !== otherProfile.collegeId) {
+    throw new Error('Messaging is currently limited to students from your campus.');
+  }
+  await assertCanMessage(currentUser.uid, otherUserId);
+
+  const chatId = [currentUser.uid, otherUserId].sort().join('_');
+  const deterministic = await getDoc(doc(db, 'chats', chatId));
+  if (deterministic.exists()) return deterministic.id;
+
   const existing = await findDirectChat(currentUser.uid, otherUserId);
   if (existing) return existing.id;
-
-  const chat = await addDoc(collection(db, 'chats'), {
+  const chatData = {
+    type: 'direct',
+    collegeId: currentProfile.collegeId,
     participants: [currentUser.uid, otherUserId],
     updatedAt: serverTimestamp(),
     lastMessage: '',
@@ -41,9 +67,9 @@ export const createDirectChat = async ({ currentUser, otherUser, otherUserId }) 
         avatar: otherUser.avatar || null,
       },
     },
-  });
-
-  return chat.id;
+  };
+  await setDoc(doc(db, 'chats', chatId), chatData, { merge: true });
+  return chatId;
 };
 
 export const markChatRead = async (chatId, uid) => {

@@ -1,19 +1,44 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BackHandler } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
 // Import screens
 import ChatsScreen from '../screens/ChatsScreen';
 import ConnectScreen from '../screens/ConnectScreen';
-import ProfileScreen from '../screens/ProfileScreen';
+import ProfileScreenNew from '../screens/ProfileScreenNew';
 import UpdatesScreen from '../screens/UpdatesScreen';
 import VaultScreen from '../screens/VaultScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
-const Tabs = () => (
+const Tabs = () => {
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    const handleHardwareBack = () => {
+      const state = navigation.getState();
+      const tabsRoute = state?.routes?.find((route) => route.name === 'Tabs');
+      const tabState = tabsRoute?.state;
+      const activeTab = tabState?.routes?.[tabState.index ?? 0]?.name;
+
+      if (activeTab && activeTab !== 'Chats') {
+        navigation.navigate('Tabs', { screen: 'Chats' });
+        return true;
+      }
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', handleHardwareBack);
+    return () => subscription.remove();
+  }, [navigation]);
+
+  return (
   <Tab.Navigator
     initialRouteName="Chats"
     backBehavior="none"
@@ -30,7 +55,7 @@ const Tabs = () => (
       },
       tabBarActiveTintColor: '#111111',
       tabBarInactiveTintColor: '#8A8A8A',
-      tabBarStyle: { height: 66, paddingBottom: 10, paddingTop: 6, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E8E8E3', elevation: 0 },
+      tabBarStyle: { height: 66 + insets.bottom, paddingBottom: 10 + insets.bottom, paddingTop: 6, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E8E8E3', elevation: 0 },
       tabBarLabelStyle: { fontSize: 10, fontWeight: '800' },
     })}
   >
@@ -38,9 +63,10 @@ const Tabs = () => (
     <Tab.Screen name="Vault" component={VaultScreen} options={{ title: 'Vault' }} />
     <Tab.Screen name="Updates" component={UpdatesScreen} options={{ title: 'Updates' }} />
     <Tab.Screen name="Connect" component={ConnectScreen} options={{ title: 'Connect' }} />
-    <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
+    <Tab.Screen name="Profile" component={ProfileScreenNew} options={{ title: 'Profile' }} />
   </Tab.Navigator>
-);
+  );
+};
 
 const MainTabNavigator = () => (
   <Stack.Navigator
@@ -50,7 +76,7 @@ const MainTabNavigator = () => (
     <Stack.Screen name="Tabs" component={Tabs} />
     <Stack.Screen
       name="ProfileDetails"
-      component={ProfileScreen}
+      component={ProfileScreenNew}
       options={{
         presentation: 'card',
         animation: 'slide_from_right',

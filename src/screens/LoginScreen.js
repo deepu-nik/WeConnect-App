@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   KeyboardAvoidingView, Platform, ActivityIndicator,
-  TouchableWithoutFeedback, Keyboard, StatusBar,
+  TouchableWithoutFeedback, Keyboard, StatusBar, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react-native';
@@ -94,6 +94,17 @@ const LoginScreen = ({ navigation }) => {
             <TouchableOpacity style={[styles.loginBtn, loading && styles.disabledBtn]} onPress={handleLogin} disabled={loading}>
               {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.loginBtnText}>Log In</Text>}
             </TouchableOpacity>
+
+            <TouchableOpacity style={styles.forgotBtn} onPress={() => navigation.navigate('ForgotPassword')}>
+              <Text style={styles.forgotText}>Forgot Password?</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.forgotBtn} onPress={() => Alert.alert(
+              'Forgot your username?',
+              'Your username is not required to sign in. Use your registered student email to log in. Once you are signed in, your username is visible on your Profile.'
+            )}>
+              <Text style={styles.forgotText}>Forgot Username?</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.footerContainer}>
@@ -125,7 +136,9 @@ const styles = StyleSheet.create({
   loginBtn: { height: 54, borderRadius: 14, backgroundColor: '#007AFF', alignItems: 'center', justifyContent: 'center', marginTop: 6 },
   disabledBtn: { opacity: 0.7 },
   loginBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  footerContainer: { flexDirection: 'row', justifyContent: 'center', marginTop: 30 },
+  forgotBtn: { alignItems: 'center', paddingVertical: 12 },
+  forgotText: { color: '#007AFF', fontWeight: '700' },
+  footerContainer: { flexDirection: 'row', justifyContent: 'center', marginTop: 18 },
   footerText: { color: '#64748b' },
   registerLink: { color: '#007AFF', fontWeight: '800' },
 });

@@ -12,9 +12,19 @@ import {
   where,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { getUserProfile } from './userService';
+import { isBlockedBetween } from './safetyService';
 
 export const sendConnectionRequest = async ({ sender, receiver }) => {
   if (!sender?.uid || !receiver?.uid || sender.uid === receiver.uid) return;
+  if (await isBlockedBetween(receiver.uid)) throw new Error('You cannot connect with a blocked account.');
+  const [senderProfile, receiverProfile] = await Promise.all([
+    getUserProfile(sender.uid),
+    getUserProfile(receiver.uid),
+  ]);
+  if (!senderProfile?.collegeId || !receiverProfile?.collegeId || senderProfile.collegeId !== receiverProfile.collegeId) {
+    throw new Error('You can only connect with students from your campus.');
+  }
 
   const request = {
     senderId: sender.uid,
@@ -66,6 +76,14 @@ export const declineConnectionRequest = async (request) => {
 
 export const connectUsersViaQr = async (currentUid, otherUid) => {
   if (!currentUid || !otherUid || currentUid === otherUid) throw new Error('Invalid QR profile.');
+  if (await isBlockedBetween(otherUid)) throw new Error('You cannot connect with a blocked account.');
+  const [currentProfile, otherProfile] = await Promise.all([
+    getUserProfile(currentUid),
+    getUserProfile(otherUid),
+  ]);
+  if (!currentProfile?.collegeId || !otherProfile?.collegeId || currentProfile.collegeId !== otherProfile.collegeId) {
+    throw new Error('You can only connect with students from your campus.');
+  }
   const batch = writeBatch(db);
   batch.update(doc(db, 'users', currentUid), { connections: arrayUnion(otherUid) });
   batch.update(doc(db, 'users', otherUid), { connections: arrayUnion(currentUid) });
@@ -79,4 +97,32 @@ export const subscribeToConnectionRequests = (uid, callback) => {
       .map((item) => ({ id: item.id, ...item.data() }))
       .filter((item) => item.status === 'pending'));
   });
+};
+
+
+export const areConnected = async (currentUid, otherUid) => {
+  if (!currentUid || !otherUid || currentUid === otherUid) return false;
+  const [currentProfile, otherProfile] = await Promise.all([
+    getUserProfile(currentUid),
+    getUserProfile(otherUid),
+  ]);
+  return Boolean(
+    currentProfile?.collegeId &&
+    otherProfile?.collegeId &&
+    currentProfile.collegeId === otherProfile.collegeId &&
+    Array.isArray(currentProfile.connections) &&
+    currentProfile.connections.includes(otherUid) &&
+    Array.isArray(otherProfile.connections) &&
+    otherProfile.connections.includes(currentUid)
+  );
+};
+
+export const assertCanMessage = async (currentUid, otherUid) => {
+  if (await isBlockedBetween(otherUid)) {
+    throw new Error('Messaging is unavailable because this account is blocked.');
+  }
+  if (!(await areConnected(currentUid, otherUid))) {
+    throw new Error('You can message this student after you connect with each other.');
+  }
+  return true;
 };

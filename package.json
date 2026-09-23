@@ -7,7 +7,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "test:rules": "node --test tests/firestore.rules.expanded.test.js"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -53,14 +54,18 @@
     "react-native-screens": "~4.26.0",
     "react-native-svg": "15.15.4",
     "react-native-web": "~0.21.0",
-    "react-native-worklets": "0.10.1"
+    "react-native-worklets": "0.10.1",
+    "expo-video": "~57.0.4",
+    "expo-notifications": "~57.0.20",
+    "react-native-keyboard-controller": "1.21.11"
   },
   "devDependencies": {
     "@expo/ngrok": "^4.1.3",
     "@types/react": "~19.2.4",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~57.0.2",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "@firebase/rules-unit-testing": "^5.0.2"
   },
   "private": true
 }

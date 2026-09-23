@@ -1,34 +1,127 @@
-import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query, serverTimestamp, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, orderBy, query, serverTimestamp, updateDoc, arrayUnion, getDoc, where } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
+import { getUserProfile } from './userService';
+import { createDirectChat } from './chatService';
+import { sendChatMessage } from './chatMessageService';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { File } from 'expo-file-system';
 
 const STORY_LIFETIME_MS = 24 * 60 * 60 * 1000;
+const MAX_STORY_VIDEO_DURATION_MS = 15 * 1000;
+const MAX_STORY_VIDEO_BYTES = 10 * 1024 * 1024;
+const MAX_STORY_IMAGE_BYTES = 3 * 1024 * 1024;
 
 export const subscribeToStories = (onStories, onError) => {
-  const q = query(collection(db, 'stories'), orderBy('createdAt', 'desc'));
-  return onSnapshot(q, (snapshot) => {
-    const cutoff = Date.now() - STORY_LIFETIME_MS;
-    const stories = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((story) => {
-      const created = story.createdAt?.toDate ? story.createdAt.toDate().getTime() : new Date(story.createdAt || 0).getTime();
-      return created >= cutoff;
-    });
-    onStories(stories);
-  }, onError);
+  let unsubscribe = null;
+  let active = true;
+
+  const subscribe = async () => {
+    try {
+      const profile = await getUserProfile(auth.currentUser?.uid);
+      if (!profile?.collegeId) {
+        if (active) onStories([]);
+        return;
+      }
+
+      const q = query(
+        collection(db, 'stories'),
+        where('collegeId', '==', profile.collegeId),
+        where('audience', 'array-contains', auth.currentUser.uid)
+      );
+      unsubscribe = onSnapshot(q, (snapshot) => {
+        const now = Date.now();
+        const stories = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((story) => story.collegeId === profile.collegeId).filter((story) => {
+          const expires = story.expiresAt?.toDate ? story.expiresAt.toDate().getTime() : new Date(story.expiresAt || 0).getTime();
+          return expires > now;
+        });
+        stories.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+        onStories(stories);
+      }, onError);
+    } catch (error) {
+      if (active && onError) onError(error);
+    }
+  };
+
+  subscribe();
+  return () => {
+    active = false;
+    if (unsubscribe) unsubscribe();
+  };
 };
 
-export const createStory = async ({ uri, type = 'image', caption = '' }) => {
+const prepareStoryImage = async (uri) => {
+  const result = await ImageManipulator.manipulateAsync(
+    uri,
+    [{ resize: { width: 1080 } }],
+    { compress: 0.78, format: ImageManipulator.SaveFormat.JPEG }
+  );
+  return result.uri;
+};
+
+const validateFileSize = async (uri, maxBytes, label) => {
+  const file = new File(uri);
+  if (typeof file.size === 'number' && file.size > maxBytes) {
+    throw new Error(`${label} is too large. Please choose a smaller file.`);
+  }
+};
+
+export const createStory = async ({ uri, type = 'image', caption = '', duration = null, editor = null }) => {
   if (!auth.currentUser?.uid) throw new Error('You must be signed in.');
-  const mediaUrl = await uploadToCloudinary(uri, type);
-  if (!mediaUrl) throw new Error('Story upload failed.');
-  return addDoc(collection(db, 'stories'), {
-    userId: auth.currentUser.uid,
-    userName: auth.currentUser.displayName || 'Student',
-    userAvatar: auth.currentUser.photoURL || null,
-    mediaUrl, mediaType: type, caption: caption.trim(),
-    createdAt: serverTimestamp(),
-    expiresAt: new Date(Date.now() + STORY_LIFETIME_MS),
-    viewers: [], reactions: {},
-  });
+  if (!uri) throw new Error('Choose a photo or video first.');
+
+  const profile = await getUserProfile(auth.currentUser.uid);
+  if (!profile?.collegeId) throw new Error('Your campus profile is incomplete.');
+
+  let uploadUri = uri;
+  if (type === 'image') {
+    uploadUri = await prepareStoryImage(uri);
+    await validateFileSize(uploadUri, MAX_STORY_IMAGE_BYTES, 'Photo');
+  } else {
+    if (duration && duration > MAX_STORY_VIDEO_DURATION_MS) {
+      throw new Error('Story videos must be 15 seconds or shorter.');
+    }
+    await validateFileSize(uri, MAX_STORY_VIDEO_BYTES, 'Video');
+  }
+
+  const media = await uploadToCloudinary(uploadUri, type, { returnMetadata: true });
+  if (!media?.secureUrl || !media.publicId) throw new Error('Story upload failed.');
+
+  try {
+    return await addDoc(collection(db, 'stories'), {
+      collegeId: profile.collegeId,
+      userId: auth.currentUser.uid,
+      userName: auth.currentUser.displayName || 'Student',
+      userAvatar: auth.currentUser.photoURL || null,
+      mediaUrl: media.secureUrl,
+      mediaType: type,
+      cloudinaryPublicId: media.publicId,
+      cloudinaryResourceType: media.resourceType,
+      cloudinaryFormat: media.format,
+      mediaBytes: media.bytes,
+      mediaDuration: media.duration || (duration ? duration / 1000 : null),
+      mediaWidth: media.width || null,
+      mediaHeight: media.height || null,
+      caption: caption.trim(),
+      editor: editor ? {
+        text: String(editor.text || '').slice(0, 180),
+        textColor: editor.textColor || '#FFFFFF',
+        textSize: Number(editor.textSize) || 26,
+        textAlign: editor.textAlign || 'center',
+        textPosition: editor.textPosition || 'middle',
+        sticker: String(editor.sticker || '').slice(0, 4),
+        filter: editor.filter || 'none',
+      } : null,
+      createdAt: serverTimestamp(),
+      expiresAt: new Date(Date.now() + STORY_LIFETIME_MS),
+      viewers: [],
+      reactions: {},
+      audience: Array.from(new Set([auth.currentUser.uid, ...(profile.connections || [])])),
+    });
+  } catch (error) {
+    console.error('Story metadata save failed after media upload:', error);
+    throw new Error('Story could not be published. Please try again.');
+  }
 };
 
 export const markStoryViewed = async (storyId, uid = auth.currentUser?.uid) => {
@@ -41,15 +134,51 @@ export const deleteStory = async (storyId) => {
 };
 
 export const getActiveStories = async () => {
-  const snapshot = await getDocs(collection(db, 'stories'));
-  const cutoff = Date.now() - STORY_LIFETIME_MS;
-  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((story) => {
-    const created = story.createdAt?.toDate ? story.createdAt.toDate().getTime() : new Date(story.createdAt || 0).getTime();
-    return created >= cutoff;
+  const profile = await getUserProfile(auth.currentUser?.uid);
+  if (!profile?.collegeId) return [];
+  const snapshot = await getDocs(query(
+    collection(db, 'stories'),
+    where('collegeId', '==', profile.collegeId),
+    where('audience', 'array-contains', auth.currentUser.uid)
+  ));
+  const now = Date.now();
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((story) => story.collegeId === profile.collegeId).filter((story) => {
+    const expires = story.expiresAt?.toDate ? story.expiresAt.toDate().getTime() : new Date(story.expiresAt || 0).getTime();
+    return expires > now;
   });
 };
-export const reactToStory = async (storyId, emoji) => {
+
+const sendStoryInteractionToChat = async ({ story, kind, emoji, text }) => {
+  const viewer = auth.currentUser;
+  if (!viewer?.uid || !story?.userId || viewer.uid === story.userId) return;
+  const chatId = await createDirectChat({
+    currentUser: viewer,
+    otherUserId: story.userId,
+    otherUser: { name: story.userName || 'Student', avatar: story.userAvatar || null },
+  });
+  const id = `story-${story.id}-${kind}-${viewer.uid}-${Date.now()}`;
+  const messageText = kind === 'reaction' ? `${emoji} reacted to your story` : text.trim();
+  await sendChatMessage({
+    chatId,
+    message: {
+      id,
+      text: messageText,
+      storyContext: {
+        type: kind,
+        storyId: story.id,
+        mediaUrl: story.mediaUrl || null,
+        caption: story.caption || '',
+        reaction: kind === 'reaction' ? emoji : null,
+        senderId: viewer.uid,
+      },
+    },
+  });
+};
+
+export const reactToStory = async (storyOrId, emoji) => {
   const uid = auth.currentUser?.uid;
+  const storyId = typeof storyOrId === 'string' ? storyOrId : storyOrId?.id;
+  const story = typeof storyOrId === 'object' ? storyOrId : null;
   if (!storyId || !uid || !emoji) return;
   const ref = doc(db, 'stories', storyId);
   const snapshot = await getDoc(ref);
@@ -59,17 +188,28 @@ export const reactToStory = async (storyId, emoji) => {
   reactions[emoji] = users.includes(uid) ? users.filter((id) => id !== uid) : [...users, uid];
   if (!reactions[emoji].length) delete reactions[emoji];
   await updateDoc(ref, { reactions });
+  if (story && !users.includes(uid)) await sendStoryInteractionToChat({ story, kind: 'reaction', emoji });
 };
 
-export const replyToStory = async (storyId, text) => {
+export const replyToStory = async (story, text) => {
   const uid = auth.currentUser?.uid;
+  const storyId = typeof story === 'string' ? story : story?.id;
   if (!storyId || !uid || !text?.trim()) return;
-  return addDoc(collection(db, 'stories', storyId, 'replies'), {
+  const reply = await addDoc(collection(db, 'stories', storyId, 'replies'), {
     senderId: uid,
     senderName: auth.currentUser.displayName || 'Student',
     text: text.trim(),
     createdAt: serverTimestamp(),
   });
+  if (typeof story === 'object') await sendStoryInteractionToChat({ story, kind: 'reply', text });
+  return reply;
+};
+
+export const subscribeToStory = (storyId, onStory, onError) => {
+  if (!storyId) return () => {};
+  return onSnapshot(doc(db, 'stories', storyId), (snapshot) => {
+    if (snapshot.exists()) onStory({ id: snapshot.id, ...snapshot.data() });
+  }, onError);
 };
 
 export const subscribeToStoryReplies = (storyId, onReplies, onError) => {

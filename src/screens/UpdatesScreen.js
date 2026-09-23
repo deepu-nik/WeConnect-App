@@ -15,9 +15,10 @@ import * as ImagePicker from 'expo-image-picker';
 
 // Firebase & Utils
 import { auth, db } from '../config/firebase';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, arrayRemove, orderBy, increment } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, doc, updateDoc, arrayUnion, arrayRemove, orderBy, increment, where } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import MediaShareSheet from '../components/MediaShareSheet';
+import { getUserProfile } from '../services/userService';
 import StoriesStrip from '../components/StoriesStrip';
 
 const { width } = Dimensions.get('window');
@@ -52,27 +53,55 @@ const UpdatesScreen = ({ navigation }) => {
 
   // --- ⏳ FETCH POSTS (WITH 48-HOUR AUTO-HIDE LOGIC) ---
   useEffect(() => {
-    const q = query(collection(db, 'buzz_posts'), orderBy('createdAt', 'desc'));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const now = Date.now();
-      const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000;
-      const cutoffTime = now - FORTY_EIGHT_HOURS_MS;
+    let unsubscribe = null;
+    let active = true;
 
-      const fetchedPosts = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter(post => {
-          if (!post.createdAt) return true;
-          const postTime = post.createdAt.toMillis ? post.createdAt.toMillis() : post.createdAt.toDate().getTime();
-          return postTime > cutoffTime;
+    const subscribeToCampusPosts = async () => {
+      if (!currentUser?.uid) return;
+      try {
+        const profile = await getUserProfile(currentUser.uid);
+        if (!active || !profile?.collegeId) {
+          if (active) setLoading(false);
+          return;
+        }
+
+        const q = query(
+          collection(db, 'buzz_posts'),
+          where('collegeId', '==', profile.collegeId)
+        );
+
+        unsubscribe = onSnapshot(q, (snapshot) => {
+          const now = Date.now();
+          const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000;
+          const cutoffTime = now - FORTY_EIGHT_HOURS_MS;
+
+          const fetchedPosts = snapshot.docs
+            .map(postDoc => ({ id: postDoc.id, ...postDoc.data() }))
+            .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))
+            .filter(post => {
+              if (!post.createdAt) return true;
+              const postTime = post.createdAt.toMillis ? post.createdAt.toMillis() : post.createdAt.toDate().getTime();
+              return postTime > cutoffTime;
+            });
+
+          setPosts(fetchedPosts);
+          setLoading(false);
+        }, (error) => {
+          console.error('Campus posts subscription failed:', error);
+          setLoading(false);
         });
-      
-      setPosts(fetchedPosts);
-      setLoading(false);
-    });
+      } catch (error) {
+        console.error('Could not load campus profile:', error);
+        if (active) setLoading(false);
+      }
+    };
 
-    return () => unsubscribe();
-  }, []);
+    subscribeToCampusPosts();
+    return () => {
+      active = false;
+      if (unsubscribe) unsubscribe();
+    };
+  }, [currentUser?.uid]);
 
   // --- FETCH COMMENTS REAL-TIME ---
   useEffect(() => {
@@ -122,6 +151,8 @@ const UpdatesScreen = ({ navigation }) => {
       }
 
       const newPost = {
+        collegeId: (await getUserProfile(currentUser.uid))?.collegeId || 'dypiu',
+        authorId: currentUser.uid,
         type: postType,
         createdAt: serverTimestamp(),
         likes: [],
@@ -574,12 +605,12 @@ const UpdatesScreen = ({ navigation }) => {
           <Text style={styles.headerTitle}>College Buzz</Text>
           <Zap size={24} color="#FF9500" fill="#FF9500" style={styles.headerZapIcon} />
         </View>
-        <TouchableOpacity style={styles.headerIconBtn} onPress={() => setModalVisible(true)}>
-          <View style={styles.headerPlusWrapper}>
-            <Plus size={20} color="#000" />
-          </View>
-        </TouchableOpacity>
       </View>
+
+      <TouchableOpacity style={styles.createFab} onPress={() => setModalVisible(true)} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Create a campus update">
+        <Plus size={19} color="#111111" strokeWidth={2.8} />
+        <Text style={styles.createFabText}>Create</Text>
+      </TouchableOpacity>
 
       {/* MAIN FEED */}
       {loading ? (
@@ -855,6 +886,8 @@ const styles = StyleSheet.create({
   headerZapIcon: { marginLeft: 6, marginTop: 2 },
   headerIconBtn: { padding: 4 },
   headerPlusWrapper: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
+  createFab: { position: 'absolute', left: 16, bottom: 18, minHeight: 52, paddingHorizontal: 17, borderRadius: 18, backgroundColor: '#FFFC00', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: '#E3E000', shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.16, shadowRadius: 9, elevation: 6, zIndex: 20 },
+  createFabText: { color: '#111111', fontSize: 13, fontWeight: '900' },
 
   feedContent: { paddingBottom: 100, paddingTop: 10 },
   

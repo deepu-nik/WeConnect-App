@@ -7,10 +7,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { User, Mail, Lock, Eye, EyeOff, Camera, ArrowLeft, AtSign } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword, sendEmailVerification, updateProfile } from 'firebase/auth';
 import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
+import { COURSES, DEFAULT_COLLEGE_ID, COLLEGES, YEARS } from '../config/collegeConfig';
 
 const FALLBACK_AVATAR = 'https://via.placeholder.com/150';
 
@@ -19,6 +20,8 @@ const RegisterScreen = ({ navigation }) => {
   const [handle, setHandle] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [course, setCourse] = useState(COURSES[0]);
+  const [year, setYear] = useState(YEARS[0]);
   const [avatarUri, setAvatarUri] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -80,16 +83,29 @@ const RegisterScreen = ({ navigation }) => {
         photoURL: avatar,
       });
 
+      await sendEmailVerification(user).catch((verificationError) => {
+        console.warn('Verification email could not be sent:', verificationError);
+      });
+
       await setDoc(doc(db, 'users', user.uid), {
         uid: user.uid,
         name: cleanName,
         displayName: cleanName,
         handle: '@' + cleanHandle,
-        email: cleanEmail,
+        emailVerified: false,
+        collegeId: DEFAULT_COLLEGE_ID,
+        collegeName: COLLEGES[0].name,
+        course,
+        year,
         avatar,
         photoURL: avatar,
         bio: 'Available to chat',
         connections: [],
+        createdAt: serverTimestamp(),
+      });
+
+      await setDoc(doc(db, 'userPrivate', user.uid), {
+        email: cleanEmail,
         createdAt: serverTimestamp(),
       });
     } catch (err) {
@@ -141,6 +157,12 @@ const RegisterScreen = ({ navigation }) => {
           <View style={styles.formContainer}>
             {error ? <View style={styles.errorContainer}><Text style={styles.errorText}>{error}</Text></View> : null}
 
+            <View style={styles.campusCard}>
+              <Text style={styles.campusLabel}>YOUR CAMPUS</Text>
+              <Text style={styles.campusName}>{COLLEGES[0].name}</Text>
+              <Text style={styles.campusHint}>WeConnect is currently launching for this campus.</Text>
+            </View>
+
             {[
               { icon: User, placeholder: 'Full Name', value: name, set: setName },
               { icon: AtSign, placeholder: 'Username (Handle)', value: handle, set: setHandle, autoCapitalize: 'none' },
@@ -160,6 +182,28 @@ const RegisterScreen = ({ navigation }) => {
                 />
               </View>
             ))}
+
+            <View style={styles.selectBoxStandalone}>
+              <Text style={styles.selectLabel}>Course / Program</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                {COURSES.map((item) => (
+                  <TouchableOpacity key={item} style={[styles.chip, course === item && styles.chipActive]} onPress={() => setCourse(item)}>
+                    <Text style={[styles.chipText, course === item && styles.chipTextActive]}>{item}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={styles.selectBoxStandalone}>
+              <Text style={styles.selectLabel}>Current Year</Text>
+              <View style={styles.chipRowWrap}>
+                {YEARS.map((item) => (
+                  <TouchableOpacity key={item} style={[styles.chip, year === item && styles.chipActive]} onPress={() => setYear(item)}>
+                    <Text style={[styles.chipText, year === item && styles.chipTextActive]}>{item}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
 
             <View style={styles.inputWrapper}>
               <Lock size={20} color="#888" style={styles.inputIcon} />
@@ -208,6 +252,18 @@ const styles = StyleSheet.create({
   cameraIconContainer: { position: 'absolute', right: 0, bottom: 0, width: 30, height: 30, borderRadius: 15, backgroundColor: '#007AFF', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
   avatarText: { color: '#64748b', marginTop: 8, fontSize: 13 },
   formContainer: { width: '100%' },
+  campusCard: { backgroundColor: '#FFFDE7', borderWidth: 1, borderColor: '#E8E8E3', borderRadius: 16, padding: 15, marginBottom: 14 },
+  campusLabel: { fontSize: 11, fontWeight: '900', color: '#707070', letterSpacing: 1 },
+  campusName: { fontSize: 16, fontWeight: '800', color: '#111111', marginTop: 4 },
+  campusHint: { fontSize: 12, color: '#707070', marginTop: 4 },
+  selectBoxStandalone: { backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 14, padding: 13, marginBottom: 14 },
+  selectLabel: { fontSize: 12, fontWeight: '800', color: '#64748b', marginBottom: 9 },
+  chipRow: { gap: 8 },
+  chipRowWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { borderWidth: 1, borderColor: '#dbe2ea', backgroundColor: '#fff', paddingHorizontal: 11, paddingVertical: 8, borderRadius: 18 },
+  chipActive: { backgroundColor: '#FFFC00', borderColor: '#111111' },
+  chipText: { fontSize: 12, fontWeight: '700', color: '#64748b' },
+  chipTextActive: { color: '#111111' },
   errorContainer: { backgroundColor: '#fff1f2', borderWidth: 1, borderColor: '#fecdd3', borderRadius: 12, padding: 12, marginBottom: 15 },
   errorText: { color: '#be123c', fontSize: 14, textAlign: 'center' },
   inputWrapper: { flexDirection: 'row', alignItems: 'center', height: 56, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 14, paddingHorizontal: 15, marginBottom: 14, backgroundColor: '#f8fafc' },

@@ -1,16 +1,17 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  InteractionManager,
   Animated,
   FlatList,
   Image,
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
   Share,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -18,7 +19,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  KeyboardChatScrollView,
+  KeyboardGestureArea,
+  KeyboardStickyView,
+} from 'react-native-keyboard-controller';
+import { useSharedValue } from 'react-native-reanimated';
 import {
   ArrowLeft,
   Camera,
@@ -34,28 +41,34 @@ import {
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { PinchGestureHandler, State } from 'react-native-gesture-handler';
+import { CommonActions } from '@react-navigation/native';
 import { auth, db } from '../config/firebase';
-import { markChatRead } from '../services/chatService';
+import { createDirectChat, markChatRead } from '../services/chatService';
 import {
   deleteMessage,
+  loadPendingMessages,
+  mergeMessages,
+  removePendingMessage,
+  savePendingMessage,
   sendChatMessage as sendPersistedMessage,
   subscribeToMessages,
   toggleMessageReaction,
 } from '../services/chatMessageService';
 import { getUserProfile } from '../services/userService';
 import {
-  addDoc,
   collection,
   doc,
   getDocs,
   onSnapshot,
   query,
-  serverTimestamp,
   updateDoc,
   where,
 } from 'firebase/firestore';
 import { uploadToCloudinary } from '../utils/cloudinaryHelper';
 import { openProfile } from '../navigation/navigationHelpers';
+import { isBlockedByMe } from '../services/safetyService';
+import { assertCanMessage } from '../services/connectionService';
+import { addGroupMembers, leaveGroupChat, updateGroupChat } from '../services/groupService';
 
 const QUICK_REACTIONS = ['❤️', '😂', '👍', '🔥', '😮', '👏'];
 const COMPOSER_EMOJIS = [
@@ -66,6 +79,8 @@ const COMPOSER_EMOJIS = [
 ];
 
 const FALLBACK_AVATAR = 'https://via.placeholder.com/150';
+const COMPOSER_MARGIN = 0;
+const COMPOSER_BASE_INPUT_HEIGHT = 40;
 
 const TypingIndicator = () => {
   const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
@@ -81,7 +96,7 @@ const TypingIndicator = () => {
       )
     );
     animations.forEach((animation) => animation.start());
-    return () => animations.forEach((animation) => animation.stop());
+  return () => animations.forEach((animation) => animation.stop());
   }, []);
 
   return (
@@ -109,9 +124,11 @@ const ChatRoomScreen = ({ route, navigation }) => {
     uid: otherUserId,
     name: routeName = 'Student',
     avatar: routeAvatar = FALLBACK_AVATAR,
+    isGroup: routeIsGroup = false,
   } = route.params || {};
 
   const currentUser = auth.currentUser;
+  const insets = useSafeAreaInsets();
   const listRef = useRef(null);
   const typingTimeout = useRef(null);
   const viewerScale = useRef(new Animated.Value(1)).current;
@@ -136,6 +153,36 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [mediaVisible, setMediaVisible] = useState(false);
   const [detailsVisible, setDetailsVisible] = useState(false);
+  const [blocked, setBlocked] = useState(false);
+  const [isGroupChat, setIsGroupChat] = useState(Boolean(routeIsGroup));
+  const [groupMembers, setGroupMembers] = useState([]);
+  const [groupAdmins, setGroupAdmins] = useState([]);
+  const [groupActionLoading, setGroupActionLoading] = useState(false);
+  const [groupAddVisible, setGroupAddVisible] = useState(false);
+  const [groupAddCandidates, setGroupAddCandidates] = useState([]);
+  const [selectedGroupAddIds, setSelectedGroupAddIds] = useState([]);
+  const extraContentPadding = useSharedValue(0);
+
+  const handleInputLayout = useCallback((event) => {
+    const height = event.nativeEvent.layout.height;
+    extraContentPadding.value = Math.max(height - COMPOSER_BASE_INPUT_HEIGHT, 0);
+  }, [extraContentPadding]);
+
+  const renderChatScrollComponent = useCallback(
+    (props) => (
+      <KeyboardChatScrollView
+        {...props}
+        automaticallyAdjustContentInsets={false}
+        contentInsetAdjustmentBehavior="never"
+        keyboardDismissMode="interactive"
+        offset={insets.bottom - COMPOSER_MARGIN}
+        extraContentPadding={extraContentPadding}
+      />
+    ),
+    [extraContentPadding, insets.bottom]
+  );
+
+  const returningHomeRef = useRef(false);
 
   const imageMessages = useMemo(
     () => messages.filter((message) => message.mediaUrl && message.mediaType === 'image' && !message.deleted),
@@ -151,7 +198,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
   useEffect(() => {
     let active = true;
     const loadOtherUser = async () => {
-      if (!otherUserId) return;
+      if (routeIsGroup || !otherUserId) return;
       try {
         const profile = await getUserProfile(otherUserId);
         if (!active || !profile) return;
@@ -163,13 +210,23 @@ const ChatRoomScreen = ({ route, navigation }) => {
     };
     loadOtherUser();
     return () => { active = false; };
-  }, [otherUserId, routeName, routeAvatar]);
+  }, [otherUserId, routeName, routeAvatar, routeIsGroup]);
 
   useEffect(() => {
     const findExistingChat = async () => {
       if (chatId || !otherUserId || !currentUser) return;
       try {
-        const q = query(collection(db, 'chats'), where('participants', 'array-contains', currentUser.uid));
+        if (await isBlockedByMe(otherUserId)) {
+          setBlocked(true);
+          return;
+        }
+        const currentProfile = await getUserProfile(currentUser.uid);
+        if (!currentProfile?.collegeId) return;
+        const q = query(
+          collection(db, 'chats'),
+          where('collegeId', '==', currentProfile.collegeId),
+          where('participants', 'array-contains', currentUser.uid)
+        );
         const snapshot = await getDocs(q);
         const existing = snapshot.docs.find((item) => item.data()?.participants?.includes(otherUserId));
         if (existing) setChatId(existing.id);
@@ -183,25 +240,51 @@ const ChatRoomScreen = ({ route, navigation }) => {
   useEffect(() => {
     if (!chatId || !currentUser) return;
 
-    markChatRead(chatId, currentUser.uid).catch((error) => console.error('Failed to mark chat read:', error));
+    // Keep the first paint focused on rendering the chat. Read receipts and
+    // local pending-message hydration are non-critical and can run after the
+    // navigation transition has settled.
+    const interaction = InteractionManager.runAfterInteractions(() => {
+      markChatRead(chatId, currentUser.uid).catch((error) => console.error('Failed to mark chat read:', error));
+      loadPendingMessages(chatId)
+        .then((pending) => {
+          if (pending.length) setMessages((current) => mergeMessages(current, pending));
+        })
+        .catch(() => {});
+    });
 
     const unsubscribeMessages = subscribeToMessages(
       chatId,
-      (nextMessages) => setMessages(nextMessages),
+      (nextMessages) => {
+        loadPendingMessages(chatId)
+          .then((pending) => setMessages(mergeMessages(nextMessages, pending)))
+          .catch(() => setMessages(nextMessages));
+      },
       (error) => console.error('Message subscription failed:', error)
     );
 
     const unsubscribeChat = onSnapshot(doc(db, 'chats', chatId), (snapshot) => {
       if (!snapshot.exists()) return;
       const data = snapshot.data();
-      setIsOtherUserTyping(Boolean(data.typing?.[otherUserId]));
+      const group = data.type === 'group' || Array.isArray(data.participants) && data.participants.length > 2;
+      setIsGroupChat(group);
+      if (group) {
+        const participants = Array.isArray(data.participants) ? data.participants : [];
+        setOtherUserName(data.groupName || routeName || 'Group chat');
+        setOtherUserAvatar(data.groupAvatar || routeAvatar || FALLBACK_AVATAR);
+        setGroupAdmins(Array.isArray(data.admins) ? data.admins : []);
+        setGroupMembers(participants.map((uid) => ({ uid, ...(data.usersInfo?.[uid] || {}) })));
+        setIsOtherUserTyping(participants.some((uid) => uid !== currentUser?.uid && Boolean(data.typing?.[uid])));
+      } else {
+        setIsOtherUserTyping(Boolean(data.typing?.[otherUserId]));
+      }
     });
 
     return () => {
+      interaction.cancel();
       unsubscribeMessages();
       unsubscribeChat();
     };
-  }, [chatId, currentUser, otherUserId]);
+  }, [chatId, currentUser, otherUserId, routeName, routeAvatar]);
 
   useEffect(() => () => {
     if (typingTimeout.current) clearTimeout(typingTimeout.current);
@@ -221,28 +304,17 @@ const ChatRoomScreen = ({ route, navigation }) => {
   };
 
   const createChatIfNeeded = async () => {
+    if (blocked) throw new Error('You have blocked this student. Unblock them from their profile to message again.');
     if (chatId) return chatId;
     if (!currentUser || !otherUserId) throw new Error('Missing chat participants');
 
-    const chatRef = await addDoc(collection(db, 'chats'), {
-      participants: [currentUser.uid, otherUserId],
-      updatedAt: serverTimestamp(),
-      lastMessage: '',
-      typing: { [currentUser.uid]: false, [otherUserId]: false },
-      unreadCount: { [currentUser.uid]: 0, [otherUserId]: 0 },
-      usersInfo: {
-        [currentUser.uid]: {
-          name: currentUser.displayName || 'You',
-          avatar: currentUser.photoURL || FALLBACK_AVATAR,
-        },
-        [otherUserId]: {
-          name: otherUserName,
-          avatar: otherUserAvatar,
-        },
-      },
+    const createdChatId = await createDirectChat({
+      currentUser,
+      otherUserId,
+      otherUser: { name: otherUserName, avatar: otherUserAvatar },
     });
-    setChatId(chatRef.id);
-    return chatRef.id;
+    setChatId(createdChatId);
+    return createdChatId;
   };
 
   const sendMessage = async (mediaUrl = null, mediaType = null, caption = null) => {
@@ -259,26 +331,41 @@ const ChatRoomScreen = ({ route, navigation }) => {
       const activeChatId = await createChatIfNeeded();
       const messageId = Date.now().toString() + '-' + Math.random().toString(36).slice(2, 8);
 
-      await sendPersistedMessage({
-        chatId: activeChatId,
-        message: {
-          id: messageId,
-          text: messageText,
-          mediaUrl,
-          mediaType,
-          replyTo: reply
-            ? {
-                id: reply.id,
-                text: reply.text || (reply.mediaType === 'video' ? '🎥 Video' : '📷 Photo'),
-                senderId: reply.senderId,
-              }
-            : null,
-        },
-      });
+      const localMessage = {
+        id: messageId,
+        text: messageText,
+        senderId: currentUser.uid,
+        mediaUrl,
+        mediaType,
+        replyTo: reply
+          ? {
+              id: reply.id,
+              text: reply.text || (reply.mediaType === 'video' ? '🎥 Video' : '📷 Photo'),
+              senderId: reply.senderId,
+            }
+          : null,
+        createdAt: new Date(),
+        status: 'sending',
+      };
+      await savePendingMessage(activeChatId, localMessage);
+      setMessages((current) => mergeMessages([localMessage], current));
+
+      try {
+        await sendPersistedMessage({
+          chatId: activeChatId,
+          message: localMessage,
+        });
+        await removePendingMessage(activeChatId, messageId);
+      } catch (error) {
+        const failedMessage = { ...localMessage, status: 'failed' };
+        await savePendingMessage(activeChatId, failedMessage);
+        setMessages((current) => mergeMessages([failedMessage], current));
+        throw error;
+      }
     } catch (error) {
       setInputText(messageText);
       setReplyingTo(reply);
-      Alert.alert('Message not sent', 'Please check your connection and try again.');
+      Alert.alert('Message not sent', error?.message || 'Please check your connection and try again.');
       console.error('Message send failed:', error);
     }
   };
@@ -465,6 +552,17 @@ const ChatRoomScreen = ({ route, navigation }) => {
               </View>
             ) : null}
 
+            {item.storyContext ? (
+              <View style={styles.storyChatCard}>
+                {item.storyContext.mediaUrl ? <Image source={{ uri: item.storyContext.mediaUrl }} style={styles.storyChatImage} /> : null}
+                <View style={styles.storyChatMeta}>
+                  <Text style={styles.storyChatLabel}>{item.storyContext.type === 'reaction' ? 'STORY REACTION' : 'STORY REPLY'}</Text>
+                  {item.storyContext.reaction ? <Text style={styles.storyChatReaction}>{item.storyContext.reaction}</Text> : null}
+                  <Text style={styles.storyChatCaption} numberOfLines={2}>{item.storyContext.caption || 'Your story'}</Text>
+                </View>
+              </View>
+            ) : null}
+
             {item.deleted ? (
               <Text style={[styles.deletedText, isMe && styles.myDeletedText]}>This message was deleted</Text>
             ) : (
@@ -563,26 +661,104 @@ const ChatRoomScreen = ({ route, navigation }) => {
     );
   };
 
+  const openGroupAddMembers = async () => {
+    if (!isGroupChat || !chatId || !groupAdmins.includes(currentUser?.uid)) return;
+    try {
+      const profile = await getUserProfile(currentUser.uid);
+      const snapshot = await getDocs(query(collection(db, 'users'), where('collegeId', '==', profile?.collegeId || '')));
+      const memberIds = new Set(groupMembers.map((member) => member.uid));
+      const candidates = snapshot.docs.map((item) => {
+        const data = item.data() || {};
+        return { ...data, uid: data.uid || item.id, name: data.name || data.displayName || 'Student', avatar: data.avatar || data.photoURL || FALLBACK_AVATAR };
+      }).filter((member) => !memberIds.has(member.uid));
+      setGroupAddCandidates(candidates);
+      setSelectedGroupAddIds([]);
+      setGroupAddVisible(true);
+    } catch (error) {
+      Alert.alert('Could not load students', error?.message || 'Please try again.');
+    }
+  };
+
+  const handleAddGroupMembers = async () => {
+    const selected = groupAddCandidates.filter((member) => selectedGroupAddIds.includes(member.uid));
+    if (!selected.length) {
+      setGroupAddVisible(false);
+      return;
+    }
+    try {
+      setGroupActionLoading(true);
+      await addGroupMembers(chatId, selected);
+      setGroupAddVisible(false);
+      setSelectedGroupAddIds([]);
+    } catch (error) {
+      Alert.alert('Could not add members', error?.message || 'Please try again.');
+    } finally {
+      setGroupActionLoading(false);
+    }
+  };
+
+  const renameGroup = () => {
+    if (!isGroupChat || !groupAdmins.includes(currentUser?.uid)) return;
+    Alert.prompt?.('Rename group', 'Choose a new group name.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Save', onPress: async (value) => {
+        const nextName = String(value || '').trim();
+        if (!nextName) return;
+        try {
+          await updateGroupChat(chatId, { groupName: nextName });
+          setOtherUserName(nextName);
+        } catch (error) {
+          Alert.alert('Could not rename group', error?.message || 'Please try again.');
+        }
+      }},
+    ], 'plain-text', otherUserName);
+  };
+
+  const returnToHomeChats = () => {
+    if (returningHomeRef.current) return;
+    returningHomeRef.current = true;
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{
+          name: 'MainTabs',
+          params: {
+            screen: 'Tabs',
+            params: { screen: 'Chats' },
+          },
+        }],
+      })
+    );
+  };
+
+  useEffect(() => {
+    return navigation.addListener('beforeRemove', (event) => {
+      if (returningHomeRef.current) return;
+      event.preventDefault();
+      returnToHomeChats();
+    });
+  }, [navigation]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" />
 
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerBack} onPress={() => navigation.canGoBack() && navigation.goBack()}>
+        <TouchableOpacity style={styles.headerBack} onPress={returnToHomeChats}>
           <ArrowLeft size={24} color="#111827" />
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.headerProfile}
           activeOpacity={0.75}
-          onPress={() => openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar })}
+          onPress={() => isGroupChat ? setDetailsVisible(true) : openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar })}
         >
           <Image source={{ uri: otherUserAvatar }} style={styles.headerAvatar} />
           <View style={styles.headerIdentity}>
             <Text style={styles.headerName} numberOfLines={1}>{otherUserName}</Text>
             <View style={styles.onlineRow}>
               <View style={styles.onlineDot} />
-              <Text style={styles.headerStatus}>{isOtherUserTyping ? 'typing…' : 'Chat'}</Text>
+              <Text style={styles.headerStatus}>{isOtherUserTyping ? 'typing…' : isGroupChat ? groupMembers.length + ' members' : 'Chat'}</Text>
             </View>
           </View>
         </TouchableOpacity>
@@ -620,10 +796,11 @@ const ChatRoomScreen = ({ route, navigation }) => {
         </View>
       ) : null}
 
-      <KeyboardAvoidingView
+            <KeyboardGestureArea
+        interpolator="ios"
+        offset={COMPOSER_BASE_INPUT_HEIGHT}
         style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
+        textInputNativeID="chat-input"
       >
         <FlatList
           ref={listRef}
@@ -633,7 +810,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
           inverted
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          keyboardDismissMode="interactive"
+          renderScrollComponent={renderChatScrollComponent}
           contentContainerStyle={styles.listContent}
           ListHeaderComponent={
             isOtherUserTyping ? (
@@ -654,6 +832,12 @@ const ChatRoomScreen = ({ route, navigation }) => {
           }
         />
 
+        <KeyboardStickyView
+          offset={{
+            opened: insets.bottom - COMPOSER_MARGIN,
+            closed: 0,
+          }}
+        >
         {replyingTo ? (
           <View style={styles.replyBar}>
             <View style={styles.replyAccent} />
@@ -689,7 +873,14 @@ const ChatRoomScreen = ({ route, navigation }) => {
           </View>
         ) : null}
 
-        <View style={styles.composerShell}>
+        <View
+          style={[
+            styles.composerShell,
+            {
+              paddingBottom: 7,
+            },
+          ]}
+        >
           <View style={styles.composer}>
             <TouchableOpacity style={styles.composerIcon} onPress={openCameraAndSend} disabled={isUploading}>
               <Camera size={21} color="#475569" />
@@ -697,6 +888,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
             <View style={styles.textInputShell}>
               <TextInput
+                nativeID="chat-input"
+                onLayout={handleInputLayout}
                 value={inputText}
                 onChangeText={handleTextChange}
                 placeholder="Message…"
@@ -737,7 +930,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
             </View>
           ) : null}
         </View>
-      </KeyboardAvoidingView>
+        </KeyboardStickyView>
+      </KeyboardGestureArea>
 
       <Modal visible={!!fullScreenImage} transparent animationType="fade" onRequestClose={closeFullScreenImage}>
         <View style={styles.mediaViewer}>
@@ -834,16 +1028,46 @@ const ChatRoomScreen = ({ route, navigation }) => {
           <Pressable style={styles.detailsCard} onPress={() => {}}>
             <Image source={{ uri: otherUserAvatar }} style={styles.detailsAvatar} />
             <Text style={styles.detailsName}>{otherUserName}</Text>
-            <Text style={styles.detailsMeta}>Conversation</Text>
-            <TouchableOpacity
-              style={styles.detailsAction}
-              onPress={() => {
-                setDetailsVisible(false);
-                openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar });
-              }}
-            >
-              <Text style={styles.detailsActionText}>View profile</Text>
-            </TouchableOpacity>
+            <Text style={styles.detailsMeta}>{isGroupChat ? groupMembers.length + ' members' : 'Conversation'}</Text>
+
+            {isGroupChat ? (
+              <>
+                <ScrollView style={styles.groupMembersList} contentContainerStyle={{ paddingBottom: 4 }}>
+                  {groupMembers.map((member) => (
+                    <TouchableOpacity key={member.uid} style={styles.groupMemberMini} onPress={() => member.uid !== currentUser?.uid && openProfile(navigation, { uid: member.uid, name: member.name, avatar: member.avatar })}>
+                      <Image source={{ uri: member.avatar || FALLBACK_AVATAR }} style={styles.groupMemberMiniAvatar} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.groupMemberMiniName}>{member.name || 'Student'}{member.uid === currentUser?.uid ? ' (You)' : ''}</Text>
+                        {groupAdmins.includes(member.uid) ? <Text style={styles.groupAdminText}>Admin</Text> : null}
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                {groupAdmins.includes(currentUser?.uid) ? (
+                  <>
+                    <TouchableOpacity style={styles.detailsAction} onPress={openGroupAddMembers}>
+                      <Text style={styles.detailsActionText}>Add members</Text>
+                    </TouchableOpacity>
+                    {Platform.OS === 'ios' ? (
+                      <TouchableOpacity style={styles.detailsAction} onPress={renameGroup}>
+                        <Text style={styles.detailsActionText}>Rename group</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </>
+                ) : null}
+              </>
+            ) : (
+              <TouchableOpacity
+                style={styles.detailsAction}
+                onPress={() => {
+                  setDetailsVisible(false);
+                  openProfile(navigation, { uid: otherUserId, name: otherUserName, avatar: otherUserAvatar });
+                }}
+              >
+                <Text style={styles.detailsActionText}>View profile</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
               style={styles.detailsAction}
               onPress={() => {
@@ -853,11 +1077,61 @@ const ChatRoomScreen = ({ route, navigation }) => {
             >
               <Text style={styles.detailsActionText}>Shared photos</Text>
             </TouchableOpacity>
+
+            {isGroupChat ? (
+              <TouchableOpacity
+                style={[styles.detailsAction, { backgroundColor: '#FFFEE6' }]}
+                disabled={groupActionLoading}
+                onPress={() => {
+                  Alert.alert('Leave group?', 'You will stop receiving messages from this group.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Leave', style: 'destructive', onPress: async () => {
+                      try {
+                        setGroupActionLoading(true);
+                        await leaveGroupChat(chatId);
+                        setDetailsVisible(false);
+                        returnToHomeChats();
+                      } catch (error) {
+                        Alert.alert('Could not leave group', error?.message || 'Please try again.');
+                      } finally {
+                        setGroupActionLoading(false);
+                      }
+                    }},
+                  ]);
+                }}
+              >
+                <Text style={[styles.detailsActionText, { color: '#D11A2A' }]}>Leave group</Text>
+              </TouchableOpacity>
+            ) : null}
+
             <TouchableOpacity style={styles.detailsCancel} onPress={() => setDetailsVisible(false)}>
               <Text style={styles.detailsCancelText}>Close</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
+      </Modal>
+
+      <Modal visible={groupAddVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setGroupAddVisible(false)}>
+        <SafeAreaView style={styles.groupAddModal}>
+          <View style={styles.groupAddHeader}>
+            <TouchableOpacity onPress={() => setGroupAddVisible(false)}><X size={23} color="#111111" /></TouchableOpacity>
+            <Text style={styles.detailsName}>Add members</Text>
+            <TouchableOpacity onPress={handleAddGroupMembers} disabled={groupActionLoading}><Text style={styles.groupAddDone}>{groupActionLoading ? '...' : 'Done'}</Text></TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16 }}>
+            {groupAddCandidates.map((member) => {
+              const selected = selectedGroupAddIds.includes(member.uid);
+              return (
+                <TouchableOpacity key={member.uid} style={[styles.groupMemberRowFull, selected && styles.groupMemberRowFullSelected]} onPress={() => setSelectedGroupAddIds((current) => selected ? current.filter((id) => id !== member.uid) : [...current, member.uid])}>
+                  <Image source={{ uri: member.avatar || FALLBACK_AVATAR }} style={styles.groupMemberMiniAvatar} />
+                  <View style={{ flex: 1 }}><Text style={styles.groupMemberMiniName}>{member.name}</Text></View>
+                  <View style={[styles.memberCheck, selected && styles.memberCheckSelected]}>{selected ? <Text style={styles.memberCheckGlyph}>✓</Text> : null}</View>
+                </TouchableOpacity>
+              );
+            })}
+            {!groupAddCandidates.length ? <Text style={styles.groupEmpty}>Everyone in your campus is already in this group.</Text> : null}
+          </ScrollView>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -907,6 +1181,12 @@ const styles = StyleSheet.create({
   quotedReplyLabelMine: { color: '#fff' },
   quotedReplyText: { marginTop: 2, fontSize: 12, color: '#707070' },
   quotedReplyTextMine: { color: 'rgba(255,255,255,0.85)' },
+  storyChatCard: { flexDirection: 'row', alignItems: 'center', minHeight: 58, marginBottom: 6, borderRadius: 12, backgroundColor: 'rgba(15,23,42,0.08)', overflow: 'hidden' },
+  storyChatImage: { width: 48, height: 58, backgroundColor: '#e2e8f0' },
+  storyChatMeta: { flex: 1, paddingHorizontal: 9, paddingVertical: 6 },
+  storyChatLabel: { fontSize: 9, fontWeight: '900', color: '#64748b', letterSpacing: 0.7 },
+  storyChatReaction: { fontSize: 19, marginTop: 1 },
+  storyChatCaption: { fontSize: 10, color: '#475569', marginTop: 2 },
   messageImage: { width: 240, height: 240, borderRadius: 15, marginBottom: 3, backgroundColor: '#E8E8E3' },
   messageVideo: { width: 240, height: 175, borderRadius: 15, backgroundColor: '#111111', alignItems: 'center', justifyContent: 'center', marginBottom: 3 },
   videoPlayCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
@@ -959,7 +1239,7 @@ const styles = StyleSheet.create({
   emojiRow: { flexDirection: 'row', justifyContent: 'space-around' },
   emojiButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   emojiButtonText: { fontSize: 24 },
-  composerShell: { paddingHorizontal: 8, paddingTop: 6, paddingBottom: Platform.OS === 'ios' ? 7 : 5, backgroundColor: '#F7F7F5' },
+  composerShell: { paddingHorizontal: 8, paddingTop: 6, paddingBottom: Platform.OS === 'ios' ? 7 : 12, backgroundColor: '#F7F7F5' },
   composer: { minHeight: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 5, paddingVertical: 5, borderRadius: 27, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E8E8E3', elevation: 3, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
   composerIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19 },
   textInputShell: { flex: 1, minHeight: 40, maxHeight: 100, flexDirection: 'row', alignItems: 'center', marginHorizontal: 2, paddingLeft: 8, borderRadius: 20, backgroundColor: '#F0F0EC' },
@@ -1000,6 +1280,16 @@ const styles = StyleSheet.create({
   detailsAction: { width: '100%', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#EEEEEA', alignItems: 'center' },
   detailsActionText: { fontSize: 14, fontWeight: '800', color: '#111111' },
   detailsCancel: { marginTop: 12, paddingVertical: 10 },
+  groupMembersList: { maxHeight: 220, width: '100%', marginVertical: 8 },
+  groupMemberMini: { minHeight: 48, flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
+  groupMemberMiniAvatar: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#E8E8E3', marginRight: 9 },
+  groupMemberMiniName: { fontSize: 12, fontWeight: '800', color: '#111111' },
+  groupAdminText: { fontSize: 9, fontWeight: '800', color: '#777770', marginTop: 1 },
+  groupAddModal: { flex: 1, backgroundColor: '#F6F6F2' },
+  groupAddHeader: { minHeight: 62, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E5E5DF' },
+  groupAddDone: { fontSize: 13, fontWeight: '900', color: '#111111' },
+  groupMemberRowFull: { minHeight: 58, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5DF', paddingHorizontal: 10, marginBottom: 7, flexDirection: 'row', alignItems: 'center' },
+  groupMemberRowFullSelected: { borderColor: '#111111', backgroundColor: '#FFFEE6' },
   detailsCancelText: { fontSize: 14, fontWeight: '800', color: '#707070' },
 });
 

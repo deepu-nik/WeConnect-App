@@ -13,6 +13,7 @@ import { auth } from '../config/firebase';
 import { subscribeToStories } from '../services/storyService';
 
 const FALLBACK_AVATAR = 'https://via.placeholder.com/150';
+const YELLOW = '#FFFC00';
 
 const groupStories = (stories = []) => {
   const groups = new Map();
@@ -71,7 +72,9 @@ export default function StoriesStrip({ navigation }) {
         <TouchableOpacity
           key="your-story"
           style={styles.item}
-          onPress={() => navigation.navigate('NewStory')}
+          onPress={() => own
+            ? navigation.navigate('StoryViewer', { stories: own, startIndex: 0 })
+            : navigation.navigate('NewStory')}
           activeOpacity={0.85}
         >
           <View style={styles.addRing}>
@@ -85,9 +88,18 @@ export default function StoriesStrip({ navigation }) {
             </View>
           </View>
           <Text style={styles.name} numberOfLines={1}>
-            Your story
+            {own ? 'Your story' : 'Add story'}
           </Text>
         </TouchableOpacity>
+        {own ? (
+          <TouchableOpacity
+            style={styles.addStoryButton}
+            onPress={() => navigation.navigate('NewStory')}
+            accessibilityLabel="Add another story"
+          >
+            <Plus size={12} color="#111111" />
+          </TouchableOpacity>
+        ) : null}
 
         {others.map((group) => {
           const story = group?.[0];
@@ -152,6 +164,7 @@ const styles = StyleSheet.create({
   },
   item: {
     width: 68,
+    position: 'relative',
     alignItems: 'center',
   },
   ring: {
@@ -193,6 +206,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#fff',
+  },
+  addStoryButton: {
+    position: 'absolute',
+    right: 2,
+    top: 43,
+    width: 21,
+    height: 21,
+    borderRadius: 11,
+    backgroundColor: YELLOW,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   name: {
     marginTop: 5,

@@ -2,17 +2,20 @@ import React, { useContext, useEffect, useRef } from 'react';
 import { View, ActivityIndicator, Linking } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-
-// Context
 import { AuthContext } from '../context/AuthContext';
 
-// Screens
 import LoginScreen from '../screens/LoginScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import RegisterScreen from '../screens/RegisterScreen';
+import VerifyEmailScreen from '../screens/VerifyEmailScreen';
+import DeleteAccountScreen from '../screens/DeleteAccountScreen';
+import SettingsScreen from '../screens/SettingsScreen';
+import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
+import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
+import CommunityGuidelinesScreen from '../screens/CommunityGuidelinesScreen';
 import ChatRoomScreen from '../screens/ChatRoomScreen';
 import NewStoryScreen from '../screens/NewStoryScreen';
 import StoryViewerScreen from '../screens/StoryViewerScreen';
-// EXISTING NAVIGATOR (Your Main Tabs)
 import MainTabNavigator from './MainTabNavigator';
 
 const Stack = createStackNavigator();
@@ -23,52 +26,58 @@ const getProfileUidFromUrl = (url) => {
   return match ? match[1] : null;
 };
 
-// 1. THE AUTH STACK (Login/Register)
-const AuthStack = () => {
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="Register" component={RegisterScreen} />
-    </Stack.Navigator>
-  );
-};
+const AuthStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="Login" component={LoginScreen} />
+    <Stack.Screen name="Register" component={RegisterScreen} />
+    <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+  </Stack.Navigator>
+);
 
-// 2. THE APP STACK (Tabs + ChatRoom + Profile)
-const AuthenticatedStack = () => {
-  return (
-    <Stack.Navigator screenOptions={{ 
-      headerShown: false,
-      detachPreviousScreen: true,
-     }}>
-      {/* The Main App (Tabs) is the first screen */}
-      <Stack.Screen name="MainTabs" component={MainTabNavigator} />
-      
-      {/* The Chat Room sits on top of the tabs */}
-     <Stack.Screen name="NewStory" component={NewStoryScreen} />
+const VerifyStack = ({ user, refreshEmailVerification, resendVerificationEmail, logout }) => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="VerifyEmail">
+      {() => (
+        <VerifyEmailScreen
+          user={user}
+          onRefresh={refreshEmailVerification}
+          onResend={resendVerificationEmail}
+          onSignOut={logout}
+        />
+      )}
+    </Stack.Screen>
+  </Stack.Navigator>
+);
+
+const AuthenticatedStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false, detachPreviousScreen: true }}>
+    <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+    <Stack.Screen name="Settings" component={SettingsScreen} />
+    <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+    <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+    <Stack.Screen name="CommunityGuidelines" component={CommunityGuidelinesScreen} />
+    <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
+    <Stack.Screen name="NewStory" component={NewStoryScreen} />
     <Stack.Screen name="StoryViewer" component={StoryViewerScreen} />
-
     <Stack.Screen
       name="ChatRoom"
       component={ChatRoomScreen}
       options={{
         headerShown: false,
-        presentation: "card",
-        animation: "slide_from_right",
+        presentation: 'card',
+        animation: 'slide_from_right',
         gestureEnabled: true,
       }}
     />
+  </Stack.Navigator>
+);
 
-    </Stack.Navigator>
-  );
-};
-
-// 3. THE MAIN NAVIGATOR (Decider)
 const AppNavigator = () => {
-  const { user, loading } = useContext(AuthContext);
+  const { user, emailVerified, loading, refreshEmailVerification, resendVerificationEmail, logout } = useContext(AuthContext);
   const navigationRef = useRef(null);
 
   useEffect(() => {
-    if (!user) return undefined;
+    if (!emailVerified) return undefined;
 
     const openProfileFromUrl = (url) => {
       const uid = getProfileUidFromUrl(url);
@@ -80,13 +89,9 @@ const AppNavigator = () => {
     };
 
     Linking.getInitialURL().then(openProfileFromUrl).catch(() => {});
-
-    const subscription = Linking.addEventListener('url', ({ url }) => {
-      openProfileFromUrl(url);
-    });
-
+    const subscription = Linking.addEventListener('url', ({ url }) => openProfileFromUrl(url));
     return () => subscription.remove();
-  }, [user]);
+  }, [emailVerified]);
 
   if (loading) {
     return (
@@ -98,7 +103,18 @@ const AppNavigator = () => {
 
   return (
     <NavigationContainer ref={navigationRef}>
-      {user ? <AuthenticatedStack /> : <AuthStack />}
+      {!user ? (
+        <AuthStack />
+      ) : !emailVerified ? (
+        <VerifyStack
+          user={user}
+          refreshEmailVerification={refreshEmailVerification}
+          resendVerificationEmail={resendVerificationEmail}
+          logout={logout}
+        />
+      ) : (
+        <AuthenticatedStack />
+      )}
     </NavigationContainer>
   );
 };

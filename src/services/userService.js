@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 export const FALLBACK_AVATAR = 'https://via.placeholder.com/150';
@@ -9,11 +9,13 @@ export const normalizeUser = (uid, data = {}) => ({
   handle: data.handle || '',
   avatar: data.photoURL || data.avatar || FALLBACK_AVATAR,
   bio: data.bio || '',
-  email: data.email || '',
+  collegeId: data.collegeId || '',
+  collegeName: data.collegeName || '',
+  course: data.course || '',
+  year: data.year || data.gradYear || '',
   location: data.location || 'Campus',
   locationIcon: data.locationIcon || '📍',
   locationPhoto: data.locationPhoto || '',
-  course: data.course || '',
   gradYear: data.gradYear || '',
   skills: Array.isArray(data.skills) ? data.skills : [],
   connections: Array.isArray(data.connections) ? data.connections : [],
@@ -24,8 +26,13 @@ export const normalizeUser = (uid, data = {}) => ({
   instagram: data.instagram || '',
   linkedin: data.linkedin || '',
   github: data.github || '',
-  whatsapp: data.whatsapp || '',
 });
+
+export const getPrivateUserProfile = async (uid) => {
+  if (!uid) return null;
+  const snapshot = await getDoc(doc(db, 'userPrivate', uid));
+  return snapshot.exists() ? snapshot.data() : null;
+};
 
 export const getUserProfile = async (uid) => {
   if (!uid) return null;
@@ -34,7 +41,11 @@ export const getUserProfile = async (uid) => {
 };
 
 export const getAllUsers = async (currentUid) => {
-  const snapshot = await getDocs(collection(db, 'users'));
+  if (!currentUid) return [];
+  const currentProfile = await getDoc(doc(db, 'users', currentUid));
+  const collegeId = currentProfile.exists() ? currentProfile.data()?.collegeId : null;
+  if (!collegeId) return [];
+  const snapshot = await getDocs(query(collection(db, 'users'), where('collegeId', '==', collegeId)));
   return snapshot.docs
     .filter((item) => item.id !== currentUid)
     .map((item) => normalizeUser(item.id, item.data()));
@@ -45,7 +56,7 @@ export const findUsersByName = async (searchText, currentUid) => {
   if (!text) return [];
   const users = await getAllUsers(currentUid);
   return users.filter((user) =>
-    [user.name, user.handle, user.email].some((value) =>
+    [user.name, user.handle].some((value) =>
       value.toLowerCase().includes(text)
     )
   );

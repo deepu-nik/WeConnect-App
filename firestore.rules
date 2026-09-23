@@ -1,0 +1,474 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // WeConnect v1 is a single-campus launch.
+    // Expand this to a verified multi-campus membership model before adding
+    // additional colleges to the public product.
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function verified() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
+    function myUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function myCollegeId() {
+      return myUser().data.get('collegeId', '');
+    }
+
+    function isCampusStudent(collegeId) {
+      return verified() &&
+        collegeId == 'dypiu' &&
+        myCollegeId() == 'dypiu';
+    }
+
+    function isSameCampusUser(uid) {
+      return verified() &&
+        get(/databases/$(database)/documents/users/$(uid)).data.get('collegeId', '') == myCollegeId() &&
+        myCollegeId() == 'dypiu';
+    }
+
+    function immutableUserFieldsUnchanged() {
+      return request.resource.data.uid == resource.data.uid &&
+        request.resource.data.get('collegeId', '') == resource.data.get('collegeId', '') &&
+        request.resource.data.get('collegeName', '') == resource.data.get('collegeName', '') &&
+        request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null) &&
+        true;
+    }
+
+    function canEditOwnProfile() {
+      return verified() &&
+        request.auth.uid == resource.data.uid &&
+        immutableUserFieldsUnchanged() &&
+        !request.resource.data.keys().hasAny(['email', 'whatsapp']) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['connections']);
+    }
+
+    function canAddSelfToConnections() {
+      return verified() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['connections']) &&
+        request.resource.data.get('collegeId', '') == 'dypiu' &&
+        resource.data.get('collegeId', '') == 'dypiu' &&
+        request.resource.data.get('connections', []).hasAll(resource.data.get('connections', [])) &&
+        request.resource.data.get('connections', []).hasAny([request.auth.uid]);
+    }
+
+    function connectionRequestParticipant() {
+      return verified() &&
+        (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
+    }
+
+    function vaultRef(vaultId) {
+      return get(/databases/$(database)/documents/vaults/$(vaultId));
+    }
+
+    function isVaultMember(vaultId) {
+      return verified() &&
+        vaultRef(vaultId).data.get('collegeId', '') == myCollegeId() &&
+        myCollegeId() == 'dypiu' &&
+        vaultRef(vaultId).data.get('members', []).hasAny([request.auth.uid]);
+    }
+
+    function isCampusVault(vaultId) {
+      return verified() &&
+        vaultRef(vaultId).data.get('collegeId', '') == myCollegeId() &&
+        myCollegeId() == 'dypiu';
+    }
+
+    function isVaultAdmin(vaultId) {
+      return isVaultMember(vaultId) &&
+        vaultRef(vaultId).data.get('admins', []).hasAny([request.auth.uid]);
+    }
+
+    function isPostCampus(postId) {
+      return verified() &&
+        get(/databases/$(database)/documents/buzz_posts/$(postId)).data.get('collegeId', '') == myCollegeId() &&
+        myCollegeId() == 'dypiu';
+    }
+
+    function isStoryCampus(storyId) {
+      return verified() &&
+        get(/databases/$(database)/documents/stories/$(storyId)).data.get('collegeId', '') == myCollegeId() &&
+        get(/databases/$(database)/documents/stories/$(storyId)).data.get('audience', []).hasAny([request.auth.uid]) &&
+        myCollegeId() == 'dypiu';
+    }
+
+    // -----------------------------------------------------------------------
+    // USERS
+    // -----------------------------------------------------------------------
+    match /users/{userId} {
+      allow get: if (
+        (signedIn() && request.auth.uid == userId && !resource.data.keys().hasAny(['collegeId'])) ||
+        isCampusStudent(resource.data.get('collegeId', ''))
+      );
+      allow list: if isCampusStudent(resource.data.get('collegeId', ''));
+      allow create: if signedIn() &&
+        request.auth.uid == userId &&
+        request.resource.data.uid == userId &&
+        request.resource.data.get('collegeId', '') == 'dypiu' &&
+        request.resource.data.get('collegeName', '') != '' &&
+        !request.resource.data.keys().hasAny(['email', 'whatsapp']);
+
+      // Existing accounts may be backfilled with college fields by AuthContext.
+      allow update: if
+        (
+          request.auth.uid == userId &&
+          request.resource.data.get('collegeId', '') == 'dypiu' &&
+          (
+            resource.data.get('collegeId', '') == 'dypiu' ||
+            !resource.data.keys().hasAny(['collegeId'])
+          ) &&
+          canEditOwnProfile()
+        )
+        ||
+        (
+          request.auth.uid == userId &&
+          !resource.data.keys().hasAny(['collegeId']) &&
+          request.resource.data.get('collegeId', '') == 'dypiu' &&
+          request.resource.data.get('collegeName', '') != ''
+        )
+        ||
+        (
+          isSameCampusUser(userId) &&
+          canAddSelfToConnections()
+        );
+
+      allow delete: if verified() && request.auth.uid == userId;
+    }
+
+    match /userPrivate/{userId} {
+      allow get: if signedIn() && request.auth.uid == userId;
+
+      allow create: if signedIn() &&
+        request.auth.uid == userId &&
+        request.resource.data.get('email', '') == request.auth.token.email;
+
+      allow update: if signedIn() &&
+        request.auth.uid == userId &&
+        request.resource.data.get('email', '') == resource.data.get('email', '') &&
+        request.resource.data.get('email', '') == request.auth.token.email;
+
+      allow delete: if signedIn() && request.auth.uid == userId;
+    }
+
+    // -----------------------------------------------------------------------
+    // BLOCKS & REPORTS
+    // -----------------------------------------------------------------------
+    match /blocks/{blockId} {
+      allow get: if verified() && resource.data.get('blockerId', '') == request.auth.uid;
+      allow list: if verified() && resource.data.get('blockerId', '') == request.auth.uid;
+      allow create: if verified() &&
+        request.resource.data.get('blockerId', '') == request.auth.uid &&
+        request.resource.data.get('blockedId', '') != request.auth.uid &&
+        request.resource.data.get('blockedId', '') != '';
+      allow update: if false;
+      allow delete: if verified() && resource.data.get('blockerId', '') == request.auth.uid;
+    }
+
+    match /reports/{reportId} {
+      allow get, list: if false;
+      allow create: if verified() &&
+        request.resource.data.get('reporterId', '') == request.auth.uid &&
+        request.resource.data.get('targetId', '') != request.auth.uid &&
+        request.resource.data.get('targetId', '') != '' &&
+        request.resource.data.get('status', '') == 'open';
+      allow update, delete: if false;
+    }
+
+    // -----------------------------------------------------------------------
+    // CONNECTION REQUESTS
+    // -----------------------------------------------------------------------
+    match /connectionRequests/{requestId} {
+      allow get, list: if verified() &&
+        (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid) &&
+        resource.data.senderId != resource.data.receiverId;
+
+      allow create: if verified() &&
+        request.resource.data.senderId == request.auth.uid &&
+        request.resource.data.receiverId != request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        isSameCampusUser(request.resource.data.receiverId) &&
+        request.resource.data.senderId == request.auth.uid &&
+        request.resource.data.get('sender', {}).get('uid', '') == request.auth.uid &&
+        request.resource.data.get('receiver', {}).get('uid', '') == request.resource.data.receiverId;
+
+      allow update: if verified() &&
+        resource.data.status == 'pending' &&
+        resource.data.receiverId == request.auth.uid &&
+        request.resource.data.senderId == resource.data.senderId &&
+        request.resource.data.receiverId == resource.data.receiverId &&
+        request.resource.data.status in ['accepted', 'declined'] &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+
+      allow delete: if verified() &&
+        (resource.data.senderId == request.auth.uid || resource.data.receiverId == request.auth.uid);
+    }
+
+    // -----------------------------------------------------------------------
+    // CHATS
+    // -----------------------------------------------------------------------
+    match /chats/{chatId} {
+      allow get, list: if verified() &&
+        resource.data.get('participants', []).hasAny([request.auth.uid]) &&
+        resource.data.get('participants', []).size() >= 2 &&
+        resource.data.get('collegeId', '') == myCollegeId() &&
+        myCollegeId() == 'dypiu';
+
+      allow create: if verified() &&
+        request.resource.data.get('participants', []).size() >= 2 &&
+        request.resource.data.get('participants', []).hasAny([request.auth.uid]) &&
+        request.resource.data.get('collegeId', '') == myCollegeId() &&
+        myCollegeId() == 'dypiu' &&
+        (
+          (
+            request.resource.data.get('type', 'direct') == 'group' &&
+            request.resource.data.get('createdBy', '') == request.auth.uid &&
+            request.resource.data.get('admins', []).hasAny([request.auth.uid])
+          )
+          ||
+          (
+            request.resource.data.get('type', 'direct') != 'group' &&
+            request.resource.data.get('participants', []).size() == 2 &&
+            myUser().data.get('connections', []).hasAny(request.resource.data.get('participants', []))
+          )
+        );
+
+      allow update: if verified() &&
+        resource.data.get('participants', []).hasAny([request.auth.uid]) &&
+        request.resource.data.get('collegeId', '') == resource.data.get('collegeId', '') &&
+        (
+          (
+            resource.data.get('type', 'group') == 'group' &&
+            (
+              request.resource.data.get('admins', []).hasAny([request.auth.uid]) &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'participants', 'usersInfo', 'admins', 'groupName', 'groupAvatar', 'lastMessage', 'updatedAt', 'unreadCount', 'typing'
+              ])
+              ||
+              !request.resource.data.get('participants', []).hasAny([request.auth.uid]) &&
+              request.resource.data.get('participants', []).size() + 1 == resource.data.get('participants', []).size() &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'participants', 'usersInfo', 'admins', 'lastMessage', 'updatedAt', 'unreadCount', 'typing'
+              ])
+              ||
+              request.resource.data.get('participants', []) == resource.data.get('participants', []) &&
+              request.resource.data.get('usersInfo', {}) == resource.data.get('usersInfo', {}) &&
+              request.resource.data.get('admins', []) == resource.data.get('admins', []) &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'lastMessage', 'updatedAt', 'unreadCount', 'typing'
+              ])
+            )
+          )
+          ||
+          (
+            resource.data.get('type', 'direct') != 'group' &&
+            request.resource.data.get('participants', []) == resource.data.get('participants', []) &&
+            request.resource.data.get('usersInfo', {}) == resource.data.get('usersInfo', {}) &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'lastMessage', 'updatedAt', 'unreadCount', 'typing'
+            ])
+          )
+        );
+
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow get, list: if verified() &&
+          get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []).hasAny([request.auth.uid]);
+
+        allow create: if verified() &&
+          get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []).hasAny([request.auth.uid]) &&
+          (
+            get(/databases/$(database)/documents/chats/$(chatId)).data.get('type', 'direct') == 'group' ||
+            myUser().data.get('connections', []).hasAny(get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []))
+          ) &&
+          request.resource.data.senderId == request.auth.uid;
+
+        allow update: if verified() &&
+          get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []).hasAny([request.auth.uid]) &&
+          (
+            get(/databases/$(database)/documents/chats/$(chatId)).data.get('type', 'direct') == 'group' ||
+            myUser().data.get('connections', []).hasAny(get(/databases/$(database)/documents/chats/$(chatId)).data.get('participants', []))
+          ) &&
+          (
+            (
+              resource.data.senderId == request.auth.uid &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'text', 'mediaUrl'])
+            )
+            ||
+            (
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+            )
+          );
+
+        allow delete: if false;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // STORIES
+    // -----------------------------------------------------------------------
+    match /stories/{storyId} {
+      allow get, list: if isCampusStudent(resource.data.get('collegeId', '')) && resource.data.get('audience', []).hasAny([request.auth.uid]);
+
+      allow create: if verified() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.get('collegeId', '') == myCollegeId() &&
+        request.resource.data.get('audience', []).hasAny([request.auth.uid]) &&
+        myCollegeId() == 'dypiu';
+
+      allow update: if verified() && resource.data.get('audience', []).hasAny([request.auth.uid]) &&
+        resource.data.get('collegeId', '') == myCollegeId() &&
+        myCollegeId() == 'dypiu' &&
+        (
+          (
+            resource.data.userId == request.auth.uid &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['caption'])
+          ) ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewers', 'reactions'])
+        );
+
+      allow delete: if verified() && resource.data.userId == request.auth.uid;
+
+      match /replies/{replyId} {
+        allow get, list: if isStoryCampus(storyId);
+
+        allow create: if isStoryCampus(storyId) &&
+          request.resource.data.senderId == request.auth.uid;
+
+        allow update, delete: if false;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // CAMPUS UPDATES / BUZZ
+    // -----------------------------------------------------------------------
+    match /buzz_posts/{postId} {
+      allow get, list: if isCampusStudent(resource.data.get('collegeId', ''));
+
+      allow create: if verified() &&
+        request.resource.data.get('collegeId', '') == myCollegeId() &&
+        myCollegeId() == 'dypiu' &&
+        request.resource.data.get('authorId', '') == request.auth.uid;
+
+      allow update: if verified() &&
+        resource.data.get('collegeId', '') == myCollegeId() &&
+        myCollegeId() == 'dypiu' &&
+        (
+          (
+            resource.data.get('authorId', '') == request.auth.uid &&
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['collegeId', 'authorId', 'createdAt'])
+          )
+          ||
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'commentCount', 'votes'])
+        );
+
+      allow delete: if verified() && resource.data.get('authorId', '') == request.auth.uid;
+
+      match /comments/{commentId} {
+        allow get, list: if isPostCampus(postId);
+
+        allow create: if isPostCampus(postId) &&
+          request.resource.data.get('author', {}).get('uid', '') == request.auth.uid;
+
+        allow update, delete: if false;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // VAULTS
+    // -----------------------------------------------------------------------
+    match /vaults/{vaultId} {
+      allow get, list: if verified() &&
+        resource.data.get('collegeId', '') == myCollegeId() &&
+        myCollegeId() == 'dypiu' &&
+        resource.data.get('members', []).hasAny([request.auth.uid]);
+
+      allow create: if verified() &&
+        request.resource.data.get('collegeId', '') == myCollegeId() &&
+        myCollegeId() == 'dypiu' &&
+        request.resource.data.get('createdBy', '') == request.auth.uid &&
+        request.resource.data.get('members', []).hasAny([request.auth.uid]) &&
+        request.resource.data.get('admins', []).hasAny([request.auth.uid]);
+
+      // Admins can manage the vault. Members may only add themselves.
+      allow update: if
+        (
+          isVaultAdmin(vaultId) &&
+          request.resource.data.get('collegeId', '') == resource.data.get('collegeId', '') &&
+          request.resource.data.get('createdBy', '') == resource.data.get('createdBy', '')
+        )
+        ||
+        (
+          isCampusVault(vaultId) &&
+          request.resource.data.get('collegeId', '') == resource.data.get('collegeId', '') &&
+          request.resource.data.get('createdBy', '') == resource.data.get('createdBy', '') &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members']) &&
+          request.resource.data.get('members', []).hasAll(resource.data.get('members', [])) &&
+          request.resource.data.get('members', []).hasAny([request.auth.uid])
+        );
+
+      allow delete: if isVaultAdmin(vaultId);
+    }
+
+    match /vault_files/{fileId} {
+      allow get, list: if isVaultMember(resource.data.get('vaultId', ''));
+
+      allow create: if isVaultMember(request.resource.data.get('vaultId', '')) &&
+        request.resource.data.get('uploader', {}).get('uid', '') == request.auth.uid;
+
+      allow update: if
+        (
+          isVaultAdmin(resource.data.get('vaultId', '')) &&
+          request.resource.data.get('vaultId', '') == resource.data.get('vaultId', '')
+        )
+        ||
+        (
+          isVaultMember(resource.data.get('vaultId', '')) &&
+          request.resource.data.get('vaultId', '') == resource.data.get('vaultId', '') &&
+          (
+            (
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['upvotes']) &&
+              (
+                request.resource.data.get('upvotes', []).hasAll(resource.data.get('upvotes', [])) ||
+                resource.data.get('upvotes', []).hasAny([request.auth.uid])
+              )
+            )
+            ||
+            (
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['upvotes', 'status']) &&
+              request.resource.data.get('upvotes', []).size() >= 5 &&
+              request.resource.data.get('status', '') == 'approved'
+            )
+          )
+        )
+        ||
+        (
+          verified() &&
+          resource.data.get('uploader', {}).get('uid', '') == request.auth.uid &&
+          request.resource.data.get('vaultId', '') == resource.data.get('vaultId', '') &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+        );
+
+      allow delete: if
+        isVaultAdmin(resource.data.get('vaultId', '')) ||
+        (
+          verified() &&
+          resource.data.get('uploader', {}).get('uid', '') == request.auth.uid
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // DENY EVERYTHING ELSE
+    // -----------------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
