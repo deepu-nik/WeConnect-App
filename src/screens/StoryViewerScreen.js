@@ -262,7 +262,7 @@ export default function StoryViewerScreen({ route, navigation }) {
               viewerLoading ? <View style={styles.center}><ActivityIndicator color="#111" /></View> :
               <FlatList
                 data={viewerProfiles}
-                keyExtractor={(item) => item.uid}
+                keyExtractor={(item, itemIndex) => String(item?.uid || item?.id || `viewer-${itemIndex}`)}
                 contentContainerStyle={styles.viewerList}
                 ListEmptyComponent={<View style={styles.center}><Text style={styles.emptyActivity}>No viewers yet. Share your story with classmates.</Text></View>}
                 renderItem={({ item }) => (
