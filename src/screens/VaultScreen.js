@@ -362,7 +362,7 @@ const VaultScreen = ({ navigation }) => {
     return (
       <TouchableOpacity style={styles.listItem} activeOpacity={0.7} onPress={() => openVault(item)}>
         <View style={[styles.iconBox, { backgroundColor: item.type === 'shared' ? '#E6F4FE' : '#F4E8FA' }]}>
-          {item.type === 'shared' ? <Users size={24} color="#111111" /> : <Lock size={24} color="#AF52DE" />}
+          {item.type === 'shared' ? <Users size={24} color="#111111" /> : <Lock size={24} color="#111111" />}
         </View>
         <View style={styles.itemDetails}>
           <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
