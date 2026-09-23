@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -108,7 +108,7 @@ export default function NewStoryScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.body}>
+      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {asset ? (
           <View style={styles.previewWrap}>
             {asset.type === 'video'
@@ -192,7 +192,7 @@ export default function NewStoryScreen({ navigation }) {
           multiline
           style={styles.caption}
         />
-      </View>
+      </ScrollView>
 
       {uploading ? (
         <View style={styles.overlay}>
@@ -210,7 +210,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 18, fontWeight: '800', color: '#0f172a' },
   publish: { fontSize: 16, fontWeight: '800', color: '#007AFF' },
   disabled: { color: '#cbd5e1' },
-  body: { flex: 1, padding: 16 },
+  body: { flex: 1, paddingHorizontal: 16 },
+  bodyContent: { paddingVertical: 16, paddingBottom: 28 },
   editorPanel: { marginTop: 12, borderRadius: 18, padding: 12, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
   editorHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   editorTitle: { fontSize: 14, fontWeight: '900', color: '#111827' },
