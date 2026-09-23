@@ -504,7 +504,15 @@ const ConnectScreen = ({ navigation }) => {
             <CameraView
               style={StyleSheet.absoluteFillObject}
               facing="back"
+              ratio="16:9"
+              mode="picture"
+              autofocus="on"
               barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              onCameraReady={() => console.log('QR camera preview ready')}
+              onMountError={(error) => {
+                console.error('QR camera mount failed:', error);
+                Alert.alert('Camera unavailable', error?.message || 'Could not start the camera preview.');
+              }}
               onBarcodeScanned={scanned ? undefined : handleScan}
             />
             <View pointerEvents="none" style={styles.scannerFrame}>
@@ -622,7 +630,7 @@ const styles = StyleSheet.create({
   scannerScreen: { flex: 1, backgroundColor: '#000' },
   scannerHeader: { height: 64, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff' },
   scannerTitle: { fontSize: 18, fontWeight: '900', color: '#111111' },
-  scannerCameraWrap: { flex: 1, position: 'relative', overflow: 'hidden' },
+  scannerCameraWrap: { flex: 1, position: 'relative', overflow: 'hidden', backgroundColor: '#000' },
   scannerFrame: { position: 'absolute', left: '15%', right: '15%', top: '28%', aspectRatio: 1, borderWidth: 2, borderColor: '#FFFC00', borderRadius: 24 },
   scannerCorner: { position: 'absolute', width: 28, height: 28, borderLeftWidth: 4, borderTopWidth: 4, borderColor: '#FFFC00', top: -2, left: -2, borderTopLeftRadius: 12 },
   scannerHintPill: { position: 'absolute', bottom: 44, left: 24, right: 24, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 18, backgroundColor: 'rgba(0,0,0,.68)', alignItems: 'center' },
