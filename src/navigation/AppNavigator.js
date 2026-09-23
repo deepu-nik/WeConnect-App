@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useRef } from 'react';
 import { View, ActivityIndicator, Linking } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { AuthContext } from '../context/AuthContext';
@@ -79,6 +80,25 @@ const AppNavigator = () => {
   useEffect(() => {
     if (!emailVerified) return undefined;
 
+    const openNotificationTarget = (response) => {
+      const data = response?.notification?.request?.content?.data || {};
+      if (!navigationRef.current) return;
+
+      if (data.chatId) {
+        navigationRef.current.navigate('ChatRoom', {
+          chatId: data.chatId,
+          uid: data.senderId,
+        });
+      }
+    };
+
+    Notifications.getLastNotificationResponseAsync()
+      .then(openNotificationTarget)
+      .catch(() => {});
+
+    const notificationSubscription =
+      Notifications.addNotificationResponseReceivedListener(openNotificationTarget);
+
     const openProfileFromUrl = (url) => {
       const uid = getProfileUidFromUrl(url);
       if (!uid || !navigationRef.current) return;
@@ -90,7 +110,10 @@ const AppNavigator = () => {
 
     Linking.getInitialURL().then(openProfileFromUrl).catch(() => {});
     const subscription = Linking.addEventListener('url', ({ url }) => openProfileFromUrl(url));
-    return () => subscription.remove();
+    return () => {
+      subscription.remove();
+      notificationSubscription.remove();
+    };
   }, [emailVerified]);
 
   if (loading) {
