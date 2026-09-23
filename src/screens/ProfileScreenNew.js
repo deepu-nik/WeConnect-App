@@ -9,7 +9,7 @@ import { collection, doc, getDocs, query, updateDoc, where } from 'firebase/fire
 import {
   Award, BookOpen, BriefcaseBusiness, Camera, Check, ChevronRight, Code2, Edit3,
   Github, Globe, GraduationCap, Instagram, Link as LinkIcon, Linkedin, MapPin,
-  MessageCircle, Plus, ShieldCheck, Trash2, UserRound, X, Youtube,
+  MessageCircle, Plus, Settings, ShieldCheck, Trash2, UserRound, X, Youtube,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { auth, db } from '../config/firebase';
