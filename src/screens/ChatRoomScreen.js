@@ -94,28 +94,6 @@ const TypingIndicator = () => {
       )
     );
     animations.forEach((animation) => animation.start());
-    const handleInputLayout = useCallback((event) => {
-    const height = event.nativeEvent.layout.height;
-    extraContentPadding.value = withTiming(
-      Math.max(height - COMPOSER_BASE_INPUT_HEIGHT, 0),
-      { duration: 180 }
-    );
-  }, [extraContentPadding]);
-
-  const renderChatScrollComponent = useCallback(
-    (props) => (
-      <KeyboardChatScrollView
-        {...props}
-        automaticallyAdjustContentInsets={false}
-        contentInsetAdjustmentBehavior="never"
-        keyboardDismissMode="interactive"
-        offset={insets.bottom - COMPOSER_MARGIN}
-        extraContentPadding={extraContentPadding}
-      />
-    ),
-    [extraContentPadding, insets.bottom]
-  );
-
   return () => animations.forEach((animation) => animation.stop());
   }, []);
 
@@ -182,6 +160,28 @@ const ChatRoomScreen = ({ route, navigation }) => {
   const [groupAddCandidates, setGroupAddCandidates] = useState([]);
   const [selectedGroupAddIds, setSelectedGroupAddIds] = useState([]);
   const extraContentPadding = useSharedValue(0);
+
+  const handleInputLayout = useCallback((event) => {
+    const height = event.nativeEvent.layout.height;
+    extraContentPadding.value = withTiming(
+      Math.max(height - COMPOSER_BASE_INPUT_HEIGHT, 0),
+      { duration: 180 }
+    );
+  }, [extraContentPadding]);
+
+  const renderChatScrollComponent = useCallback(
+    (props) => (
+      <KeyboardChatScrollView
+        {...props}
+        automaticallyAdjustContentInsets={false}
+        contentInsetAdjustmentBehavior="never"
+        keyboardDismissMode="interactive"
+        offset={insets.bottom - COMPOSER_MARGIN}
+        extraContentPadding={extraContentPadding}
+      />
+    ),
+    [extraContentPadding, insets.bottom]
+  );
 
   const returningHomeRef = useRef(false);
 
