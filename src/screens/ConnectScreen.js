@@ -375,9 +375,11 @@ const ConnectScreen = ({ navigation }) => {
           </View>
           <View style={styles.scannerGuide} pointerEvents="none">
             <View style={styles.scannerGuideCorner} />
+            <View style={styles.scannerGuideInner} />
           </View>
           <View style={styles.scannerHintPill} pointerEvents="none">
-            <Text style={styles.scannerHintText}>Point your camera at a WeConnect QR code</Text>
+            <Text style={styles.scannerHintTitle}>Scan a WeConnect QR</Text>
+            <Text style={styles.scannerHintText}>Keep the code inside the frame</Text>
           </View>
         </SafeAreaView>
       </View>
@@ -631,13 +633,75 @@ const styles = StyleSheet.create({
   locationModalEmptyText: { color: '#707070', marginTop: 10 },
   scannerScreen: { flex: 1, backgroundColor: '#000', position: 'relative' },
   scannerCamera: { flex: 1 },
+  scannerOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'space-between' },
+  scannerHeaderOverlay: {
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 18,
+    minHeight: 92,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0,0,0,0.42)',
+  },
+  scannerCloseButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.42)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+  },
+  scannerTitleOverlay: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  scannerGuide: {
+    position: 'absolute',
+    width: 270,
+    height: 270,
+    alignSelf: 'center',
+    top: '50%',
+    marginTop: -145,
+    borderRadius: 28,
+  },
+  scannerGuideCorner: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 2,
+    borderColor: '#FFFC00',
+    borderRadius: 28,
+  },
+  scannerGuideInner: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 27,
+    margin: 10,
+  },
   scannerHeader: { height: 64, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff' },
   scannerTitle: { fontSize: 18, fontWeight: '900', color: '#111111' },
   scannerCameraWrap: { flex: 1, position: 'relative', overflow: 'hidden', backgroundColor: '#000' },
   scannerFrame: { position: 'absolute', left: '15%', right: '15%', top: '28%', aspectRatio: 1, borderWidth: 2, borderColor: '#FFFC00', borderRadius: 24 },
   scannerCorner: { position: 'absolute', width: 28, height: 28, borderLeftWidth: 4, borderTopWidth: 4, borderColor: '#FFFC00', top: -2, left: -2, borderTopLeftRadius: 12 },
-  scannerHintPill: { position: 'absolute', bottom: 44, left: 24, right: 24, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 18, backgroundColor: 'rgba(0,0,0,.68)', alignItems: 'center' },
-  scannerHintText: { color: '#fff', fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  scannerHintPill: {
+    position: 'absolute',
+    bottom: 34,
+    left: 28,
+    right: 28,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.68)',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  scannerHintTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '800', marginBottom: 3 },
+  scannerHintText: { color: 'rgba(255,255,255,0.78)', fontSize: 11, fontWeight: '600', textAlign: 'center' },
   qrModal: { flex: 1, backgroundColor: '#F7F7F5' },
   qrHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18, backgroundColor: '#fff' },
   qrTitle: { fontSize: 18, fontWeight: '800', color: '#111111' },
