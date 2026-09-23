@@ -113,10 +113,16 @@ export default function StoryViewerScreen({ route, navigation }) {
     if (!isMine || !displayedStory?.viewers?.length) return;
     setViewerLoading(true);
     try {
-      const profiles = await Promise.all((displayedStory.viewers || []).slice(0, 50).map(async (uid) => {
-        try { return await getUserProfile(uid); } catch { return { uid, name: 'Student' }; }
+      const viewerIds = Array.from(new Set((displayedStory.viewers || []).filter(Boolean))).slice(0, 50);
+      const profiles = await Promise.all(viewerIds.map(async (uid) => {
+        try {
+          const profile = await getUserProfile(uid);
+          return { ...(profile || {}), uid: profile?.uid || uid };
+        } catch {
+          return { uid, name: 'Student' };
+        }
       }));
-      setViewerProfiles(profiles.filter(Boolean));
+      setViewerProfiles(profiles.filter((profile) => profile?.uid));
     } finally {
       setViewerLoading(false);
     }
