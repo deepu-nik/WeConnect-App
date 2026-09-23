@@ -605,11 +605,6 @@ const UpdatesScreen = ({ navigation }) => {
           <Text style={styles.headerTitle}>College Buzz</Text>
           <Zap size={24} color="#FF9500" fill="#FF9500" style={styles.headerZapIcon} />
         </View>
-        <TouchableOpacity style={styles.headerIconBtn} onPress={() => setModalVisible(true)}>
-          <View style={styles.headerPlusWrapper}>
-            <Plus size={20} color="#000" />
-          </View>
-        </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.createFab} onPress={() => setModalVisible(true)} activeOpacity={0.88} accessibilityRole="button" accessibilityLabel="Create a campus update">
