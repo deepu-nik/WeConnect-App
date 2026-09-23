@@ -247,6 +247,7 @@ const ConnectScreen = ({ navigation }) => {
 
     setScanned(false);
     setScanSuccess(false);
+    setQrVisible(false);
     setScannerVisible(true);
   };
 
