@@ -4,6 +4,7 @@ import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 
 const EAS_PROJECT_ID = 'd02fb091-59a8-49aa-8df4-bcbe09252c11';
+let pushTokenSubscription = null;
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -48,6 +49,29 @@ export const registerForPushNotifications = async () => {
     console.warn('Push notification registration failed:', error);
     return null;
   }
+};
+
+export const subscribeToPushTokenChanges = async () => {
+  if (pushTokenSubscription) {
+    pushTokenSubscription.remove();
+    pushTokenSubscription = null;
+  }
+
+  pushTokenSubscription = Notifications.addPushTokenListener(async (token) => {
+    const user = auth.currentUser;
+    if (!user?.uid || !token?.data) return;
+
+    try {
+      await setDoc(doc(db, 'userPrivate', user.uid), {
+        expoPushToken: token.data,
+        pushTokenUpdatedAt: serverTimestamp(),
+      }, { merge: true });
+    } catch (error) {
+      console.warn('Push token refresh save failed:', error);
+    }
+  });
+
+  return pushTokenSubscription;
 };
 
 export const unregisterPushNotifications = async () => {
