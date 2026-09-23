@@ -161,6 +161,31 @@ export default function StoryViewerScreen({ route, navigation }) {
   return (
     <View style={styles.container}>
       <StoryMedia story={displayedStory} paused={paused} muted={muted} onVideoProgress={handleVideoProgress} onVideoEnd={goNext} />
+      {displayedStory?.editor?.filter && displayedStory.editor.filter !== 'none' ? (
+        <View pointerEvents="none" style={[
+          styles.editorFilter,
+          displayedStory.editor.filter === 'warm' ? styles.editorFilterWarm :
+          displayedStory.editor.filter === 'mono' ? styles.editorFilterMono : styles.editorFilterCool,
+        ]} />
+      ) : null}
+      {displayedStory?.editor?.sticker ? <Text pointerEvents="none" style={styles.editorSticker}>{displayedStory.editor.sticker}</Text> : null}
+      {displayedStory?.editor?.text ? (
+        <Text
+          pointerEvents="none"
+          style={[
+            styles.editorText,
+            {
+              color: displayedStory.editor.textColor || '#fff',
+              fontSize: Number(displayedStory.editor.textSize) || 26,
+              textAlign: displayedStory.editor.textAlign || 'center',
+            },
+            displayedStory.editor.textPosition === 'top' ? styles.editorTextTop :
+            displayedStory.editor.textPosition === 'bottom' ? styles.editorTextBottom : styles.editorTextMiddle,
+          ]}
+        >
+          {displayedStory.editor.text}
+        </Text>
+      ) : null}
 
       <SafeAreaView style={styles.overlay}>
         <View style={styles.top}>
@@ -297,6 +322,15 @@ export default function StoryViewerScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   media: { width, height, position: 'absolute', backgroundColor: '#000' },
+  editorFilter: { ...StyleSheet.absoluteFillObject },
+  editorFilterWarm: { backgroundColor: 'rgba(255,180,60,.16)' },
+  editorFilterMono: { backgroundColor: 'rgba(40,40,40,.25)' },
+  editorFilterCool: { backgroundColor: 'rgba(50,130,255,.13)' },
+  editorSticker: { position: 'absolute', top: '43%', alignSelf: 'center', fontSize: 48 },
+  editorText: { position: 'absolute', left: 20, right: 20, fontWeight: '900', textShadowColor: 'rgba(0,0,0,.7)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 5, paddingVertical: 8 },
+  editorTextTop: { top: '12%' },
+  editorTextMiddle: { top: '42%' },
+  editorTextBottom: { bottom: '14%' },
   overlay: { flex: 1 },
   top: { paddingHorizontal: 10 },
   progressRow: { flexDirection: 'row', gap: 4, paddingTop: 5 },
