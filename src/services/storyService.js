@@ -66,7 +66,7 @@ const validateFileSize = async (uri, maxBytes, label) => {
   }
 };
 
-export const createStory = async ({ uri, type = 'image', caption = '', duration = null }) => {
+export const createStory = async ({ uri, type = 'image', caption = '', duration = null, editor = null }) => {
   if (!auth.currentUser?.uid) throw new Error('You must be signed in.');
   if (!uri) throw new Error('Choose a photo or video first.');
 
@@ -103,6 +103,15 @@ export const createStory = async ({ uri, type = 'image', caption = '', duration 
       mediaWidth: media.width || null,
       mediaHeight: media.height || null,
       caption: caption.trim(),
+      editor: editor ? {
+        text: String(editor.text || '').slice(0, 180),
+        textColor: editor.textColor || '#FFFFFF',
+        textSize: Number(editor.textSize) || 26,
+        textAlign: editor.textAlign || 'center',
+        textPosition: editor.textPosition || 'middle',
+        sticker: String(editor.sticker || '').slice(0, 4),
+        filter: editor.filter || 'none',
+      } : null,
       createdAt: serverTimestamp(),
       expiresAt: new Date(Date.now() + STORY_LIFETIME_MS),
       viewers: [],
