@@ -44,6 +44,7 @@ const ConnectScreen = ({ navigation }) => {
   const [qrMode, setQrMode] = useState('my_code');
   const [scanned, setScanned] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
+  const [scannerActive, setScannerActive] = useState(false);
   const [locationPreview, setLocationPreview] = useState(null);
   const [customLocationVisible, setCustomLocationVisible] = useState(false);
   const [customLocationText, setCustomLocationText] = useState('');
@@ -52,6 +53,13 @@ const ConnectScreen = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (scannerActive) {
+          CameraView.dismissScanner().catch(() => {});
+          setScannerActive(false);
+          setScanned(false);
+          setScanSuccess(false);
+          return true;
+        }
         if (qrVisible) {
           setQrVisible(false);
           return true;
@@ -59,7 +67,7 @@ const ConnectScreen = ({ navigation }) => {
         return false;
       });
       return () => subscription.remove();
-    }, [qrVisible])
+    }, [qrVisible, scannerActive])
   );
 
   useEffect(() => {
@@ -242,13 +250,16 @@ const ConnectScreen = ({ navigation }) => {
     setScanSuccess(false);
 
     try {
+      setScannerActive(true);
       await CameraView.launchScanner({
         barcodeTypes: ['qr'],
         isGuidanceEnabled: true,
         isHighlightingEnabled: true,
         isPinchToZoomEnabled: true,
       });
+      setScannerActive(false);
     } catch (error) {
+      setScannerActive(false);
       console.error('Native QR scanner failed:', error);
       Alert.alert(
         'Scanner unavailable',
@@ -270,6 +281,7 @@ const ConnectScreen = ({ navigation }) => {
       await connectUsersViaQr(currentUser.uid, profile.uid);
 
       await CameraView.dismissScanner().catch(() => {});
+      setScannerActive(false);
       setScanned(false);
       setScanSuccess(false);
       openProfile(navigation, { uid: profile.uid, name: profile.name, avatar: profile.avatar });
