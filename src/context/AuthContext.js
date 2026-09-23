@@ -4,7 +4,6 @@ import { deleteField, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
 import { auth, db } from '../config/firebase';
 import { getUserProfile } from '../services/userService';
 import { COLLEGES, DEFAULT_COLLEGE_ID } from '../config/collegeConfig';
-import Constants from 'expo-constants';
 
 export const AuthContext = createContext(null);
 
@@ -78,10 +77,15 @@ export const AuthProvider = ({ children }) => {
           nextProfile = await getUserProfile(nextUser.uid);
         }
         setProfile(nextProfile);
-        if (nextUser.emailVerified && Constants.appOwnership !== 'expo') {
+        if (nextUser.emailVerified) {
           import('../services/notificationService')
-            .then(({ registerForPushNotifications }) => registerForPushNotifications())
-            .catch(() => {});
+            .then(({ registerForPushNotifications, subscribeToPushTokenChanges }) => {
+              registerForPushNotifications();
+              return subscribeToPushTokenChanges();
+            })
+            .catch((error) => {
+              console.warn('Notification setup failed:', error);
+            });
         }
       } catch (error) {
         console.error('Failed to load user profile:', error);
