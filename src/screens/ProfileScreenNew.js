@@ -85,6 +85,7 @@ export default function ProfileScreenNew({ route, navigation }) {
   const scrollRef = useRef(null);
   const projectsSectionY = useRef(0);
   const [fullAvatar, setFullAvatar] = useState(false);
+  const [fullCover, setFullCover] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [connected, setConnected] = useState(false);
   const [blocked, setBlocked] = useState(false);
@@ -358,10 +359,12 @@ export default function ProfileScreenNew({ route, navigation }) {
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={styles.page}>
         <View style={styles.hero}>
-          {user.coverPhoto ? <Image source={{ uri: user.coverPhoto }} style={styles.coverImage} /> : <View style={styles.coverFallback}><GraduationCap size={70} color="#5E5E58" /></View>}
-          <View style={styles.coverOverlay} />
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.getParent()?.navigate('Tabs', { screen: 'Chats' })}><ChevronRight size={22} color="#FFFFFF" style={{ transform: [{ rotate: '180deg' }] }} /></TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.96} onPress={() => user.coverPhoto ? setFullCover(true) : (isSelf ? openImageActions('cover') : null)}>
+            {user.coverPhoto ? <Image source={{ uri: user.coverPhoto }} style={styles.coverImage} /> : <View style={styles.coverFallback}><GraduationCap size={70} color="#5E5E58" /></View>}
+            <View style={styles.coverOverlay} />
+          </TouchableOpacity>
           {isSelf ? <TouchableOpacity style={styles.coverEdit} onPress={() => openImageActions('cover')}><Camera size={18} color={TEXT} /></TouchableOpacity> : null}
+          {isSelf ? <TouchableOpacity style={styles.settingsButton} onPress={() => navigation.navigate('Settings')} accessibilityLabel="Settings"><Settings size={19} color={TEXT} /></TouchableOpacity> : null}
           {uploading ? <View style={styles.uploading}><ActivityIndicator color={TEXT} /></View> : null}
         </View>
 
@@ -480,6 +483,13 @@ export default function ProfileScreenNew({ route, navigation }) {
         </View>
       </ScrollView>
 
+      <Modal visible={fullCover} transparent animationType="fade" onRequestClose={() => setFullCover(false)}>
+        <TouchableOpacity style={styles.avatarModal} activeOpacity={1} onPress={() => setFullCover(false)}>
+          {user.coverPhoto ? <Image source={{ uri: user.coverPhoto }} style={styles.fullCover} resizeMode="contain" /> : null}
+          <View style={styles.avatarName}><Text style={styles.avatarNameText}>Cover photo</Text><Text style={styles.avatarHint}>Tap outside to close</Text></View>
+        </TouchableOpacity>
+      </Modal>
+
       <Modal visible={fullAvatar} transparent animationType="fade" onRequestClose={() => setFullAvatar(false)}>
         <TouchableOpacity style={styles.avatarModal} activeOpacity={1} onPress={() => setFullAvatar(false)}>
           <Image source={{ uri: user.avatar || FALLBACK_AVATAR }} style={styles.fullAvatar} />
@@ -546,7 +556,7 @@ const styles = StyleSheet.create({
   coverImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
   coverFallback: { ...StyleSheet.absoluteFillObject, backgroundColor: YELLOW, alignItems: 'center', justifyContent: 'center' },
   coverOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(255,252,0,.18)' },
-  backButton: { position: 'absolute', left: 14, top: 10, width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(255,255,255,.8)', alignItems: 'center', justifyContent: 'center' },
+  settingsButton: { position: 'absolute', right: 14, top: 10, width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(255,255,255,.86)', alignItems: 'center', justifyContent: 'center' },
   coverEdit: { position: 'absolute', right: 14, bottom: 48, width: 40, height: 40, borderRadius: 14, backgroundColor: YELLOW, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#D9D600' },
   uploading: { position: 'absolute', right: 14, top: 10, width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(255,255,255,.82)', alignItems: 'center', justifyContent: 'center' },
   profileCard: { marginHorizontal: 12, marginTop: -34, padding: 17, paddingTop: 0, borderRadius: 24, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, shadowColor: '#000', shadowOpacity: .05, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
@@ -606,6 +616,7 @@ const styles = StyleSheet.create({
   footerText: { flex: 1, color: '#686860', fontSize: 10.5, lineHeight: 15 },
   avatarModal: { flex: 1, backgroundColor: 'rgba(0,0,0,.94)', alignItems: 'center', justifyContent: 'center' },
   fullAvatar: { width: '88%', aspectRatio: 1, borderRadius: 22 },
+  fullCover: { width: '94%', height: 230, borderRadius: 18 },
   avatarName: { marginTop: 16, alignItems: 'center' },
   avatarNameText: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
   avatarHint: { color: '#BDBDB7', fontSize: 10, marginTop: 3 },
