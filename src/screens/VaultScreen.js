@@ -514,7 +514,7 @@ const VaultScreen = ({ navigation }) => {
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
               <View style={styles.emptyState}>
-                <FileText size={48} color="#cbd5e1" />
+                <FileText size={48} color="#111111" />
                 <Text style={styles.emptyStateText}>No files uploaded yet</Text>
                 <Text style={styles.emptyStateSub}>Tap + to upload material</Text>
               </View>
@@ -528,7 +528,7 @@ const VaultScreen = ({ navigation }) => {
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
               <View style={styles.emptyState}>
-                <Folder size={48} color="#cbd5e1" />
+                <Folder size={48} color="#111111" />
                 <Text style={styles.emptyStateText}>No {activeTab} vaults found</Text>
                 <Text style={styles.emptyStateSub}>Create one or join via invite code!</Text>
               </View>
