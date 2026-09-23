@@ -44,7 +44,7 @@ const ConnectScreen = ({ navigation }) => {
   const [qrMode, setQrMode] = useState('my_code');
   const [scanned, setScanned] = useState(false);
   const [scanSuccess, setScanSuccess] = useState(false);
-  const [scannerActive, setScannerActive] = useState(false);
+  const [scannerVisible, setScannerVisible] = useState(false);
   const [locationPreview, setLocationPreview] = useState(null);
   const [customLocationVisible, setCustomLocationVisible] = useState(false);
   const [customLocationText, setCustomLocationText] = useState('');
@@ -53,9 +53,8 @@ const ConnectScreen = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-        if (scannerActive) {
-          CameraView.dismissScanner().catch(() => {});
-          setScannerActive(false);
+        if (scannerVisible) {
+          setScannerVisible(false);
           setScanned(false);
           setScanSuccess(false);
           return true;
@@ -67,7 +66,7 @@ const ConnectScreen = ({ navigation }) => {
         return false;
       });
       return () => subscription.remove();
-    }, [qrVisible, scannerActive])
+    }, [qrVisible, scannerVisible])
   );
 
   useEffect(() => {
@@ -248,24 +247,7 @@ const ConnectScreen = ({ navigation }) => {
 
     setScanned(false);
     setScanSuccess(false);
-
-    try {
-      setScannerActive(true);
-      await CameraView.launchScanner({
-        barcodeTypes: ['qr'],
-        isGuidanceEnabled: true,
-        isHighlightingEnabled: true,
-        isPinchToZoomEnabled: true,
-      });
-      setScannerActive(false);
-    } catch (error) {
-      setScannerActive(false);
-      console.error('Native QR scanner failed:', error);
-      Alert.alert(
-        'Scanner unavailable',
-        error?.message || 'The device QR scanner could not be opened. Please make sure Camera access is enabled for WeConnect.'
-      );
-    }
+    setScannerVisible(true);
   };
 
   const handleScan = useCallback(async ({ data }) => {
@@ -280,8 +262,7 @@ const ConnectScreen = ({ navigation }) => {
       if (profile.uid === currentUser?.uid) throw new Error('You cannot connect with yourself.');
       await connectUsersViaQr(currentUser.uid, profile.uid);
 
-      await CameraView.dismissScanner().catch(() => {});
-      setScannerActive(false);
+      setScannerVisible(false);
       setScanned(false);
       setScanSuccess(false);
       openProfile(navigation, { uid: profile.uid, name: profile.name, avatar: profile.avatar });
@@ -291,14 +272,6 @@ const ConnectScreen = ({ navigation }) => {
       Alert.alert('Scan failed', error?.message === 'User not found' ? 'That QR code does not belong to a WeConnect profile.' : (error?.message || 'Could not connect this profile.'));
     }
   }, [scanned, scanSuccess, currentUser, navigation]);
-
-  useEffect(() => {
-    const subscription = CameraView.onModernBarcodeScanned(({ data }) => {
-      if (!data || scanned || scanSuccess) return;
-      handleScan({ data });
-    });
-    return () => subscription.remove();
-  }, [scanned, scanSuccess, handleScan]);
 
   const shareQr = async () => {
     try {
@@ -511,6 +484,40 @@ const ConnectScreen = ({ navigation }) => {
       </Modal>
 
       <Modal
+        visible={scannerVisible}
+        animationType="slide"
+        onRequestClose={() => {
+          setScannerVisible(false);
+          setScanned(false);
+          setScanSuccess(false);
+        }}
+      >
+        <SafeAreaView style={styles.scannerScreen} edges={['top', 'bottom']}>
+          <View style={styles.scannerHeader}>
+            <TouchableOpacity onPress={() => setScannerVisible(false)} accessibilityLabel="Close QR scanner">
+              <X size={28} color="#111111" />
+            </TouchableOpacity>
+            <Text style={styles.scannerTitle}>Scan QR Code</Text>
+            <View style={{ width: 28 }} />
+          </View>
+          <View style={styles.scannerCameraWrap}>
+            <CameraView
+              style={StyleSheet.absoluteFillObject}
+              facing="back"
+              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              onBarcodeScanned={scanned ? undefined : handleScan}
+            />
+            <View pointerEvents="none" style={styles.scannerFrame}>
+              <View style={styles.scannerCorner} />
+            </View>
+            <View pointerEvents="none" style={styles.scannerHintPill}>
+              <Text style={styles.scannerHintText}>Point your camera at a WeConnect QR code</Text>
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      <Modal
         visible={qrVisible}
         animationType="slide"
         hardwareAccelerated={Platform.OS === 'android'}
@@ -612,6 +619,14 @@ const styles = StyleSheet.create({
   locationModalImage: { width: '100%', height: 300, backgroundColor: '#F0F0EC' },
   locationModalEmpty: { height: 260, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F7F7F5' },
   locationModalEmptyText: { color: '#707070', marginTop: 10 },
+  scannerScreen: { flex: 1, backgroundColor: '#000' },
+  scannerHeader: { height: 64, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fff' },
+  scannerTitle: { fontSize: 18, fontWeight: '900', color: '#111111' },
+  scannerCameraWrap: { flex: 1, position: 'relative', overflow: 'hidden' },
+  scannerFrame: { position: 'absolute', left: '15%', right: '15%', top: '28%', aspectRatio: 1, borderWidth: 2, borderColor: '#FFFC00', borderRadius: 24 },
+  scannerCorner: { position: 'absolute', width: 28, height: 28, borderLeftWidth: 4, borderTopWidth: 4, borderColor: '#FFFC00', top: -2, left: -2, borderTopLeftRadius: 12 },
+  scannerHintPill: { position: 'absolute', bottom: 44, left: 24, right: 24, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 18, backgroundColor: 'rgba(0,0,0,.68)', alignItems: 'center' },
+  scannerHintText: { color: '#fff', fontSize: 12, fontWeight: '700', textAlign: 'center' },
   qrModal: { flex: 1, backgroundColor: '#F7F7F5' },
   qrHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18, backgroundColor: '#fff' },
   qrTitle: { fontSize: 18, fontWeight: '800', color: '#111111' },
