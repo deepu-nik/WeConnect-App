@@ -51,7 +51,7 @@ export const registerForPushNotifications = async () => {
   }
 };
 
-export const subscribeToPushTokenChanges = async () => {
+export const subscribeToPushTokenChanges = () => {
   if (pushTokenSubscription) {
     pushTokenSubscription.remove();
     pushTokenSubscription = null;
@@ -72,6 +72,13 @@ export const subscribeToPushTokenChanges = async () => {
   });
 
   return pushTokenSubscription;
+};
+
+export const unsubscribeFromPushTokenChanges = () => {
+  if (pushTokenSubscription) {
+    pushTokenSubscription.remove();
+    pushTokenSubscription = null;
+  }
 };
 
 export const unregisterPushNotifications = async () => {
